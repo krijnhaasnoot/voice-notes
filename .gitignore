@@ -1,0 +1,15 @@
+# Secrets and API Keys
+Secrets.xcconfig
+
+# Xcode
+.DS_Store
+*.xcuserstate
+project.xcworkspace/xcuserdata/
+*.xcuserdatad
+build/
+DerivedData/
+
+# iOS
+*.ipa
+*.dSYM.zip
+*.dSYM

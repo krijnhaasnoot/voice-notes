@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct Voice_NotesApp: App {
+    @StateObject private var documentStore = DocumentStore()
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AnimatedSplashView()
+                .environmentObject(documentStore)
         }
     }
 }
