@@ -9,7 +9,7 @@ enum Tab: String, CaseIterable {
     var title: String {
         switch self {
         case .home: return "Home"
-        case .documents: return "Documents"
+        case .documents: return "Lists"
         }
     }
     
@@ -46,7 +46,7 @@ struct RootView: View {
             }
             .tag(Tab.home)
             
-            // Documents Tab
+            // Lists Tab
             NavigationStack {
                 DocumentsView(
                     audioRecorder: audioRecorder,
@@ -81,7 +81,7 @@ struct DocumentsView: View {
                     documentsListView
                 }
             }
-            .navigationTitle("Documents")
+            .navigationTitle("Lists")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -89,6 +89,20 @@ struct DocumentsView: View {
                         Image(systemName: "plus")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(.blue)
+                            .frame(width: 32, height: 32)
+                            .background {
+                                Circle()
+                                    .fill(.regularMaterial)
+                                    .overlay {
+                                        Circle()
+                                            .stroke(.quaternary.opacity(0.6), lineWidth: 1)
+                                    }
+                                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .if(isLiquidGlassAvailable) { view in
+                        view.glassEffect(.regular)
                     }
                 }
             }
@@ -164,10 +178,13 @@ struct DocumentsView: View {
                         .font(.headline)
                     ) {
                         ForEach(documentsOfType.sorted(by: { $0.updatedAt > $1.updatedAt })) { document in
-                            DocumentRowView(document: document)
-                                .onTapGesture {
-                                    selectedDocument = document
-                                }
+                            Button(action: {
+                                selectedDocument = document
+                            }) {
+                                DocumentRowView(document: document)
+                            }
+                            .buttonStyle(.plain)
+                            .hoverEffect(.highlight)
                         }
                         .onDelete { indexSet in
                             for index in indexSet {
@@ -185,7 +202,7 @@ struct DocumentsView: View {
     
     private var undoToast: some View {
         HStack {
-            Text("Document deleted")
+            Text("List deleted")
                 .font(.body)
                 .foregroundColor(.white)
             
@@ -219,7 +236,7 @@ struct SearchView: View {
     
     enum SearchTab: String, CaseIterable {
         case recordings = "Recordings"
-        case documents = "Documents"
+        case documents = "Lists"
         
         var systemImage: String {
             switch self {
@@ -244,10 +261,29 @@ struct SearchView: View {
                 }
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.blue)
+                .frame(width: 64, height: 32)
+                .background {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.regularMaterial)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(.quaternary.opacity(0.6), lineWidth: 1)
+                        }
+                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                }
+                .buttonStyle(.plain)
+                .if(isLiquidGlassAvailable) { view in
+                    view.glassEffect(.regular)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
-            .background(.regularMaterial)
+            .background(.ultraThinMaterial)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(.quaternary.opacity(0.3))
+                    .frame(height: 1)
+            }
             
             // Tab Picker
             Picker("Search Type", selection: $selectedTab) {
@@ -259,13 +295,18 @@ struct SearchView: View {
             .pickerStyle(.segmented)
             .padding(.horizontal, 20)
             .padding(.bottom, 16)
-            .background(.regularMaterial)
+            .background(.ultraThinMaterial)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(.quaternary.opacity(0.2))
+                    .frame(height: 1)
+            }
             
             // Search content
             VStack {
                 LiquidGlassSearchBar(
                     text: $searchText,
-                    placeholder: selectedTab == .recordings ? "Search recordings..." : "Search documents..."
+                    placeholder: selectedTab == .recordings ? "Search recordings..." : "Search lists..."
                 )
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -304,7 +345,7 @@ struct SearchView: View {
                 
                 Text(selectedTab == .recordings ? 
                      "Find recordings by title, content, or transcript" :
-                     "Find documents and items by title or content")
+                     "Find lists and items by title or content")
                     .font(.body)
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
@@ -503,6 +544,7 @@ struct HomeView: View {
     @State private var selectedCalendarDate: Date?
     @State private var showingCalendar = false
     @State private var showingSettings = false
+    @State private var showingSearch = false
     
     enum SearchScope: String, CaseIterable {
         case all = "All"
@@ -529,85 +571,52 @@ struct HomeView: View {
                         .frame(maxWidth: .infinity)
                 }
             } else {
-                // Original vertical layout for portrait (matching ContentView exactly)
+                // Portrait layout with sticky header
                 ZStack(alignment: .topTrailing) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            Text("Voice Notes")
-                                .font(.system(size: 36, weight: .bold))
-                                .padding(.top, 8)
-                                .padding(.horizontal)
-
-                            VStack(spacing: 16) {
-                                recordButton
-
-                                recordingStatusView
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 4)
-                            
-                            // Calendar in portrait mode
-                            if showingCalendar {
-                                LiquidCalendarView(selectedDate: $selectedCalendarDate, recordings: recordingsManager.recordings, startExpanded: true)
-                                    .padding(.horizontal)
-                                    .transition(.asymmetric(
-                                        insertion: .push(from: .top).combined(with: .opacity),
-                                        removal: .push(from: .bottom).combined(with: .opacity)
-                                    ))
-                            }
-
-                            HStack {
-                                Text("Recent Recordings")
-                                    .font(.title2).bold()
-                                
-                                if selectedCalendarDate != nil {
-                                    Spacer()
-                                    Button("Show All") {
-                                        withAnimation(.smooth(duration: 0.4)) {
-                                            selectedCalendarDate = nil
-                                        }
-                                    }
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
+                    // Main content with sticky header
+                    VStack(spacing: 0) {
+                        // Sticky header
+                        stickyHeader
+                        
+                        // Scrollable content
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 20) {
+                                // Calendar in portrait mode
+                                if showingCalendar {
+                                    LiquidCalendarView(selectedDate: $selectedCalendarDate, recordings: recordingsManager.recordings, startExpanded: true)
+                                        .padding(.horizontal)
+                                        .transition(.asymmetric(
+                                            insertion: .push(from: .top).combined(with: .opacity),
+                                            removal: .push(from: .bottom).combined(with: .opacity)
+                                        ))
                                 }
+
+                                HStack {
+                                    Text("Recent Recordings")
+                                        .font(.title2).bold()
+                                    
+                                    if selectedCalendarDate != nil {
+                                        Spacer()
+                                        Button("Show All") {
+                                            withAnimation(.smooth(duration: 0.4)) {
+                                                selectedCalendarDate = nil
+                                            }
+                                        }
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                    }
+                                }
+                                .padding(.horizontal)
+                                .padding(.top, 16)
+
+                                recordingsList
                             }
-                            .padding(.horizontal)
-
-                            recordingsList
                         }
                     }
-
-                    LiquidGlassButtonContainer {
-                        HStack(spacing: 8) {
-                            searchButton
-                            settingsButton
-                            calendarButton
-                        }
-                    }
-                    .padding(.top, 16)
-                    .padding(.trailing, 20)
                 }
             }
         }
         .navigationBarHidden(true)
-        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
-        .searchScopes($searchScope) {
-            ForEach(SearchScope.allCases, id: \.self) { scope in
-                Text(scope.rawValue).tag(scope)
-            }
-        }
-        .focused($isSearchFocused)
-        .onChange(of: searchText) { oldValue, newValue in
-            // Debounce search with 250ms delay
-            Task {
-                try? await Task.sleep(for: .milliseconds(250))
-                if searchText == newValue {
-                    await MainActor.run {
-                        debouncedSearchText = newValue
-                    }
-                }
-            }
-        }
         .onAppear { requestPermissions() }
         .alert("Permissions Required", isPresented: $showingPermissionAlert) {
             Button("Settings") {
@@ -627,6 +636,11 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
+        }
+        .sheet(isPresented: $showingSearch) {
+            NavigationView {
+                SearchView(recordingsManager: recordingsManager)
+            }
         }
         .dismissKeyboardOnTap()
     }
@@ -749,6 +763,42 @@ struct HomeView: View {
         }
         
         return recordings
+    }
+
+    // MARK: - Sticky Header Component
+    private var stickyHeader: some View {
+        VStack(spacing: 16) {
+            // Title row with control buttons
+            HStack {
+                Text("Voice Notes")
+                    .font(.system(size: 36, weight: .bold))
+                
+                Spacer()
+                
+                HStack(spacing: 8) {
+                    searchButton
+                    settingsButton
+                    calendarButton
+                }
+            }
+            .padding(.top, 8)
+            
+            // Centered mic button and status
+            VStack(spacing: 16) {
+                recordButton
+                recordingStatusView
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal)
+        .padding(.bottom, 16)
+        .padding(.top, 8) // Additional top padding for status bar
+        .background {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea(edges: .top)
+                .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
+        }
     }
 
     // MARK: - Horizontal Layout Components
@@ -889,7 +939,7 @@ struct HomeView: View {
             }
         }
         .padding(.horizontal)
-        .padding(.bottom, 40)
+        .padding(.bottom, 20)
     }
     
     private var emptyStateView: some View {
@@ -970,8 +1020,8 @@ struct HomeView: View {
             let impactFeedback = UIImpactFeedbackGenerator(style: .light)
             impactFeedback.impactOccurred()
             
-            // Focus the native search field
-            isSearchFocused = true
+            // Show search sheet
+            showingSearch = true
         }) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 18, weight: .medium))

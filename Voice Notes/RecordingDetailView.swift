@@ -18,6 +18,9 @@ struct RecordingDetailView: View {
     @State private var toastMessage = ""
     @State private var savedDocumentId: UUID?
     @State private var extractedActionItems: [String] = []
+    @State private var selectedActionItems: Set<String> = []
+    @State private var quickAddText = ""
+    @State private var showingQuickAddField = false
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
@@ -101,6 +104,8 @@ struct RecordingDetailView: View {
                     }
                     .navigationTitle("Raw AI Output")
                     .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(.clear, for: .navigationBar)
+                    .toolbarBackground(.visible, for: .navigationBar)
                     .navigationBarItems(trailing: Button("Done") {
                         showingRawSummary = false
                     })
@@ -111,10 +116,11 @@ struct RecordingDetailView: View {
             if let recording = recordingsManager.recordings.first(where: { $0.id == recordingId }) {
                 SaveToDocumentsSheet(
                     recording: recording,
+                    selectedItems: extractedActionItems,
                     documentStore: documentStore,
                     onSaved: { documentId, itemCount in
                         savedDocumentId = documentId
-                        let docTitle = documentStore.documents.first { $0.id == documentId }?.title ?? "Document"
+                        let docTitle = documentStore.documents.first { $0.id == documentId }?.title ?? "List"
                         toastMessage = "Added \(itemCount) items to \(docTitle)"
                         showingToast = true
                         
@@ -435,7 +441,7 @@ struct RecordingDetailView: View {
                 Button(action: {
                     showingSaveToDocuments = true
                 }) {
-                    Label("Save to Documents", systemImage: "folder.badge.plus")
+                    Label("Save to List", systemImage: "folder.badge.plus")
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color.orange.opacity(0.1))
@@ -473,8 +479,30 @@ struct RecordingDetailView: View {
     private func actionItemsSection(_ recording: Recording) -> some View {
         let actionItems = extractActionItems(from: recording)
         
-        guard !actionItems.isEmpty else {
-            return AnyView(EmptyView())
+        // Always show the section, but with different content if empty
+        if actionItems.isEmpty {
+            return AnyView(
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Action Items")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        HStack {
+                        Image(systemName: "info.circle")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                        Text("No action items detected")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.secondary.opacity(0.05))
+                    .cornerRadius(6)
+                }
+                .padding()
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(12)
+            )
         }
         
         return AnyView(
@@ -486,15 +514,59 @@ struct RecordingDetailView: View {
                     
                     Spacer()
                     
+                    // Quick add button
+                    Button(action: {
+                        showingQuickAddField.toggle()
+                    }) {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.blue)
+                    }
+                    
+                    // Select All/None toggle
+                    Button(selectedActionItems.count == actionItems.count ? "Deselect All" : "Select All") {
+                        if selectedActionItems.count == actionItems.count {
+                            selectedActionItems.removeAll()
+                        } else {
+                            selectedActionItems = Set(actionItems)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                    
                     Text("(\(actionItems.count))")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                }
+                
+                // Quick add intent field
+                if showingQuickAddField {
+                    HStack {
+                        TextField("add to list Personal", text: $quickAddText)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .onSubmit {
+                                processQuickAddIntent()
+                            }
+                        
+                        Button("Add") {
+                            processQuickAddIntent()
+                        }
+                        .disabled(quickAddText.isEmpty)
+                    }
                 }
                 
                 LazyVStack(spacing: 8) {
                     ForEach(Array(actionItems.enumerated()), id: \.offset) { index, item in
                         ActionItemRow(
                             item: item,
+                            isSelected: selectedActionItems.contains(item),
+                            onSelectionToggle: {
+                                if selectedActionItems.contains(item) {
+                                    selectedActionItems.remove(item)
+                                } else {
+                                    selectedActionItems.insert(item)
+                                }
+                            },
                             onSave: { [item] in
                                 showQuickSaveMenu(for: [item])
                             }
@@ -503,16 +575,20 @@ struct RecordingDetailView: View {
                 }
                 
                 Button(action: {
-                    extractedActionItems = actionItems
+                    extractedActionItems = Array(selectedActionItems.isEmpty ? Set(actionItems) : selectedActionItems)
                     showingSaveToDocuments = true
                 }) {
-                    Label("Save to Documents", systemImage: "folder.badge.plus")
+                    let selectedCount = selectedActionItems.count
+                    let buttonText = selectedCount == 0 ? "Save All to List (\(actionItems.count))" : "Save Selected to List (\(selectedCount))"
+                    
+                    Label(buttonText, systemImage: "folder.badge.plus")
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.blue)
+                        .background(selectedCount == 0 ? Color.gray : Color.blue)
                         .foregroundColor(.white)
                         .cornerRadius(12)
                 }
+                .disabled(actionItems.isEmpty)
             }
             .padding()
             .background(Color.secondary.opacity(0.1))
@@ -575,7 +651,8 @@ struct RecordingDetailView: View {
             items = parseActionItemsFromTranscript(transcript)
         }
         
-        return items
+        // Filter to only include actionable items
+        return items.filter { $0.isLikelyAction }
     }
     
     private func parseActionItemsFromSummary(_ summary: String) -> [String] {
@@ -685,6 +762,78 @@ struct RecordingDetailView: View {
         if b > 1_000 { return String(format: "%.1f KB", b/1_000) }
         return "\(bytes) B"
     }
+    
+    // MARK: - Add to List Intent Handling
+    private func handleAddToListIntent(_ phrase: String, items: [String], sourceRecordingId: UUID?) {
+        guard !items.isEmpty else { return }
+        
+        let (targetName, preferredType) = parseAddToListIntent(phrase)
+        guard !targetName.isEmpty else { return }
+        
+        let targetId = documentStore.ensureList(named: targetName, type: preferredType)
+        documentStore.addItems(to: targetId, items: items, sourceRecordingId: sourceRecordingId)
+        documentStore.markOpened(targetId)
+        
+        // Show success toast
+        let listTitle = documentStore.documents.first { $0.id == targetId }?.title ?? targetName
+        savedDocumentId = targetId
+        toastMessage = "Added \(items.count) items to \(listTitle)"
+        showingToast = true
+        
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+        
+        // Auto-hide after 5 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            if showingToast {
+                showingToast = false
+            }
+        }
+    }
+    
+    private func parseAddToListIntent(_ phrase: String) -> (targetName: String, preferredType: DocumentType) {
+        let lowercased = phrase.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Pattern 1: "add to shopping list <name>"
+        if let match = lowercased.range(of: #"add to shopping list\s+(.+)"#, options: .regularExpression) {
+            let nameRange = lowercased.index(match.lowerBound, offsetBy: "add to shopping list ".count)..<match.upperBound
+            let name = String(lowercased[nameRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return (name, .shopping)
+        }
+        
+        // Pattern 2: "add to list <name>"
+        if let match = lowercased.range(of: #"add to list\s+(.+)"#, options: .regularExpression) {
+            let nameRange = lowercased.index(match.lowerBound, offsetBy: "add to list ".count)..<match.upperBound
+            let name = String(lowercased[nameRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return (name, .todo)
+        }
+        
+        // Pattern 3: "add to <name>" - fallback
+        if let match = lowercased.range(of: #"add to\s+(.+)"#, options: .regularExpression) {
+            let nameRange = lowercased.index(match.lowerBound, offsetBy: "add to ".count)..<match.upperBound
+            let name = String(lowercased[nameRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            // Determine type from name or content
+            let type: DocumentType = name.contains("shop") || name.contains("grocery") || name.contains("store") ? .shopping : .todo
+            return (name, type)
+        }
+        
+        return ("", .todo)
+    }
+    
+    private func processQuickAddIntent() {
+        guard !quickAddText.isEmpty else { return }
+        
+        let selectedItems = Array(selectedActionItems)
+        let itemsToAdd = selectedItems.isEmpty ? extractActionItems(from: recordingsManager.recordings.first(where: { $0.id == recordingId })!) : selectedItems
+        
+        handleAddToListIntent(quickAddText, items: itemsToAdd, sourceRecordingId: recordingId)
+        
+        // Clear field and hide
+        quickAddText = ""
+        showingQuickAddField = false
+        selectedActionItems.removeAll()
+    }
 }
 
 struct InfoRow: View {
@@ -760,6 +909,7 @@ class AudioPlayerDelegate: NSObject, AVAudioPlayerDelegate {
 // MARK: - Save to Documents Sheet
 struct SaveToDocumentsSheet: View {
     let recording: Recording
+    let selectedItems: [String]
     @ObservedObject var documentStore: DocumentStore
     let onSaved: ((UUID, Int) -> Void)?
     @Environment(\.dismiss) private var dismiss
@@ -769,8 +919,9 @@ struct SaveToDocumentsSheet: View {
     @State private var showingSuccess = false
     @State private var createdDocumentId: UUID?
     
-    init(recording: Recording, documentStore: DocumentStore, onSaved: ((UUID, Int) -> Void)? = nil) {
+    init(recording: Recording, selectedItems: [String] = [], documentStore: DocumentStore, onSaved: ((UUID, Int) -> Void)? = nil) {
         self.recording = recording
+        self.selectedItems = selectedItems
         self.documentStore = documentStore
         self.onSaved = onSaved
     }
@@ -790,7 +941,7 @@ struct SaveToDocumentsSheet: View {
                     mainView
                 }
             }
-            .navigationTitle("Save to Documents")
+            .navigationTitle("Save to List")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -799,7 +950,11 @@ struct SaveToDocumentsSheet: View {
             }
         }
         .onAppear {
-            extractActionItems()
+            if selectedItems.isEmpty {
+                extractActionItems()
+            } else {
+                extractedItems = selectedItems
+            }
         }
     }
     
@@ -830,7 +985,7 @@ struct SaveToDocumentsSheet: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("\(extractedItems.count) items added to documents")
+            Text("\(extractedItems.count) items added to list")
                 .font(.body)
                 .foregroundColor(.secondary)
             
@@ -941,7 +1096,7 @@ struct SaveToDocumentsSheet: View {
     
     private var extractedItemsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Extracted Items (\(extractedItems.count))")
+            Text("Selected Items (\(extractedItems.count))")
                 .font(.headline)
             
             if extractedItems.isEmpty {
@@ -977,7 +1132,7 @@ struct SaveToDocumentsSheet: View {
     
     private var recentDocumentsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Documents (Today)")
+            Text("Recent Lists (Today)")
                 .font(.headline)
             
             LazyVStack(spacing: 8) {
@@ -1017,7 +1172,7 @@ struct SaveToDocumentsSheet: View {
     
     private var documentTypesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Create New Document")
+            Text("Create New List")
                 .font(.headline)
             
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
@@ -1152,24 +1307,34 @@ struct SaveToDocumentsSheet: View {
 // MARK: - Action Item Row
 struct ActionItemRow: View {
     let item: String
+    let isSelected: Bool
+    let onSelectionToggle: () -> Void
     let onSave: () -> Void
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "circle")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            // Selection checkbox
+            Button(action: onSelectionToggle) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(isSelected ? .blue : .secondary)
+            }
+            .buttonStyle(.plain)
             
             Text(item)
                 .font(.body)
                 .multilineTextAlignment(.leading)
+                .foregroundColor(isSelected ? .primary : .secondary)
             
             Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.secondary.opacity(0.05))
+        .background(isSelected ? Color.blue.opacity(0.1) : Color.secondary.opacity(0.05))
         .cornerRadius(6)
+        .onTapGesture {
+            onSelectionToggle()
+        }
         .onLongPressGesture {
             onSave()
         }

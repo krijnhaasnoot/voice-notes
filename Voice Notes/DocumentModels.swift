@@ -230,6 +230,25 @@ class DocumentStore: ObservableObject {
         saveDocuments()
     }
     
+    func renameDocument(id: UUID, newTitle: String) {
+        guard let i = documents.firstIndex(where: { $0.id == id }) else { return }
+        let t = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        documents[i].title = t
+        documents[i].updatedAt = Date()
+        saveDocuments()
+    }
+    
+    func updateItemText(documentId: UUID, itemId: UUID, newText: String) {
+        guard let d = documents.firstIndex(where: { $0.id == documentId }) else { return }
+        guard let i = documents[d].items.firstIndex(where: { $0.id == itemId }) else { return }
+        let t = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        documents[d].items[i].text = t
+        documents[d].updatedAt = Date()
+        saveDocuments()
+    }
+    
     // MARK: - Recency Tracking
     func markOpened(_ documentId: UUID) {
         // Remove if already exists and add to front
@@ -274,6 +293,39 @@ class DocumentStore: ObservableObject {
         // Clear last add and save
         self.lastAdd = nil
         saveDocuments()
+    }
+    
+    // MARK: - List Management Helpers
+    func listId(named name: String, preferredType: DocumentType? = nil) -> UUID? {
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedName.isEmpty else { return nil }
+        
+        var candidates = documents.filter { document in
+            document.title.lowercased().contains(normalizedName)
+        }
+        
+        // If preferred type is specified, prioritize it
+        if let preferredType = preferredType {
+            let typeMatches = candidates.filter { $0.type == preferredType }
+            if !typeMatches.isEmpty {
+                candidates = typeMatches
+            }
+        }
+        
+        // Return the most recently updated match
+        return candidates.sorted { $0.updatedAt > $1.updatedAt }.first?.id
+    }
+    
+    func ensureList(named name: String, type: DocumentType = .todo) -> UUID {
+        // Check if list already exists
+        if let existingId = listId(named: name, preferredType: type) {
+            return existingId
+        }
+        
+        // Create new list
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = cleanName.isEmpty ? "New List" : cleanName
+        return createDocument(title: title, type: type)
     }
     
     // MARK: - Helper Methods

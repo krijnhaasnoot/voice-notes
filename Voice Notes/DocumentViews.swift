@@ -3,13 +3,30 @@ import SwiftUI
 // MARK: - Document Row View
 struct DocumentRowView: View {
     let document: Document
+    @EnvironmentObject var documentStore: DocumentStore
+    @State private var renamingId: UUID? = nil
+    @State private var tempTitle: String = ""
+    @FocusState private var renameFocus: UUID?
     
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(document.title)
-                    .font(.headline)
-                    .lineLimit(1)
+                if renamingId == document.id {
+                    TextField("List title", text: $tempTitle, onCommit: {
+                        documentStore.renameDocument(id: document.id, newTitle: tempTitle)
+                        renamingId = nil
+                    })
+                    .textFieldStyle(.roundedBorder)
+                    .focused($renameFocus, equals: document.id)
+                    .onAppear { 
+                        tempTitle = document.title
+                        renameFocus = document.id
+                    }
+                } else {
+                    Text(document.title)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
                 
                 HStack(spacing: 8) {
                     if document.type.usesChecklist {
@@ -42,10 +59,13 @@ struct DocumentRowView: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
-        .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.regularMaterial)
-                .opacity(0)
+        .background(Color.clear)
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button("Rename", systemImage: "pencil") {
+                renamingId = document.id
+                tempTitle = document.title
+            }
         }
     }
 }
@@ -145,7 +165,7 @@ struct CreateDocumentSheet: View {
         NavigationView {
             VStack(spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Document Title")
+                    Text("List Title")
                         .font(.headline)
                     
                     TextField("Enter title...", text: $title)
@@ -153,7 +173,7 @@ struct CreateDocumentSheet: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Document Type")
+                    Text("List Type")
                         .font(.headline)
                     
                     LazyVGrid(columns: gridColumns, spacing: 16) {
@@ -170,7 +190,7 @@ struct CreateDocumentSheet: View {
                 Spacer()
             }
             .padding()
-            .navigationTitle("New Document")
+            .navigationTitle("New List")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -225,6 +245,7 @@ struct DocumentDetailView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var editingTitle = false
+    @State private var newTitleText = ""
     @State private var newItemText = ""
     @State private var notesText = ""
     @State private var showingShareSheet = false
@@ -235,6 +256,10 @@ struct DocumentDetailView: View {
     @State private var tempDueDate = Date()
     @FocusState private var isNewItemFocused: Bool
     @FocusState private var isNotesEditing: Bool
+    @State private var editingItemId: UUID? = nil
+    @State private var itemDraft: String = ""
+    @FocusState private var itemFocus: UUID?
+    @FocusState private var titleFocus: Bool
     
     private var filteredItems: [DocItem] {
         let items = getCurrentDocument().items
@@ -251,31 +276,86 @@ struct DocumentDetailView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
+                // Title editing header
+                if editingTitle {
+                    titleEditingHeader
+                }
+                
                 if document.type.usesChecklist {
                     checklistView
                 } else {
                     notesView
                 }
             }
-            .navigationTitle(document.title)
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle(editingTitle ? "Edit Title" : getCurrentDocument().title)
+            .navigationBarTitleDisplayMode(editingTitle ? .inline : .large)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Button(action: shareDocument) {
-                        Image(systemName: "square.and.arrow.up")
+                    if editingTitle {
+                        Button("Save") {
+                            saveTitleAndExit()
+                        }
+                        .disabled(newTitleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    } else {
+                        Button(action: { 
+                            newTitleText = document.title
+                            editingTitle = true
+                            // Focus the text field after a brief delay to ensure the view has updated
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                titleFocus = true
+                            }
+                        }) {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.blue)
+                                .frame(width: 32, height: 32)
+                                .background {
+                                    Circle()
+                                        .fill(.regularMaterial)
+                                        .overlay {
+                                            Circle()
+                                                .stroke(.quaternary.opacity(0.6), lineWidth: 1)
+                                        }
+                                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .if(isLiquidGlassAvailable) { view in
+                            view.glassEffect(.regular)
+                        }
+                        
+                        Button(action: shareDocument) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.blue)
+                                .frame(width: 32, height: 32)
+                                .background {
+                                    Circle()
+                                        .fill(.regularMaterial)
+                                        .overlay {
+                                            Circle()
+                                                .stroke(.quaternary.opacity(0.6), lineWidth: 1)
+                                        }
+                                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .if(isLiquidGlassAvailable) { view in
+                            view.glassEffect(.regular)
+                        }
                     }
-                    
-                    Button("Add from Recording") {
-                        // Placeholder for next step
-                    }
-                    .font(.caption)
-                    .disabled(true)
                 }
                 
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") {
-                        saveNotesIfNeeded()
-                        dismiss()
+                    if editingTitle {
+                        Button("Cancel") {
+                            editingTitle = false
+                        }
+                    } else {
+                        Button("Done") {
+                            saveNotesIfNeeded()
+                            dismiss()
+                        }
                     }
                 }
             }
@@ -289,6 +369,33 @@ struct DocumentDetailView: View {
         .sheet(isPresented: $showingDatePicker) {
             datePickerSheet
         }
+    }
+    
+    private var titleEditingHeader: some View {
+        VStack(spacing: 12) {
+            TextField("List title", text: $newTitleText)
+                .textFieldStyle(.roundedBorder)
+                .font(.title2)
+                .focused($titleFocus)
+                .onSubmit {
+                    saveTitleAndExit()
+                }
+        }
+        .padding()
+        .background(.regularMaterial)
+    }
+    
+    private func saveTitleAndExit() {
+        let trimmedTitle = newTitleText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedTitle.isEmpty {
+            documentStore.renameDocument(id: document.id, newTitle: trimmedTitle)
+            
+            // Haptic feedback to confirm save
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.impactOccurred()
+        }
+        editingTitle = false
+        titleFocus = false
     }
     
     private var datePickerSheet: some View {
@@ -373,10 +480,19 @@ struct DocumentDetailView: View {
                                 selectedItemForDate = itemId
                                 tempDueDate = item.dueDate ?? Date()
                                 showingDatePicker = true
-                            }
+                            },
+                            editingItemId: $editingItemId,
+                            itemDraft: $itemDraft,
+                            itemFocus: $itemFocus
                         )
                         .listRowBackground(Color(.systemBackground))
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button("Edit") {
+                                editingItemId = item.id
+                                itemDraft = item.text
+                            }
+                            .tint(.indigo)
+                            
                             Button(role: .destructive) {
                                 withAnimation {
                                     documentStore.deleteItem(documentId: document.id, itemId: item.id)
@@ -543,12 +659,18 @@ struct ChecklistItemView: View {
     let documentId: UUID
     let documentStore: DocumentStore
     let onDateTap: ((UUID) -> Void)?
+    @Binding var editingItemId: UUID?
+    @Binding var itemDraft: String
+    @FocusState.Binding var itemFocus: UUID?
     
-    init(item: DocItem, documentId: UUID, documentStore: DocumentStore, onDateTap: ((UUID) -> Void)? = nil) {
+    init(item: DocItem, documentId: UUID, documentStore: DocumentStore, onDateTap: ((UUID) -> Void)? = nil, editingItemId: Binding<UUID?>, itemDraft: Binding<String>, itemFocus: FocusState<UUID?>.Binding) {
         self.item = item
         self.documentId = documentId
         self.documentStore = documentStore
         self.onDateTap = onDateTap
+        self._editingItemId = editingItemId
+        self._itemDraft = itemDraft
+        self._itemFocus = itemFocus
     }
     
     var body: some View {
@@ -563,11 +685,30 @@ struct ChecklistItemView: View {
             
             // Content
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.text)
-                    .font(.body)
-                    .strikethrough(item.isDone)
-                    .foregroundColor(item.isDone ? .secondary : .primary)
-                    .multilineTextAlignment(.leading)
+                if editingItemId == item.id {
+                    TextField("Edit item", text: $itemDraft, onCommit: {
+                        documentStore.updateItemText(documentId: documentId, itemId: item.id, newText: itemDraft)
+                        editingItemId = nil
+                    })
+                    .textFieldStyle(.roundedBorder)
+                    .focused($itemFocus, equals: item.id)
+                    .onAppear { 
+                        itemDraft = item.text
+                        itemFocus = item.id
+                    }
+                } else {
+                    Text(item.text)
+                        .font(.body)
+                        .strikethrough(item.isDone)
+                        .foregroundColor(item.isDone ? .secondary : .primary)
+                        .multilineTextAlignment(.leading)
+                        .contextMenu {
+                            Button("Edit", systemImage: "pencil") {
+                                editingItemId = item.id
+                                itemDraft = item.text
+                            }
+                        }
+                }
                 
                 if let dueDate = item.dueDate {
                     HStack(spacing: 6) {

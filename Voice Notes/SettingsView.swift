@@ -81,13 +81,13 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
                 }
                 
-                Section(header: Text("Document Settings")) {
-                    // Default Document Type Picker
+                Section(header: Text("List Settings")) {
+                    // Default List Type Picker
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Default Document Type")
+                        Text("Default List Type")
                             .font(.headline)
                         
-                        Picker("Default Document Type", selection: Binding(
+                        Picker("Default List Type", selection: Binding(
                             get: { selectedDocumentType },
                             set: { defaultDocumentType = $0.rawValue }
                         )) {
@@ -114,8 +114,8 @@ struct SettingsView: View {
                             .font(.headline)
                         
                         Text(autoSaveToDocuments ? 
-                             "Automatically saves detected action items to documents without asking." :
-                             "Asks before saving action items to documents.")
+                             "Automatically saves detected action items to lists without asking." :
+                             "Asks before saving action items to lists.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -144,8 +144,8 @@ struct SettingsView: View {
                         
                         SettingsInfoRow(
                             icon: "doc.text.fill", 
-                            title: "Smart Documents",
-                            description: "Organize action items into intelligent document types"
+                            title: "Smart Lists",
+                            description: "Organize action items into intelligent list types"
                         )
                     }
                     .padding(.vertical, 4)
