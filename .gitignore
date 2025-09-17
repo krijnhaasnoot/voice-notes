@@ -1,15 +1,26 @@
-# Secrets and API Keys
+# macOS
+.DS_Store
+
+# Xcode / user state
+xcuserdata/
+*.xcuserstate
+
+# Xcode workspace (incl. project.xcworkspace in .xcodeproj)
+*.xcworkspace/
+
+# SwiftPM / Builds
+.build/
+DerivedData/
+build/
+
+# Package managers (optioneel)
+Pods/
+Carthage/
+
+# Secrets
 Secrets.xcconfig
 
-# Xcode
-.DS_Store
-*.xcuserstate
-project.xcworkspace/xcuserdata/
-*.xcuserdatad
-build/
-DerivedData/
-
-# iOS
+# iOS artifacts (optioneel)
 *.ipa
 *.dSYM.zip
 *.dSYM
