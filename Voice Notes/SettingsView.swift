@@ -21,14 +21,20 @@ extension SummaryMode {
 
 struct SettingsView: View {
     @AppStorage("defaultMode") private var defaultMode: String = SummaryMode.personal.rawValue
+    @AppStorage("defaultSummaryLength") private var defaultSummaryLength: String = SummaryLength.standard.rawValue
     @AppStorage("autoDetectMode") private var autoDetectMode: Bool = false
     @AppStorage("defaultDocumentType") private var defaultDocumentType: String = DocumentType.todo.rawValue
     @AppStorage("autoSaveToDocuments") private var autoSaveToDocuments: Bool = false
     
     @Environment(\.presentationMode) var presentationMode
+    @State private var showingTour = false
     
     private var selectedMode: SummaryMode {
         SummaryMode(rawValue: defaultMode) ?? .personal
+    }
+    
+    private var selectedSummaryLength: SummaryLength {
+        SummaryLength(rawValue: defaultSummaryLength) ?? .standard
     }
     
     private var selectedDocumentType: DocumentType {
@@ -36,8 +42,7 @@ struct SettingsView: View {
     }
     
     var body: some View {
-        NavigationView {
-            Form {
+        Form {
                 Section(header: Text("Summary Settings")) {
                     // Default Mode Picker
                     VStack(alignment: .leading, spacing: 8) {
@@ -62,6 +67,34 @@ struct SettingsView: View {
                         .pickerStyle(.menu)
                         
                         Text(selectedMode.description)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                    
+                    // Summary Length Picker
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Summary Detail Level")
+                            .font(.headline)
+                        
+                        Picker("Summary Length", selection: Binding(
+                            get: { selectedSummaryLength },
+                            set: { defaultSummaryLength = $0.rawValue }
+                        )) {
+                            ForEach(SummaryLength.allCases) { length in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(length.displayName)
+                                        .font(.body)
+                                    Text(length.description)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .tag(length)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        
+                        Text(selectedSummaryLength.description)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -122,6 +155,35 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
                 }
                 
+                Section(header: Text("Getting Started")) {
+                    Button(action: { showingTour = true }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "play.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.blue)
+                                .frame(width: 28, height: 28)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Take the Tour")
+                                    .font(.body)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.primary)
+                                
+                                Text("Learn about Voice Notes features")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                
                 Section(header: Text("Info")) {
                     VStack(alignment: .leading, spacing: 12) {
                         SettingsInfoRow(
@@ -150,16 +212,20 @@ struct SettingsView: View {
                     }
                     .padding(.vertical, 4)
                 }
-            }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.large)
-            .navigationBarItems(
-                trailing: Button("Done") {
+        }
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
                     presentationMode.wrappedValue.dismiss()
                 }
                 .font(.headline)
                 .foregroundColor(.blue)
-            )
+            }
+        }
+        .sheet(isPresented: $showingTour) {
+            AppTourView()
         }
     }
 }

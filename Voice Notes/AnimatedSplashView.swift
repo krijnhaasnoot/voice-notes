@@ -6,21 +6,26 @@ struct AnimatedSplashView: View {
     @State private var ready = false
 
     var body: some View {
-        ZStack {
-            Color(.systemBackground).ignoresSafeArea()
-            
-            // Use app icon or create a simple logo view
-            VStack {
-                Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 100, weight: .light))
-                    .foregroundColor(.blue)
-                Text("Voice Notes")
-                    .font(.title2)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
+        if ready {
+            RootView()
+                .transition(.opacity)
+        } else {
+            ZStack {
+                Color(.systemBackground).ignoresSafeArea()
+                
+                // Use app icon or create a simple logo view
+                VStack {
+                    Image(systemName: "waveform.circle.fill")
+                        .font(.system(size: 100, weight: .light))
+                        .foregroundColor(.blue)
+                    Text("Voice Notes")
+                        .font(.title2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                }
+                .scaleEffect(scale)
+                .opacity(opacity)
             }
-            .scaleEffect(scale)
-            .opacity(opacity)
             .onAppear {
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
                     scale = 1.0
@@ -33,11 +38,5 @@ struct AnimatedSplashView: View {
                 }
             }
         }
-        .overlay(Group {
-            if ready {
-                RootView()
-                    .transition(.opacity)
-            }
-        })
     }
 }

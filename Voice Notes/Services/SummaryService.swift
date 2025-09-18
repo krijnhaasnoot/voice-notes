@@ -1,5 +1,41 @@
 import Foundation
 
+// Summary detail/length options
+enum SummaryLength: String, CaseIterable, Identifiable {
+    case brief = "brief"
+    case standard = "standard"
+    case detailed = "detailed"
+    
+    var id: String { rawValue }
+    
+    var displayName: String {
+        switch self {
+        case .brief: return "Brief"
+        case .standard: return "Standard"
+        case .detailed: return "Detailed"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .brief: return "Short and concise summary with key points only"
+        case .standard: return "Balanced summary with main topics and details"
+        case .detailed: return "Comprehensive summary with extensive detail"
+        }
+    }
+    
+    var lengthModifier: String {
+        switch self {
+        case .brief:
+            return "Keep it very concise and brief. Focus only on the most essential points. Use short sentences and minimal detail."
+        case .standard:
+            return "Provide a balanced level of detail. Include key points with supporting information where relevant."
+        case .detailed:
+            return "Provide comprehensive detail. Include context, nuances, examples, and thorough explanations of all important points discussed."
+        }
+    }
+}
+
 // Mode-specific summary templates
 enum SummaryMode: String, CaseIterable, Identifiable {
     case primaryCare = "primaryCare"
@@ -22,33 +58,35 @@ enum SummaryMode: String, CaseIterable, Identifiable {
         }
     }
     
-    var template: String {
+    func template(length: SummaryLength = .standard) -> String {
         let baseFormatting = "Output must be plain text. No markdown headings (#). Put bold labels with double asterisks on their own line, then one blank line. One blank line between sections. Use bullets '• '. Omit empty sections. Keep the transcript's language. Do not invent facts, owners, or deadlines."
+        let lengthInstruction = length.lengthModifier
         
         switch self {
         case .primaryCare:
-            return "Summarize this primary care consultation in clear language. Use sections: **Chief Complaint**, **Exam/Findings**, **Advice/Treatment**, **Follow-up**. Be factual and concise; no interpretations not stated in the recording. " + baseFormatting
+            return "Summarize this primary care consultation in clear language. Use sections: **Chief Complaint**, **Exam/Findings**, **Advice/Treatment**, **Follow-up**. Be factual and concise; no interpretations not stated in the recording. " + lengthInstruction + " " + baseFormatting
             
         case .dentist:
-            return "Summarize this dental visit. Use sections: **Dental Findings**, **Procedure Performed**, **Advice**, **Follow-up**. Keep it short and concrete. Use bullets for advice. " + baseFormatting
+            return "Summarize this dental visit. Use sections: **Dental Findings**, **Procedure Performed**, **Advice**, **Follow-up**. Keep it short and concrete. Use bullets for advice. " + lengthInstruction + " " + baseFormatting
             
         case .techTeam:
-            return "Summarize this team meeting. Use sections: **Title** (short), **Summary**, **Key Points** (bullets), **Decisions**, **Action Items** (only if explicitly mentioned, with assignee if present). Business-neutral tone. " + baseFormatting
+            return "Summarize this team meeting. Use sections: **Title** (short), **Summary**, **Key Points** (bullets), **Decisions**, **Action Items** (only if explicitly mentioned, with assignee if present). Business-neutral tone. " + lengthInstruction + " " + baseFormatting
             
         case .planning:
-            return "Summarize this planning discussion. Use sections: **Title**, **Summary**, **Key Dates & Commitments**, **Decisions**, **Action Items**. Include dates/times exactly as mentioned. " + baseFormatting
+            return "Summarize this planning discussion. Use sections: **Title**, **Summary**, **Key Dates & Commitments**, **Decisions**, **Action Items**. Include dates/times exactly as mentioned. " + lengthInstruction + " " + baseFormatting
             
         case .alignment:
-            return "Summarize this alignment conversation. Use sections: **Title**, **Summary**, **Main Topics**, **Decisions / Next Steps**. Informal but clear tone. " + baseFormatting
+            return "Summarize this alignment conversation. Use sections: **Title**, **Summary**, **Main Topics**, **Decisions / Next Steps**. Informal but clear tone. " + lengthInstruction + " " + baseFormatting
             
         case .personal:
-            return "Summarize this conversation in simple language. Use sections: **Title**, **Summary**, **Key Points**. Keep it light and personal. " + baseFormatting
+            return "Summarize this conversation in simple language. Use sections: **Title**, **Summary**, **Key Points**. Keep it light and personal. " + lengthInstruction + " " + baseFormatting
         }
     }
 }
 
 struct SummarySettings {
     static let defaultModeKey = "defaultMode"
+    static let defaultLengthKey = "defaultSummaryLength"
 }
 
 // Uses SummarizationError and CancellationToken defined elsewhere in the project.
@@ -154,6 +192,7 @@ actor SummaryService {
     func summarize(
         transcript: String,
         mode: SummaryMode = .personal,
+        length: SummaryLength = .standard,
         progress: @escaping @Sendable (Double) -> Void,
         cancelToken: CancellationToken
     ) async throws -> (clean: String, raw: String) {
@@ -171,7 +210,7 @@ actor SummaryService {
         progress(0.1)
 
         // System & user prompts (strict format; plain text; no Markdown headers)
-        let systemPrompt = mode.template
+        let systemPrompt = mode.template(length: length)
 
         let userPrompt = """
         Summarize the following transcript using the format specified above.
@@ -254,7 +293,6 @@ private func prettifySummaryPlain(_ input: String) -> String {
 
     // Known labels we enforce
     let labels = ["Titel", "Samenvatting", "Belangrijkste punten", "Besluiten", "Actiepunten"]
-    let labelsPattern = labels.map { NSRegularExpression.escapedPattern(for: $0) }.joined(separator: "|")
 
     // 0) Convert accidental Markdown headings to bold labels
     text = text.replacingOccurrences(

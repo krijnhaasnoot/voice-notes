@@ -97,8 +97,15 @@ class RecordingViewModel: ObservableObject {
         errorMessage = nil
         
         do {
+            // Get selected summary length
+            let selectedLength: SummaryLength = {
+                let lengthString = UserDefaults.standard.string(forKey: "defaultSummaryLength") ?? SummaryLength.standard.rawValue
+                return SummaryLength(rawValue: lengthString) ?? .standard
+            }()
+            
             let result = try await summaryService.summarize(
                 transcript: transcript,
+                length: selectedLength,
                 progress: { progress in
                     Task { @MainActor in
                         self.summarizationProgress = progress

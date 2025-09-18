@@ -31,6 +31,9 @@ struct RootView: View {
     @StateObject private var appRouter = AppRouter()
     @StateObject private var audioRecorder = AudioRecorder()
     @StateObject private var recordingsManager = RecordingsManager()
+    @EnvironmentObject var documentStore: DocumentStore
+    @AppStorage("hasCompletedTour") private var hasCompletedTour = false
+    @State private var showingTour = false
     
     var body: some View {
         TabView(selection: $appRouter.selectedTab) {
@@ -60,6 +63,20 @@ struct RootView: View {
         }
         .applyLiquidGlassTabBar()
         .environmentObject(appRouter)
+        .onAppear {
+            // Show tour on first app launch
+            if !hasCompletedTour {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    showingTour = true
+                }
+            }
+        }
+        .sheet(isPresented: $showingTour) {
+            AppTourView(onComplete: {
+                hasCompletedTour = true
+                showingTour = false
+            })
+        }
     }
 }
 
@@ -73,37 +90,36 @@ struct DocumentsView: View {
     @State private var showingCreateSheet = false
     
     var body: some View {
-        NavigationView {
-            Group {
-                if documentStore.documents.isEmpty {
-                    emptyStateView
-                } else {
-                    documentsListView
-                }
+        Group {
+            if documentStore.documents.isEmpty {
+                emptyStateView
+            } else {
+                documentsListView
             }
-            .navigationTitle("Lists")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingCreateSheet = true }) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(.blue)
-                            .frame(width: 32, height: 32)
-                            .background {
-                                Circle()
-                                    .fill(.regularMaterial)
-                                    .overlay {
-                                        Circle()
-                                            .stroke(.quaternary.opacity(0.6), lineWidth: 1)
-                                    }
-                                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .if(isLiquidGlassAvailable) { view in
-                        view.glassEffect(.regular)
-                    }
+        }
+        .navigationTitle("Lists")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showingCreateSheet = true }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.blue)
+                        .frame(width: 32, height: 32)
+                        .background {
+                            Circle()
+                                .fill(.regularMaterial)
+                                .overlay {
+                                    Circle()
+                                        .stroke(.quaternary.opacity(0.6), lineWidth: 1)
+                                }
+                                .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                        }
+                }
+                .buttonStyle(.plain)
+                .if(isLiquidGlassAvailable) { view in
+                    view.glassEffect(.regular)
                 }
             }
         }
@@ -159,7 +175,7 @@ struct DocumentsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background(Color(.systemGroupedBackground))
     }
     
     private var documentsListView: some View {
@@ -185,11 +201,12 @@ struct DocumentsView: View {
                             }
                             .buttonStyle(.plain)
                             .hoverEffect(.highlight)
-                        }
-                        .onDelete { indexSet in
-                            for index in indexSet {
-                                let sortedDocs = documentsOfType.sorted(by: { $0.updatedAt > $1.updatedAt })
-                                documentStore.deleteDocument(sortedDocs[index])
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    documentStore.deleteDocument(document)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
                             }
                         }
                     }
@@ -197,7 +214,7 @@ struct DocumentsView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background(Color(.systemGroupedBackground))
     }
     
     private var undoToast: some View {
@@ -616,7 +633,7 @@ struct HomeView: View {
                 }
             }
         }
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear { requestPermissions() }
         .alert("Permissions Required", isPresented: $showingPermissionAlert) {
             Button("Settings") {

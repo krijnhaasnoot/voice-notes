@@ -23,37 +23,46 @@ struct Voice_NotesApp: App {
     }
     
     private func configureLiquidNavigationBar() {
-        // Configure navigation bar appearance
-        let navBarAppearance = UINavigationBarAppearance()
-        navBarAppearance.configureWithTransparentBackground()
-        navBarAppearance.backgroundColor = UIColor.clear
-        navBarAppearance.shadowColor = UIColor.clear
+        // Configure navigation bar appearance for standard/compact states (small title)
+        let standardAppearance = UINavigationBarAppearance()
+        standardAppearance.configureWithTransparentBackground()
+        standardAppearance.backgroundColor = UIColor.clear
+        standardAppearance.shadowColor = UIColor.clear
+        standardAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
         
-        // Create a stronger blur effect
-        navBarAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        // Configure navigation bar appearance for large title states
+        let largeTitleAppearance = UINavigationBarAppearance()
+        largeTitleAppearance.configureWithDefaultBackground()
+        largeTitleAppearance.backgroundColor = UIColor.systemBackground
+        largeTitleAppearance.shadowColor = UIColor.clear
         
-        // Configure text colors
-        navBarAppearance.titleTextAttributes = [
+        // Configure text colors for both appearances
+        let titleAttributes: [NSAttributedString.Key: Any] = [
             .foregroundColor: UIColor.label,
             .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
         ]
-        navBarAppearance.largeTitleTextAttributes = [
+        let largeTitleAttributes: [NSAttributedString.Key: Any] = [
             .foregroundColor: UIColor.label,
             .font: UIFont.systemFont(ofSize: 34, weight: .bold)
         ]
         
+        standardAppearance.titleTextAttributes = titleAttributes
+        standardAppearance.largeTitleTextAttributes = largeTitleAttributes
+        largeTitleAppearance.titleTextAttributes = titleAttributes  
+        largeTitleAppearance.largeTitleTextAttributes = largeTitleAttributes
+        
         // Apply to all navigation bar states
         let navBar = UINavigationBar.appearance()
-        navBar.standardAppearance = navBarAppearance
-        navBar.compactAppearance = navBarAppearance
-        navBar.scrollEdgeAppearance = navBarAppearance
+        navBar.standardAppearance = standardAppearance
+        navBar.compactAppearance = standardAppearance
+        navBar.scrollEdgeAppearance = largeTitleAppearance
         if #available(iOS 15.0, *) {
-            navBar.compactScrollEdgeAppearance = navBarAppearance
+            navBar.compactScrollEdgeAppearance = standardAppearance
         }
         
         // Additional styling
         navBar.isTranslucent = true
-        navBar.barTintColor = UIColor.clear
         navBar.tintColor = UIColor.systemBlue
+        navBar.prefersLargeTitles = false // Let individual views control this
     }
 }

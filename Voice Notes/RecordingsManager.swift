@@ -301,10 +301,17 @@ class RecordingsManager: ObservableObject {
                     print("🎯 RecordingsManager: Using default mode: \(selectedMode.rawValue)")
                 }
                 
-                print("🎯 RecordingsManager: Starting summarization with mode: \(selectedMode.rawValue)")
+                // Get selected summary length
+                let selectedLength: SummaryLength = {
+                    let lengthString = UserDefaults.standard.string(forKey: "defaultSummaryLength") ?? SummaryLength.standard.rawValue
+                    return SummaryLength(rawValue: lengthString) ?? .standard
+                }()
+                
+                print("🎯 RecordingsManager: Starting summarization with mode: \(selectedMode.rawValue), length: \(selectedLength.rawValue)")
                 let result = try await summaryService.summarize(
                     transcript: transcript,
                     mode: selectedMode,
+                    length: selectedLength,
                     progress: { progress in
                         Task { @MainActor in
                             self.updateRecording(recordingId, status: .summarizing(progress: progress))

@@ -233,7 +233,7 @@ actor OpenAITranscriptionService {
         
         let start = segment["start"] as? Double ?? 0
         let end = segment["end"] as? Double ?? 0
-        let duration = end - start
+        _ = end - start
         
         // Simple pattern: longer pauses might indicate speaker changes
         // This is a basic implementation - you might want to use a proper speaker diarization service

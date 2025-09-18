@@ -1,4 +1,6 @@
 import SwiftUI
+import AVFoundation
+import Speech
 
 // MARK: - Document Row View
 struct DocumentRowView: View {
@@ -125,7 +127,7 @@ struct QuickCreateButton: View {
     
     private func createDocument() {
         let title = generateQuickTitle(for: type)
-        documentStore.createDocument(title: title, type: type)
+        _ = documentStore.createDocument(title: title, type: type)
         
         // Haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -146,6 +148,92 @@ struct QuickCreateButton: View {
             return "Ideas — \(dateString)"
         case .meeting:
             return "Meeting — \(dateString)"
+        }
+    }
+}
+
+// MARK: - Document List Overview View
+struct DocumentListOverviewView: View {
+    @EnvironmentObject var documentStore: DocumentStore
+    @State private var showingCreateSheet = false
+    
+    var body: some View {
+        Group {
+            if documentStore.documents.isEmpty {
+                // Empty state
+                VStack(spacing: 16) {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.tertiary)
+                    Text("No lists yet")
+                        .font(.title3).fontWeight(.semibold)
+                    Text("Create a To‑Do, Shopping, Ideas or Meeting list.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    // Order: To‑Do, Shopping, Ideas, Meeting
+                    Section(header: sectionHeader(.todo)) {
+                        ForEach(documentStore.documents.filter { $0.type == .todo }) { document in
+                            NavigationLink(destination: DocumentDetailView(document: document)) {
+                                DocumentRowView(document: document)
+                            }
+                        }
+                    }
+
+                    Section(header: sectionHeader(.shopping)) {
+                        ForEach(documentStore.documents.filter { $0.type == .shopping }) { document in
+                            NavigationLink(destination: DocumentDetailView(document: document)) {
+                                DocumentRowView(document: document)
+                            }
+                        }
+                    }
+
+                    Section(header: sectionHeader(.ideas)) {
+                        ForEach(documentStore.documents.filter { $0.type == .ideas }) { document in
+                            NavigationLink(destination: DocumentDetailView(document: document)) {
+                                DocumentRowView(document: document)
+                            }
+                        }
+                    }
+
+                    Section(header: sectionHeader(.meeting)) {
+                        ForEach(documentStore.documents.filter { $0.type == .meeting }) { document in
+                            NavigationLink(destination: DocumentDetailView(document: document)) {
+                                DocumentRowView(document: document)
+                            }
+                        }
+                    }
+                }
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+            }
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Lists")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: { showingCreateSheet = true }) {
+                    Image(systemName: "plus")
+                }
+            }
+        }
+        .sheet(isPresented: $showingCreateSheet) {
+            CreateDocumentSheet()
+                .environmentObject(documentStore)
+        }
+    }
+
+    private func sectionHeader(_ type: DocumentType) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: type.systemImage)
+                .foregroundStyle(type.color)
+            Text(type.displayName)
+                .font(.headline)
+                .foregroundStyle(.secondary)
         }
     }
 }
@@ -260,6 +348,8 @@ struct DocumentDetailView: View {
     @State private var itemDraft: String = ""
     @FocusState private var itemFocus: UUID?
     @FocusState private var titleFocus: Bool
+    @State private var isRecordingNewItem = false
+    @StateObject private var voiceRecorder = VoiceRecorder()
     
     private var filteredItems: [DocItem] {
         let items = getCurrentDocument().items
@@ -274,94 +364,92 @@ struct DocumentDetailView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Title editing header
+        VStack(spacing: 0) {
+            // Title editing header
+            if editingTitle {
+                titleEditingHeader
+            }
+            
+            if document.type.usesChecklist {
+                checklistView
+            } else {
+                notesView
+            }
+        }
+        .navigationTitle(editingTitle ? "Edit Title" : getCurrentDocument().title)
+        .navigationBarTitleDisplayMode((document.type.usesChecklist || editingTitle) ? .inline : .large)
+        .toolbar {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
                 if editingTitle {
-                    titleEditingHeader
-                }
-                
-                if document.type.usesChecklist {
-                    checklistView
+                    Button("Save") {
+                        saveTitleAndExit()
+                    }
+                    .disabled(newTitleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 } else {
-                    notesView
-                }
-            }
-            .navigationTitle(editingTitle ? "Edit Title" : getCurrentDocument().title)
-            .navigationBarTitleDisplayMode(editingTitle ? .inline : .large)
-            .toolbar {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    if editingTitle {
-                        Button("Save") {
-                            saveTitleAndExit()
+                    Button(action: { 
+                        newTitleText = document.title
+                        editingTitle = true
+                        // Focus the text field after a brief delay to ensure the view has updated
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            titleFocus = true
                         }
-                        .disabled(newTitleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    } else {
-                        Button(action: { 
-                            newTitleText = document.title
-                            editingTitle = true
-                            // Focus the text field after a brief delay to ensure the view has updated
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                titleFocus = true
+                    }) {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.blue)
+                            .frame(width: 32, height: 32)
+                            .background {
+                                Circle()
+                                    .fill(.regularMaterial)
+                                    .overlay {
+                                        Circle()
+                                            .stroke(.quaternary.opacity(0.6), lineWidth: 1)
+                                    }
+                                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
                             }
-                        }) {
-                            Image(systemName: "pencil")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(.blue)
-                                .frame(width: 32, height: 32)
-                                .background {
-                                    Circle()
-                                        .fill(.regularMaterial)
-                                        .overlay {
-                                            Circle()
-                                                .stroke(.quaternary.opacity(0.6), lineWidth: 1)
-                                        }
-                                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                                }
-                        }
-                        .buttonStyle(.plain)
-                        .if(isLiquidGlassAvailable) { view in
-                            view.glassEffect(.regular)
-                        }
-                        
-                        Button(action: shareDocument) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(.blue)
-                                .frame(width: 32, height: 32)
-                                .background {
-                                    Circle()
-                                        .fill(.regularMaterial)
-                                        .overlay {
-                                            Circle()
-                                                .stroke(.quaternary.opacity(0.6), lineWidth: 1)
-                                        }
-                                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                                }
-                        }
-                        .buttonStyle(.plain)
-                        .if(isLiquidGlassAvailable) { view in
-                            view.glassEffect(.regular)
-                        }
                     }
-                }
-                
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if editingTitle {
-                        Button("Cancel") {
-                            editingTitle = false
-                        }
-                    } else {
-                        Button("Done") {
-                            saveNotesIfNeeded()
-                            dismiss()
-                        }
+                    .buttonStyle(.plain)
+                    .if(isLiquidGlassAvailable) { view in
+                        view.glassEffect(.regular)
+                    }
+                    
+                    Button(action: shareDocument) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(.blue)
+                            .frame(width: 32, height: 32)
+                            .background {
+                                Circle()
+                                    .fill(.regularMaterial)
+                                    .overlay {
+                                        Circle()
+                                            .stroke(.quaternary.opacity(0.6), lineWidth: 1)
+                                    }
+                                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .if(isLiquidGlassAvailable) { view in
+                        view.glassEffect(.regular)
                     }
                 }
             }
-            .onAppear {
-                notesText = document.notes
+            
+            ToolbarItem(placement: .navigationBarLeading) {
+                if editingTitle {
+                    Button("Cancel") {
+                        editingTitle = false
+                    }
+                } else {
+                    Button("Done") {
+                        saveNotesIfNeeded()
+                        dismiss()
+                    }
+                }
             }
+        }
+        .onAppear {
+            notesText = document.notes
         }
         .sheet(isPresented: $showingShareSheet) {
             ShareSheet(items: [shareText])
@@ -466,11 +554,25 @@ struct DocumentDetailView: View {
             .padding(.vertical, 8)
             .background(.regularMaterial)
             
-            // Items List or Empty State
-            if filteredItems.isEmpty {
-                emptyStateView
-            } else {
-                List {
+            // Items List (always shown so header is visible even when empty)
+            List {
+                if filteredItems.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: document.type.systemImage)
+                            .font(.system(size: 40, weight: .light))
+                            .foregroundStyle(.tertiary)
+                        Text("No \(selectedFilter.rawValue.lowercased()) items")
+                            .font(.body)
+                            .fontWeight(.medium)
+                        Text("Add items or save action items from a recording.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+                    .listRowBackground(Color(.systemGroupedBackground))
+                } else {
                     ForEach(filteredItems) { item in
                         ChecklistItemView(
                             item: item,
@@ -513,10 +615,28 @@ struct DocumentDetailView: View {
                             .tint(item.isDone ? .orange : .green)
                         }
                     }
+                    .onMove(perform: selectedFilter == .all ? moveItems : nil)
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
             }
+            .safeAreaInset(edge: .top) {
+                HStack(spacing: 12) {
+                    Image(systemName: document.type.systemImage)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(document.type.color)
+                    Text(getCurrentDocument().title)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+                .background(Color(.systemGroupedBackground))
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             
             // Add New Item Bar
             addItemBar
@@ -561,6 +681,16 @@ struct DocumentDetailView: View {
                     addNewItem()
                 }
             
+            // Voice recording button
+            Button(action: toggleVoiceRecording) {
+                Image(systemName: isRecordingNewItem ? "stop.circle.fill" : "mic.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(isRecordingNewItem ? .red : .blue)
+                    .scaleEffect(isRecordingNewItem ? 1.1 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isRecordingNewItem)
+            }
+            .buttonStyle(.plain)
+            
             if !newItemText.isEmpty {
                 Button("Add") {
                     addNewItem()
@@ -572,6 +702,12 @@ struct DocumentDetailView: View {
         }
         .padding()
         .background(.regularMaterial)
+        .onAppear {
+            voiceRecorder.onTranscriptionComplete = { transcript in
+                newItemText = transcript
+                isRecordingNewItem = false
+            }
+        }
     }
     
     private var notesView: some View {
@@ -620,6 +756,27 @@ struct DocumentDetailView: View {
         
         // Haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+    }
+    
+    private func moveItems(from source: IndexSet, to destination: Int) {
+        documentStore.reorderItems(documentId: document.id, from: source, to: destination)
+        
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+    }
+    
+    private func toggleVoiceRecording() {
+        if isRecordingNewItem {
+            voiceRecorder.stopRecording()
+        } else {
+            voiceRecorder.startRecording()
+        }
+        isRecordingNewItem.toggle()
+        
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
     }
     
@@ -799,6 +956,94 @@ struct DocumentTypeButton: View {
     }
 }
 
+// MARK: - Voice Recorder for List Items
+class VoiceRecorder: ObservableObject {
+    private var audioEngine: AVAudioEngine?
+    private var speechRecognizer: SFSpeechRecognizer?
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
+    
+    var onTranscriptionComplete: ((String) -> Void)?
+    
+    init() {
+        speechRecognizer = SFSpeechRecognizer(locale: Locale.current)
+    }
+    
+    func startRecording() {
+        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            print("Speech recognizer not available")
+            return
+        }
+        
+        // Request permissions
+        SFSpeechRecognizer.requestAuthorization { authStatus in
+            guard authStatus == .authorized else {
+                print("Speech recognition not authorized")
+                return
+            }
+        }
+        
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            
+            audioEngine = AVAudioEngine()
+            recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+            
+            guard let audioEngine = audioEngine,
+                  let recognitionRequest = recognitionRequest else {
+                print("Failed to create audio engine or recognition request")
+                return
+            }
+            
+            recognitionRequest.shouldReportPartialResults = true
+            
+            let inputNode = audioEngine.inputNode
+            let recordingFormat = inputNode.outputFormat(forBus: 0)
+            
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+                recognitionRequest.append(buffer)
+            }
+            
+            audioEngine.prepare()
+            try audioEngine.start()
+            
+            recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+                if let result = result {
+                    let transcript = result.bestTranscription.formattedString
+                    if result.isFinal {
+                        DispatchQueue.main.async {
+                            self?.onTranscriptionComplete?(transcript)
+                        }
+                    }
+                }
+                
+                if error != nil || (result?.isFinal ?? false) {
+                    DispatchQueue.main.async {
+                        self?.stopRecording()
+                    }
+                }
+            }
+        } catch {
+            print("Failed to start recording: \(error)")
+        }
+    }
+    
+    func stopRecording() {
+        audioEngine?.stop()
+        audioEngine?.inputNode.removeTap(onBus: 0)
+        
+        recognitionRequest?.endAudio()
+        recognitionRequest = nil
+        
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        
+        audioEngine = nil
+    }
+}
+
 // MARK: - Press Gesture Extension
 extension View {
     func onPressGesture(onPress: @escaping () -> Void, onRelease: @escaping () -> Void) -> some View {
@@ -813,3 +1058,4 @@ extension View {
             }, perform: {})
     }
 }
+

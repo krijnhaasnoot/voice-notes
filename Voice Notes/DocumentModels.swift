@@ -249,6 +249,14 @@ class DocumentStore: ObservableObject {
         saveDocuments()
     }
     
+    func reorderItems(documentId: UUID, from source: IndexSet, to destination: Int) {
+        guard let docIndex = documents.firstIndex(where: { $0.id == documentId }) else { return }
+        
+        documents[docIndex].items.move(fromOffsets: source, toOffset: destination)
+        documents[docIndex].updatedAt = Date()
+        saveDocuments()
+    }
+    
     // MARK: - Recency Tracking
     func markOpened(_ documentId: UUID) {
         // Remove if already exists and add to front

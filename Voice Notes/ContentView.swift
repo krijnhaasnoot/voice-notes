@@ -25,8 +25,8 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geometry in
             let isLandscape = geometry.size.width > geometry.size.height
-            
-            NavigationView {
+
+            NavigationStack {
                 if isLandscape {
                     // Horizontal layout for landscape
                     HStack(spacing: 0) {
@@ -34,9 +34,9 @@ struct ContentView: View {
                         recordingSection
                             .frame(width: geometry.size.width * 0.4)
                             .background(Color(.systemGroupedBackground))
-                        
+
                         Divider()
-                        
+
                         // Right side - Recordings list
                         recordingsListSection
                             .frame(maxWidth: .infinity)
@@ -46,11 +46,6 @@ struct ContentView: View {
                     ZStack(alignment: .topTrailing) {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 20) {
-                                Text("Voice Notes")
-                                    .font(.system(size: 36, weight: .bold))
-                                    .padding(.top, 8)
-                                    .padding(.horizontal)
-
                                 VStack(spacing: 16) {
                                     recordButton
 
@@ -58,7 +53,7 @@ struct ContentView: View {
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 4)
-                                
+
                                 // Calendar in portrait mode
                                 if showingCalendar {
                                     LiquidCalendarView(selectedDate: $selectedCalendarDate, recordings: recordingsManager.recordings, startExpanded: true)
@@ -72,7 +67,7 @@ struct ContentView: View {
                                 HStack {
                                     Text("Recent Recordings")
                                         .font(.title2).bold()
-                                    
+
                                     if selectedCalendarDate != nil {
                                         Spacer()
                                         Button("Show All") {
@@ -89,17 +84,11 @@ struct ContentView: View {
                                 recordingsList
                             }
                         }
-
-                        HStack(spacing: 12) {
-                            settingsButton
-                            calendarButton
-                        }
-                        .padding(.top, 16)
-                        .padding(.trailing, 20)
+                        // Removed header overlay buttons in portrait mode
                     }
                 }
             }
-            .navigationBarHidden(true)
+            // Remove .navigationBarHidden(true)
             .onAppear { requestPermissions() }
             .alert("Permissions Required", isPresented: $showingPermissionAlert) {
                 Button("Settings") {
@@ -111,6 +100,21 @@ struct ContentView: View {
             } message: {
                 Text("Voice Notes needs microphone and speech recognition permissions to function.")
             }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: {
+                        withAnimation(.smooth(duration: 0.6, extraBounce: 0.2)) { showingCalendar.toggle() }
+                    }) { Image(systemName: showingCalendar ? "calendar.badge.checkmark" : "calendar") }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: { showingSettings = true }) { Image(systemName: "gearshape.fill") }
+                }
+            }
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbar(.visible, for: .navigationBar)
+            .navigationTitle("Voice Notes")
+            .navigationBarTitleDisplayMode(.large)
         }
         .sheet(item: $selectedRecording) { recording in
             RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
@@ -258,16 +262,10 @@ struct ContentView: View {
     private var recordingSection: some View {
         VStack(spacing: 24) {
             VStack(spacing: 16) {
-                Text("Voice Notes")
-                    .font(.system(size: 28, weight: .bold))
-                    .multilineTextAlignment(.center)
-                
                 recordButton
-                
                 recordingStatusView
             }
             .padding(.top, 40)
-            
             Spacer()
         }
         .padding()
@@ -281,7 +279,7 @@ struct ContentView: View {
                     Text("Recent Recordings")
                         .font(.title2)
                         .bold()
-                    
+
                     if selectedCalendarDate != nil {
                         Button("Show All") {
                             withAnimation(.smooth(duration: 0.4)) {
@@ -291,16 +289,10 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundColor(.blue)
                     }
-                    
+
                     Spacer()
-                    
-                    HStack(spacing: 12) {
-                        settingsButton
-                        calendarButton
-                    }
-                    .padding(.trailing, 8)
                 }
-                
+
                 // Calendar in landscape mode (more compact)
                 if showingCalendar {
                     LiquidCalendarView(selectedDate: $selectedCalendarDate, recordings: recordingsManager.recordings, startExpanded: true)
@@ -313,42 +305,9 @@ struct ContentView: View {
             .padding(.horizontal)
             .padding(.vertical, 16)
             .background(Color(.systemGroupedBackground))
-            
+
             ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(filteredRecordings) { recording in
-                        Button { selectedRecording = recording } label: {
-                            RecordingListRow(
-                                title: displayTitle(for: recording),
-                                date: recording.date,
-                                duration: recording.duration,
-                                preview: previewText(for: recording),
-                                status: recording.status,
-                                onCancel: recording.status.isProcessing ? {
-                                    recordingsManager.cancelProcessing(for: recording.id)
-                                } : nil,
-                                recording: recording
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .swipeActions(allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                recordingsManager.delete(id: recording.id)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                            
-                            Button {
-                                shareRecordingImmediately(recording)
-                            } label: {
-                                Label("Share", systemImage: "square.and.arrow.up")
-                            }
-                            .tint(.blue)
-                        }
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 20)
+                recordingsList
             }
         }
     }
@@ -452,7 +411,7 @@ struct ContentView: View {
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)
                 
-                if let selectedDate = selectedCalendarDate {
+                if selectedCalendarDate != nil {
                     Text("Try selecting a different date or create a new recording")
                         .font(.body)
                         .foregroundStyle(.tertiary)
@@ -479,41 +438,6 @@ struct ContentView: View {
         .animation(.smooth(duration: 0.6), value: selectedCalendarDate)
     }
     
-    private var calendarButton: some View {
-        Button(action: {
-            withAnimation(.smooth(duration: 0.6, extraBounce: 0.2)) {
-                showingCalendar.toggle()
-            }
-        }) {
-            Image(systemName: showingCalendar ? "calendar.badge.checkmark" : "calendar")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(.blue)
-                .frame(width: 32, height: 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-    
-    private var settingsButton: some View {
-        Button(action: {
-            showingSettings = true
-        }) {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(.gray)
-                .frame(width: 32, height: 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
 }
 
 struct SearchBar: View {
@@ -630,11 +554,17 @@ struct RecordingListRow: View, Equatable {
         }
     }
 
+    private static let dateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "MMM d 'at' h:mm a"
+        return df
+    }()
     private func dateFormatted(_ date: Date) -> String {
-        let df = DateFormatter(); df.dateFormat = "MMM d 'at' h:mm a"; return df.string(from: date)
+        Self.dateFormatter.string(from: date)
     }
     private func timeFormatted(_ interval: TimeInterval) -> String {
-        let m = Int(interval) / 60, s = Int(interval) % 60; return String(format: "%d:%02d", m, s)
+        let m = Int(interval) / 60, s = Int(interval) % 60
+        return String(format: "%d:%02d", m, s)
     }
 }
 

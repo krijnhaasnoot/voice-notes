@@ -20,7 +20,7 @@ class AudioRecorder: NSObject, ObservableObject {
     
     override init() {
         super.init()
-        permissionStatus = audioSession.recordPermission
+        self.permissionStatus = audioSession.recordPermission
         setupNotifications()
     }
     
@@ -371,3 +371,4 @@ extension AudioRecorder: AVAudioRecorderDelegate {
         }
     }
 }
+
