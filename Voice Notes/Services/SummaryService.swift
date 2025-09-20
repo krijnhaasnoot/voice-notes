@@ -188,6 +188,114 @@ actor SummaryService {
         }
     }
 
+    /// Detect if the transcript contains multiple speakers
+    func detectMultipleSpeakers(
+        transcript: String,
+        cancelToken: CancellationToken
+    ) async throws -> Bool {
+        let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        if cancelToken.isCancelled { throw SummarizationError.cancelled }
+
+        // First do simple heuristics check for performance
+        let conversationIndicators = [
+            "Speaker", "Person", "A:", "B:", "1:", "2:", 
+            "SPEAKER", "PERSON", "Speaker 1", "Speaker 2",
+            "Participant", "Interviewer", "Interviewee"
+        ]
+        
+        let hasIndicators = conversationIndicators.contains { indicator in
+            trimmed.contains(indicator)
+        }
+        
+        let hasMultipleLineBreaks = trimmed.components(separatedBy: "\n").count > 5
+        let hasQuestionMarks = trimmed.filter { $0 == "?" }.count > 2
+        
+        // If clear indicators, return early
+        if hasIndicators {
+            return true
+        }
+        
+        // If simple heuristics suggest single speaker, return early
+        if !hasMultipleLineBreaks && !hasQuestionMarks {
+            return false
+        }
+        
+        // Use AI for ambiguous cases
+        let apiKey = (Bundle.main.object(forInfoDictionaryKey: "OpenAIAPIKey") as? String ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !apiKey.isEmpty, !apiKey.hasPrefix("$(") else {
+            // Fall back to heuristics if no API key
+            return hasMultipleLineBreaks && hasQuestionMarks
+        }
+
+        let systemPrompt = """
+        You are a conversation analysis AI. Determine if this transcript contains multiple people speaking.
+        
+        Look for:
+        - Direct dialogue exchanges
+        - Multiple distinct speaking patterns
+        - Questions and responses between different people
+        - Changes in topics that suggest different speakers
+        - Different perspectives or viewpoints expressed
+        
+        Respond with only "YES" if multiple speakers are detected, or "NO" if it's a single person speaking.
+        """
+
+        let userPrompt = """
+        Analyze this transcript for multiple speakers:
+        
+        \"\"\"\(trimmed.prefix(2000))\"\"\"
+        """
+
+        // Minimal request/response models (reusing from detectMode)
+        struct Msg: Codable { let role: String; let content: String }
+        struct Req: Codable { let model: String; let messages: [Msg]; let temperature: Double; let max_tokens: Int }
+        struct Choice: Codable { struct M: Codable { let role: String; let content: String }; let index: Int?; let message: M }
+        struct Res: Codable { let choices: [Choice] }
+
+        let payload = Req(
+            model: model,
+            messages: [
+                .init(role: "system", content: systemPrompt),
+                .init(role: "user", content: userPrompt)
+            ],
+            temperature: 0.1,
+            max_tokens: 10
+        )
+
+        var req = URLRequest(url: endpoint)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.httpBody = try JSONEncoder().encode(payload)
+
+        if cancelToken.isCancelled { throw SummarizationError.cancelled }
+
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else {
+                return hasMultipleLineBreaks && hasQuestionMarks // Fallback
+            }
+
+            switch http.statusCode {
+            case 200:
+                let decoded = try JSONDecoder().decode(Res.self, from: data)
+                let result = decoded.choices.first?.message.content ?? ""
+                let response = result.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                
+                return response.contains("YES")
+
+            default:
+                return hasMultipleLineBreaks && hasQuestionMarks // Fallback
+            }
+        } catch {
+            if cancelToken.isCancelled { throw SummarizationError.cancelled }
+            return hasMultipleLineBreaks && hasQuestionMarks // Fallback
+        }
+    }
+
     /// Summarize a transcript into strict plain text with bold labels and bullets.
     func summarize(
         transcript: String,

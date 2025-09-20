@@ -26,14 +26,14 @@ struct DocumentRowView: View {
                     }
                 } else {
                     Text(document.title)
-                        .font(.headline)
+                        .font(.poppins.headline)
                         .lineLimit(1)
                 }
                 
                 HStack(spacing: 8) {
                     if document.type.usesChecklist {
                         Text("\(document.completedCount)/\(document.itemCount) items")
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundStyle(.secondary)
                         
                         if document.itemCount > 0 {
@@ -44,7 +44,7 @@ struct DocumentRowView: View {
                         }
                     } else {
                         Text(document.notes.isEmpty ? "No notes" : "Has notes")
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -102,7 +102,7 @@ struct QuickCreateButton: View {
     
     private var typeIcon: some View {
         Image(systemName: type.systemImage)
-            .font(.system(size: 24, weight: .medium))
+            .font(.poppins.medium(size: 24))
             .foregroundStyle(type.color)
     }
     
@@ -163,12 +163,12 @@ struct DocumentListOverviewView: View {
                 // Empty state
                 VStack(spacing: 16) {
                     Image(systemName: "list.bullet")
-                        .font(.system(size: 44))
+                        .font(.poppins.regular(size: 44))
                         .foregroundStyle(.tertiary)
                     Text("No lists yet")
-                        .font(.title3).fontWeight(.semibold)
+                        .font(.poppins.title3)
                     Text("Create a To‑Do, Shopping, Ideas or Meeting list.")
-                        .font(.callout)
+                        .font(.poppins.callout)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -232,7 +232,7 @@ struct DocumentListOverviewView: View {
             Image(systemName: type.systemImage)
                 .foregroundStyle(type.color)
             Text(type.displayName)
-                .font(.headline)
+                .font(.poppins.headline)
                 .foregroundStyle(.secondary)
         }
     }
@@ -254,7 +254,7 @@ struct CreateDocumentSheet: View {
             VStack(spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("List Title")
-                        .font(.headline)
+                        .font(.poppins.headline)
                     
                     TextField("Enter title...", text: $title)
                         .textFieldStyle(.roundedBorder)
@@ -262,7 +262,7 @@ struct CreateDocumentSheet: View {
                 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("List Type")
-                        .font(.headline)
+                        .font(.poppins.headline)
                     
                     LazyVGrid(columns: gridColumns, spacing: 16) {
                         ForEach(DocumentType.allCases, id: \.self) { type in
@@ -395,7 +395,7 @@ struct DocumentDetailView: View {
                         }
                     }) {
                         Image(systemName: "pencil")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.poppins.medium(size: 16))
                             .foregroundStyle(.blue)
                             .frame(width: 32, height: 32)
                             .background {
@@ -415,7 +415,7 @@ struct DocumentDetailView: View {
                     
                     Button(action: shareDocument) {
                         Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.poppins.medium(size: 16))
                             .foregroundStyle(.blue)
                             .frame(width: 32, height: 32)
                             .background {
@@ -559,13 +559,13 @@ struct DocumentDetailView: View {
                 if filteredItems.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: document.type.systemImage)
-                            .font(.system(size: 40, weight: .light))
+                            .font(.poppins.light(size: 40))
                             .foregroundStyle(.tertiary)
                         Text("No \(selectedFilter.rawValue.lowercased()) items")
-                            .font(.body)
+                            .font(.poppins.body)
                             .fontWeight(.medium)
                         Text("Add items or save action items from a recording.")
-                            .font(.callout)
+                            .font(.poppins.callout)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
@@ -621,11 +621,10 @@ struct DocumentDetailView: View {
             .safeAreaInset(edge: .top) {
                 HStack(spacing: 12) {
                     Image(systemName: document.type.systemImage)
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(.poppins.semiBold(size: 22))
                         .foregroundColor(document.type.color)
                     Text(getCurrentDocument().title)
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(.poppins.largeTitle)
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
                     Spacer()
@@ -649,16 +648,16 @@ struct DocumentDetailView: View {
             Spacer()
             
             Image(systemName: document.type.systemImage)
-                .font(.system(size: 48, weight: .light))
+                .font(.poppins.light(size: 48))
                 .foregroundStyle(.tertiary)
             
             VStack(spacing: 8) {
                 Text("No \(selectedFilter.rawValue.lowercased()) items")
-                    .font(.title3)
+                    .font(.poppins.title3)
                     .fontWeight(.medium)
                 
                 Text("Add items or save action items from a recording.")
-                    .font(.body)
+                    .font(.poppins.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -671,7 +670,7 @@ struct DocumentDetailView: View {
     private var addItemBar: some View {
         HStack(spacing: 12) {
             Image(systemName: "plus.circle.fill")
-                .font(.system(size: 20))
+                .font(.poppins.regular(size: 20))
                 .foregroundColor(.blue)
             
             TextField("Add item…", text: $newItemText)
@@ -684,7 +683,7 @@ struct DocumentDetailView: View {
             // Voice recording button
             Button(action: toggleVoiceRecording) {
                 Image(systemName: isRecordingNewItem ? "stop.circle.fill" : "mic.circle.fill")
-                    .font(.system(size: 20))
+                    .font(.poppins.regular(size: 20))
                     .foregroundColor(isRecordingNewItem ? .red : .blue)
                     .scaleEffect(isRecordingNewItem ? 1.1 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isRecordingNewItem)
@@ -695,7 +694,7 @@ struct DocumentDetailView: View {
                 Button("Add") {
                     addNewItem()
                 }
-                .font(.body)
+                .font(.poppins.body)
                 .fontWeight(.medium)
                 .foregroundColor(.blue)
             }
@@ -715,11 +714,11 @@ struct DocumentDetailView: View {
             // Header
             HStack {
                 Image(systemName: document.type.systemImage)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.poppins.medium(size: 20))
                     .foregroundColor(document.type.color)
                 
                 Text("Notes")
-                    .font(.title3)
+                    .font(.poppins.title3)
                     .fontWeight(.semibold)
                 
                 Spacer()
@@ -730,7 +729,7 @@ struct DocumentDetailView: View {
             // Notes Editor
             TextEditor(text: $notesText)
                 .focused($isNotesEditing)
-                .font(.body)
+                .font(.poppins.body)
                 .scrollContentBackground(.hidden)
                 .background(Color(.systemGroupedBackground))
                 .onChange(of: notesText) { _, newValue in
@@ -835,7 +834,7 @@ struct ChecklistItemView: View {
             // Checkbox
             Button(action: toggleItem) {
                 Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20))
+                    .font(.poppins.regular(size: 20))
                     .foregroundColor(item.isDone ? .green : .secondary)
             }
             .buttonStyle(.plain)
@@ -855,7 +854,7 @@ struct ChecklistItemView: View {
                     }
                 } else {
                     Text(item.text)
-                        .font(.body)
+                        .font(.poppins.body)
                         .strikethrough(item.isDone)
                         .foregroundColor(item.isDone ? .secondary : .primary)
                         .multilineTextAlignment(.leading)
@@ -933,7 +932,7 @@ struct DocumentTypeButton: View {
     
     private var typeIcon: some View {
         Image(systemName: type.systemImage)
-            .font(.system(size: 24, weight: .medium))
+            .font(.poppins.medium(size: 24))
             .foregroundStyle(isSelected ? .white : type.color)
     }
     

@@ -294,6 +294,42 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
+    func pauseRecording() {
+        guard isRecording, let recorder = audioRecorder else { return }
+        
+        print("🎵 Pausing recording...")
+        recorder.pause()
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+    }
+    
+    func resumeRecording() {
+        guard isRecording, let recorder = audioRecorder else { return }
+        
+        print("🎵 Resuming recording...")
+        guard recorder.record() else {
+            print("🎵 ❌ Failed to resume recording")
+            lastError = "Failed to resume recording"
+            return
+        }
+        
+        // Restart timer for duration updates
+        recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            if let startTime = self.recordingStartTime {
+                let currentDuration = Date().timeIntervalSince(startTime)
+                self.recordingDuration = currentDuration
+                
+                // Stop recording if max duration reached (1 hour)
+                if currentDuration >= self.maxRecordingDuration {
+                    print("🎵 Maximum recording duration reached, stopping recording")
+                    Task { @MainActor in
+                        let _ = self.stopRecording()
+                    }
+                }
+            }
+        }
+    }
+    
     func getDocumentsDirectory() -> URL {
         return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }

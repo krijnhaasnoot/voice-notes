@@ -21,6 +21,7 @@ struct ContentView: View {
     @State private var showingCalendar = false
     @State private var showingSettings = false
     @State private var searchText = ""
+    @State private var showingAlternativeView = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -66,7 +67,7 @@ struct ContentView: View {
 
                                 HStack {
                                     Text("Recent Recordings")
-                                        .font(.title2).bold()
+                                        .font(.poppins.semiBold(size: 32))
 
                                     if selectedCalendarDate != nil {
                                         Spacer()
@@ -75,7 +76,7 @@ struct ContentView: View {
                                                 selectedCalendarDate = nil
                                             }
                                         }
-                                        .font(.caption)
+                                        .font(.poppins.caption)
                                         .foregroundColor(.blue)
                                     }
                                 }
@@ -123,7 +124,7 @@ struct ContentView: View {
             ShareSheet(items: shareItems)
         }
         .sheet(isPresented: $showingSettings) {
-            SettingsView()
+            SettingsView(showingAlternativeView: $showingAlternativeView)
         }
     }
 
@@ -318,13 +319,13 @@ struct ContentView: View {
         VStack(spacing: 8) {
             if let error = audioRecorder.lastError {
                 Text(error)
-                    .font(.caption)
+                    .font(.poppins.caption)
                     .foregroundColor(.blue)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             } else {
                 Text(audioRecorder.isRecording ? "Recording… \(Int(audioRecorder.recordingDuration))s" : "Tap to start recording")
-                    .font(.title3)
+                    .font(.poppins.title3)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -334,21 +335,21 @@ struct ContentView: View {
                 switch mostRecent.status {
                 case .transcribing(let progress):
                     Text("Transcribing: \(Int(progress * 100))%")
-                        .font(.caption)
+                        .font(.poppins.caption)
                         .foregroundColor(.blue)
                 case .summarizing(let progress):
                     Text("Summarizing: \(Int(progress * 100))%")
-                        .font(.caption)
+                        .font(.poppins.caption)
                         .foregroundColor(.green)
                 case .failed(let reason):
                     Text("Failed: \(reason)")
-                        .font(.caption)
+                        .font(.poppins.caption)
                         .foregroundColor(.red)
                         .multilineTextAlignment(.center)
                 case .done:
                     if let transcript = mostRecent.transcript, !transcript.isEmpty {
                         Text("✅ Transcribed: \(transcript.count) chars")
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundColor(.green)
                     }
                 case .idle:
@@ -402,23 +403,22 @@ struct ContentView: View {
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: selectedCalendarDate != nil ? "calendar.badge.exclamationmark" : "mic.slash")
-                .font(.system(size: 48, weight: .light))
+                .font(.poppins.regular(size: 48))
                 .foregroundStyle(.tertiary)
             
             VStack(spacing: 8) {
                 Text(selectedCalendarDate != nil ? "No recordings for this date" : "No recordings yet")
-                    .font(.title3)
-                    .fontWeight(.medium)
+                    .font(.poppins.title3)
                     .foregroundStyle(.secondary)
                 
                 if selectedCalendarDate != nil {
                     Text("Try selecting a different date or create a new recording")
-                        .font(.body)
+                        .font(.poppins.body)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
                 } else {
                     Text("Tap the record button to create your first voice note")
-                        .font(.body)
+                        .font(.poppins.body)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
                 }
@@ -477,13 +477,13 @@ struct RecordingListRow: View, Equatable {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
-                    .font(.headline)
+                    .font(.poppins.headline)
                     .lineLimit(2)
                 HStack(spacing: 10) {
                     Text(dateFormatted(date))
                     HStack(spacing: 4) { Image(systemName: "clock"); Text(timeFormatted(duration)) }
                 }
-                .font(.subheadline)
+                .font(.poppins.subheadline)
                 .foregroundColor(.secondary)
                 
                 statusView
@@ -520,7 +520,7 @@ struct RecordingListRow: View, Equatable {
                 ProgressView(value: progress)
                     .frame(width: 100)
                 Text("Transcribing... \(Int(progress * 100))%")
-                    .font(.subheadline)
+                    .font(.poppins.subheadline)
                     .foregroundColor(.blue)
             }
             
@@ -529,7 +529,7 @@ struct RecordingListRow: View, Equatable {
                 ProgressView(value: progress)
                     .frame(width: 100)
                 Text("Summarizing... \(Int(progress * 100))%")
-                    .font(.subheadline)
+                    .font(.poppins.subheadline)
                     .foregroundColor(.orange)
             }
             
@@ -537,9 +537,9 @@ struct RecordingListRow: View, Equatable {
             HStack {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.red)
-                    .font(.subheadline)
+                    .font(.poppins.subheadline)
                 Text("Failed: \(reason)")
-                    .font(.subheadline)
+                    .font(.poppins.subheadline)
                     .foregroundColor(.red)
                     .lineLimit(1)
             }
@@ -547,7 +547,7 @@ struct RecordingListRow: View, Equatable {
         case .done, .idle:
             if !preview.isEmpty { 
                 Text(preview)
-                    .font(.subheadline)
+                    .font(.poppins.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(2) 
             }

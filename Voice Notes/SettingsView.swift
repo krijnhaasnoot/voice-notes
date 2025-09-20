@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension SummaryMode {
     var description: String {
@@ -25,8 +26,10 @@ struct SettingsView: View {
     @AppStorage("autoDetectMode") private var autoDetectMode: Bool = false
     @AppStorage("defaultDocumentType") private var defaultDocumentType: String = DocumentType.todo.rawValue
     @AppStorage("autoSaveToDocuments") private var autoSaveToDocuments: Bool = false
+    @AppStorage("useCompactView") private var useCompactView: Bool = true
     
-    @Environment(\.presentationMode) var presentationMode
+    @Binding var showingAlternativeView: Bool
+    @Environment(\.dismiss) private var dismiss
     @State private var showingTour = false
     
     private var selectedMode: SummaryMode {
@@ -47,7 +50,7 @@ struct SettingsView: View {
                     // Default Mode Picker
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Default Mode")
-                            .font(.headline)
+                            .font(.poppins.headline)
                         
                         Picker("Default Mode", selection: Binding(
                             get: { selectedMode },
@@ -56,9 +59,9 @@ struct SettingsView: View {
                             ForEach(SummaryMode.allCases, id: \.self) { mode in
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(mode.displayName)
-                                        .font(.body)
+                                        .font(.poppins.body)
                                     Text(mode.description)
-                                        .font(.caption)
+                                        .font(.poppins.caption)
                                         .foregroundColor(.secondary)
                                 }
                                 .tag(mode)
@@ -67,7 +70,7 @@ struct SettingsView: View {
                         .pickerStyle(.menu)
                         
                         Text(selectedMode.description)
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
@@ -75,7 +78,7 @@ struct SettingsView: View {
                     // Summary Length Picker
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Summary Detail Level")
-                            .font(.headline)
+                            .font(.poppins.headline)
                         
                         Picker("Summary Length", selection: Binding(
                             get: { selectedSummaryLength },
@@ -84,9 +87,9 @@ struct SettingsView: View {
                             ForEach(SummaryLength.allCases) { length in
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(length.displayName)
-                                        .font(.body)
+                                        .font(.poppins.body)
                                     Text(length.description)
-                                        .font(.caption)
+                                        .font(.poppins.caption)
                                         .foregroundColor(.secondary)
                                 }
                                 .tag(length)
@@ -95,7 +98,7 @@ struct SettingsView: View {
                         .pickerStyle(.menu)
                         
                         Text(selectedSummaryLength.description)
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
@@ -103,12 +106,12 @@ struct SettingsView: View {
                     // Auto-detection Toggle
                     VStack(alignment: .leading, spacing: 8) {
                         Toggle("Automatic Mode Detection", isOn: $autoDetectMode)
-                            .font(.headline)
+                            .font(.poppins.headline)
                         
                         Text(autoDetectMode ? 
                              "The app automatically detects which mode best fits the recording content." :
                              "Always uses the default mode for summaries.")
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
@@ -118,7 +121,7 @@ struct SettingsView: View {
                     // Default List Type Picker
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Default List Type")
-                            .font(.headline)
+                            .font(.poppins.headline)
                         
                         Picker("Default List Type", selection: Binding(
                             get: { selectedDocumentType },
@@ -136,7 +139,7 @@ struct SettingsView: View {
                         .pickerStyle(.menu)
                         
                         Text("When saving action items, use \(selectedDocumentType.displayName) by default if no better type is detected.")
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
@@ -144,12 +147,44 @@ struct SettingsView: View {
                     // Auto-save to documents Toggle
                     VStack(alignment: .leading, spacing: 8) {
                         Toggle("Auto-save Action Items", isOn: $autoSaveToDocuments)
-                            .font(.headline)
+                            .font(.poppins.headline)
                         
                         Text(autoSaveToDocuments ? 
                              "Automatically saves detected action items to lists without asking." :
                              "Asks before saving action items to lists.")
-                            .font(.caption)
+                            .font(.poppins.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+                
+                Section(header: Text("Interface")) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Compact Recording View", isOn: Binding(
+                            get: { useCompactView },
+                            set: { newValue in
+                                useCompactView = newValue
+                                if newValue {
+                                    // Light haptic feedback
+                                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                    impactFeedback.impactOccurred()
+                                    
+                                    dismiss()
+                                    
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                            showingAlternativeView = true
+                                        }
+                                    }
+                                }
+                            }
+                        ))
+                            .font(.poppins.headline)
+                        
+                        Text(useCompactView ? 
+                             "Using minimalist recording interface with larger controls and cleaner design" :
+                             "Switch to minimalist recording interface with larger controls and cleaner design")
+                            .font(.poppins.caption)
                             .foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
@@ -159,25 +194,24 @@ struct SettingsView: View {
                     Button(action: { showingTour = true }) {
                         HStack(spacing: 12) {
                             Image(systemName: "play.circle.fill")
-                                .font(.system(size: 20))
+                                .font(.poppins.regular(size: 20))
                                 .foregroundColor(.blue)
                                 .frame(width: 28, height: 28)
                             
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Take the Tour")
-                                    .font(.body)
-                                    .fontWeight(.medium)
+                                    .font(.poppins.body)
                                     .foregroundColor(.primary)
                                 
                                 Text("Learn about Voice Notes features")
-                                    .font(.caption)
+                                    .font(.poppins.caption)
                                     .foregroundColor(.secondary)
                             }
                             
                             Spacer()
                             
                             Image(systemName: "chevron.right")
-                                .font(.caption)
+                                .font(.poppins.caption)
                                 .foregroundStyle(.tertiary)
                         }
                     }
@@ -218,14 +252,16 @@ struct SettingsView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Done") {
-                    presentationMode.wrappedValue.dismiss()
+                    dismiss()
                 }
-                .font(.headline)
+                .font(.poppins.headline)
                 .foregroundColor(.blue)
             }
         }
         .sheet(isPresented: $showingTour) {
-            AppTourView()
+            AppTourView(onComplete: {
+                showingTour = false
+            })
         }
     }
 }
@@ -238,17 +274,17 @@ struct SettingsInfoRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 20))
+                .font(.poppins.regular(size: 20))
                 .foregroundColor(.blue)
                 .frame(width: 28, height: 28)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.body)
+                    .font(.poppins.body)
                     .fontWeight(.medium)
                 
                 Text(description)
-                    .font(.caption)
+                    .font(.poppins.caption)
                     .foregroundColor(.secondary)
             }
             
@@ -258,5 +294,5 @@ struct SettingsInfoRow: View {
 }
 
 #Preview {
-    SettingsView()
+    SettingsView(showingAlternativeView: .constant(false))
 }

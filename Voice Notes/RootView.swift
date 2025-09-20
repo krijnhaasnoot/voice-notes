@@ -4,11 +4,13 @@ import Speech
 // MARK: - Tab Selection Enum
 enum Tab: String, CaseIterable {
     case home = "home"
+    case recordings = "recordings"
     case documents = "documents"
     
     var title: String {
         switch self {
         case .home: return "Home"
+        case .recordings: return "Recordings"
         case .documents: return "Lists"
         }
     }
@@ -16,6 +18,7 @@ enum Tab: String, CaseIterable {
     var systemImage: String {
         switch self {
         case .home: return "house"
+        case .recordings: return "waveform"
         case .documents: return "doc.text"
         }
     }
@@ -33,6 +36,7 @@ struct RootView: View {
     @StateObject private var recordingsManager = RecordingsManager()
     @EnvironmentObject var documentStore: DocumentStore
     @AppStorage("hasCompletedTour") private var hasCompletedTour = false
+    @AppStorage("useCompactView") private var useCompactView = true
     @State private var showingTour = false
     
     var body: some View {
@@ -48,6 +52,18 @@ struct RootView: View {
                 Label(Tab.home.title, systemImage: Tab.home.systemImage)
             }
             .tag(Tab.home)
+            
+            // Recordings Tab
+            NavigationStack {
+                RecordingsView(
+                    audioRecorder: audioRecorder,
+                    recordingsManager: recordingsManager
+                )
+            }
+            .tabItem {
+                Label(Tab.recordings.title, systemImage: Tab.recordings.systemImage)
+            }
+            .tag(Tab.recordings)
             
             // Lists Tab
             NavigationStack {
@@ -104,22 +120,6 @@ struct DocumentsView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showingCreateSheet = true }) {
                     Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(.blue)
-                        .frame(width: 32, height: 32)
-                        .background {
-                            Circle()
-                                .fill(.regularMaterial)
-                                .overlay {
-                                    Circle()
-                                        .stroke(.quaternary.opacity(0.6), lineWidth: 1)
-                                }
-                                .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                        }
-                }
-                .buttonStyle(.plain)
-                .if(isLiquidGlassAvailable) { view in
-                    view.glassEffect(.regular)
                 }
             }
         }
@@ -145,17 +145,16 @@ struct DocumentsView: View {
         VStack(spacing: 24) {
             VStack(spacing: 16) {
                 Image(systemName: "doc.text")
-                    .font(.system(size: 64, weight: .light))
+                    .font(.poppins.light(size: 64))
                     .foregroundStyle(.tertiary)
                 
                 VStack(spacing: 8) {
                     Text("Create your first document")
-                        .font(.title2)
-                        .fontWeight(.semibold)
+                        .font(.poppins.title2)
                         .foregroundStyle(.primary)
                     
                     Text("Organize your voice notes into actionable documents")
-                        .font(.body)
+                        .font(.poppins.body)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
@@ -220,7 +219,7 @@ struct DocumentsView: View {
     private var undoToast: some View {
         HStack {
             Text("List deleted")
-                .font(.body)
+                .font(.poppins.body)
                 .foregroundColor(.white)
             
             Spacer()
@@ -228,7 +227,7 @@ struct DocumentsView: View {
             Button("Undo") {
                 documentStore.undoDeleteDocument()
             }
-            .font(.body)
+            .font(.poppins.body)
             .fontWeight(.semibold)
             .foregroundColor(.yellow)
         }
@@ -268,7 +267,7 @@ struct SearchView: View {
             // Header
             HStack {
                 Text("Search")
-                    .font(.title2)
+                    .font(.poppins.title2)
                     .fontWeight(.semibold)
                 
                 Spacer()
@@ -276,7 +275,7 @@ struct SearchView: View {
                 Button("Done") {
                     dismiss()
                 }
-                .font(.system(size: 16, weight: .medium))
+                .font(.poppins.medium(size: 16))
                 .foregroundStyle(.blue)
                 .frame(width: 64, height: 32)
                 .background {
@@ -351,7 +350,7 @@ struct SearchView: View {
     private var emptyStateView: some View {
         VStack(spacing: 20) {
             Image(systemName: selectedTab.systemImage)
-                .font(.system(size: 64, weight: .light))
+                .font(.poppins.light(size: 64))
                 .foregroundStyle(.tertiary)
             
             VStack(spacing: 8) {
@@ -363,7 +362,7 @@ struct SearchView: View {
                 Text(selectedTab == .recordings ? 
                      "Find recordings by title, content, or transcript" :
                      "Find lists and items by title or content")
-                    .font(.body)
+                    .font(.poppins.body)
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
             }
@@ -446,7 +445,7 @@ struct SearchDocumentRow: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 Image(systemName: document.type.systemImage)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.poppins.medium(size: 20))
                     .foregroundStyle(document.type.color)
                     .frame(width: 24)
                 
@@ -457,21 +456,21 @@ struct SearchDocumentRow: View {
                     
                     HStack(spacing: 8) {
                         Text(document.type.displayName)
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundStyle(.secondary)
                         
                         if document.type.usesChecklist {
                             Text("•")
                                 .foregroundStyle(.quaternary)
                             Text("\(document.completedCount)/\(document.itemCount) items")
-                                .font(.caption)
+                                .font(.poppins.caption)
                                 .foregroundStyle(.secondary)
                         }
                         
                         Spacer()
                         
                         Text(RelativeDateTimeFormatter().localizedString(for: document.updatedAt, relativeTo: Date()))
-                            .font(.caption2)
+                            .font(.poppins.caption2)
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -479,7 +478,7 @@ struct SearchDocumentRow: View {
                 Spacer()
                 
                 Image(systemName: "chevron.right")
-                    .font(.caption)
+                    .font(.poppins.caption)
                     .foregroundStyle(.tertiary)
             }
             
@@ -488,14 +487,13 @@ struct SearchDocumentRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     if !matchingItems.isEmpty {
                         Text("Matching items:")
-                            .font(.caption)
-                            .fontWeight(.medium)
+                            .font(.poppins.caption)
                             .foregroundStyle(.secondary)
                         
                         ForEach(Array(matchingItems.prefix(2)), id: \.id) { item in
                             HStack(spacing: 6) {
                                 Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
-                                    .font(.caption)
+                                    .font(.poppins.caption)
                                     .foregroundStyle(item.isDone ? .green : .secondary)
                                 
                                 Text(highlightedText(item.text))
@@ -507,14 +505,14 @@ struct SearchDocumentRow: View {
                         
                         if matchingItems.count > 2 {
                             Text("and \(matchingItems.count - 2) more...")
-                                .font(.caption2)
+                                .font(.poppins.caption2)
                                 .foregroundStyle(.tertiary)
                         }
                     }
                     
                     if hasContentMatch {
                         Text("Notes contain: \"\(searchText)\"")
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundStyle(.secondary)
                             .italic()
                     }
@@ -551,85 +549,103 @@ struct HomeView: View {
     @State private var showingPermissionAlert = false
     @State private var permissionGranted = false
     @State private var selectedRecording: Recording?
-    @State private var searchText: String = ""
-    @State private var debouncedSearchText: String = ""
-    @State private var searchScope: SearchScope = .all
-    @FocusState private var isSearchFocused: Bool
     @State private var currentRecordingFileName: String?
-    @State private var isSharePresented = false
-    @State private var shareItems: [Any] = ["Transcript wordt nog gemaakt…"]
-    @State private var selectedCalendarDate: Date?
-    @State private var showingCalendar = false
     @State private var showingSettings = false
-    @State private var showingSearch = false
-    
-    enum SearchScope: String, CaseIterable {
-        case all = "All"
-        case transcripts = "Transcripts"
-        case titles = "Titles"
-    }
+    @State private var showingAlternativeView = false
+    @State private var isPaused = false
+    @AppStorage("useCompactView") private var useCompactView = true
 
     var body: some View {
-        GeometryReader { geometry in
-            let isLandscape = geometry.size.width > geometry.size.height
-            
-            if isLandscape {
-                // Horizontal layout for landscape
-                HStack(spacing: 0) {
-                    // Left side - Record button section
-                    recordingSection
-                        .frame(width: geometry.size.width * 0.4)
-                        .background(Color(.systemGroupedBackground))
-                    
-                    Divider()
-                    
-                    // Right side - Recordings list
-                    recordingsListSection
-                        .frame(maxWidth: .infinity)
-                }
-            } else {
-                // Portrait layout with sticky header
-                ZStack(alignment: .topTrailing) {
-                    // Main content with sticky header
-                    VStack(spacing: 0) {
-                        // Sticky header
-                        stickyHeader
-                        
-                        // Scrollable content
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 20) {
-                                // Calendar in portrait mode
-                                if showingCalendar {
-                                    LiquidCalendarView(selectedDate: $selectedCalendarDate, recordings: recordingsManager.recordings, startExpanded: true)
-                                        .padding(.horizontal)
-                                        .transition(.asymmetric(
-                                            insertion: .push(from: .top).combined(with: .opacity),
-                                            removal: .push(from: .bottom).combined(with: .opacity)
-                                        ))
-                                }
-
-                                HStack {
-                                    Text("Recent Recordings")
-                                        .font(.title2).bold()
-                                    
-                                    if selectedCalendarDate != nil {
-                                        Spacer()
-                                        Button("Show All") {
-                                            withAnimation(.smooth(duration: 0.4)) {
-                                                selectedCalendarDate = nil
-                                            }
-                                        }
-                                        .font(.caption)
-                                        .foregroundColor(.blue)
-                                    }
-                                }
-                                .padding(.horizontal)
-                                .padding(.top, 16)
-
-                                recordingsList
+        if showingAlternativeView || useCompactView {
+            AlternativeHomeView(
+                audioRecorder: audioRecorder,
+                recordingsManager: recordingsManager
+            )
+            .gesture(
+                DragGesture()
+                    .onEnded { gesture in
+                        // Swipe down to return to original view (only if not set by toggle)
+                        if gesture.translation.height > 100 && !useCompactView {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                showingAlternativeView = false
                             }
                         }
                     }
+            )
+            .transition(.asymmetric(
+                insertion: .push(from: .top),
+                removal: .push(from: .bottom)
+            ))
+        } else {
+            originalHomeView
+                .gesture(
+                    DragGesture()
+                        .onEnded { gesture in
+                            // Swipe up on the top part to show alternative view
+                            if gesture.translation.height < -100 && gesture.startLocation.y < 200 {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                    showingAlternativeView = true
+                                }
+                            }
+                        }
+                )
+        }
+    }
+    
+    private var originalHomeView: some View {
+        VStack(spacing: 0) {
+            // Sticky header
+            stickyHeader
+            
+            // Simple content area with welcome message
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Welcome/info section
+                    VStack(spacing: 16) {
+                        Image(systemName: "waveform.circle.fill")
+                            .font(.system(size: 64, weight: .light))
+                            .foregroundStyle(.blue.opacity(0.6))
+                        
+                        VStack(spacing: 8) {
+                            Text("Ready to Record")
+                                .font(.poppins.title2)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.primary)
+                            
+                            Text("Tap the record button above to create a new voice note. Your recordings will appear in the Recordings tab.")
+                                .font(.poppins.body)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                    }
+                    .padding(.top, 40)
+                    
+                    // Quick stats (if there are recordings)
+                    if !recordingsManager.recordings.isEmpty {
+                        VStack(spacing: 12) {
+                            Text("Your Voice Notes")
+                                .font(.poppins.headline)
+                                .foregroundStyle(.primary)
+                            
+                            HStack(spacing: 24) {
+                                StatCard(
+                                    icon: "waveform",
+                                    value: "\(recordingsManager.recordings.count)",
+                                    label: "Recording\(recordingsManager.recordings.count == 1 ? "" : "s")"
+                                )
+                                
+                                StatCard(
+                                    icon: "clock",
+                                    value: totalDurationText,
+                                    label: "Total Time"
+                                )
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    Spacer(minLength: 100)
                 }
             }
         }
@@ -648,59 +664,127 @@ struct HomeView: View {
         .sheet(item: $selectedRecording) { recording in
             RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
         }
-        .sheet(isPresented: $isSharePresented) {
-            ShareSheet(items: shareItems)
-        }
         .sheet(isPresented: $showingSettings) {
-            SettingsView()
-        }
-        .sheet(isPresented: $showingSearch) {
-            NavigationView {
-                SearchView(recordingsManager: recordingsManager)
-            }
+            SettingsView(showingAlternativeView: $showingAlternativeView)
         }
         .dismissKeyboardOnTap()
     }
+    
+    // MARK: - Helper Properties
+    
+    private var totalDurationText: String {
+        let totalSeconds = recordingsManager.recordings.reduce(0) { $0 + $1.duration }
+        let hours = Int(totalSeconds) / 3600
+        let minutes = Int(totalSeconds) % 3600 / 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+}
 
-    private var recordButton: some View {
-        Button(action: {
-            if permissionGranted {
-                toggleRecording()
-            } else {
-                requestPermissions()
-            }
-        }) {
-            ZStack {
-                Circle()
-                    .fill(.regularMaterial)
-                    .frame(width: 80, height: 80)
-                    .overlay {
+// MARK: - StatCard Component
+struct StatCard: View {
+    let icon: String
+    let value: String
+    let label: String
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(.blue)
+            
+            Text(value)
+                .font(.poppins.title3)
+                .fontWeight(.semibold)
+                .foregroundStyle(.primary)
+            
+            Text(label)
+                .font(.poppins.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(.regularMaterial)
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+    }
+}
+
+extension HomeView {
+    private var recordingControls: some View {
+        HStack(spacing: 20) {
+            // Pause button (only visible when recording)
+            if audioRecorder.isRecording {
+                Button(action: togglePause) {
+                    ZStack {
                         Circle()
-                            .stroke(.quaternary, lineWidth: 1)
+                            .fill(.regularMaterial)
+                            .frame(width: 60, height: 60)
+                            .overlay {
+                                Circle()
+                                    .stroke(.quaternary, lineWidth: 1)
+                            }
+                            .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+                        
+                        Image(systemName: isPaused ? "play.fill" : "pause.fill")
+                            .font(.title2)
+                            .foregroundStyle(.blue)
                     }
-                    .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
-                
-                Circle()
-                    .fill(audioRecorder.isRecording ? 
-                          LinearGradient(colors: [.red.opacity(0.8), .red], startPoint: .top, endPoint: .bottom) : 
-                          LinearGradient(colors: [.blue.opacity(0.8), .blue], startPoint: .top, endPoint: .bottom))
-                    .frame(width: 60, height: 60)
-                    .overlay {
-                        Image(systemName: audioRecorder.isRecording ? "stop.fill" : "mic.fill")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
-                    }
+                }
+                .buttonStyle(.plain)
+                .contentShape(Circle())
+                .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .scale.combined(with: .opacity)))
+                .accessibilityLabel(isPaused ? "Resume recording" : "Pause recording")
+                .if(isLiquidGlassAvailable) { view in
+                    view.glassEffect(.regular.interactive())
+                }
+            }
+            
+            // Main record button
+            Button(action: {
+                if permissionGranted {
+                    toggleRecording()
+                } else {
+                    requestPermissions()
+                }
+            }) {
+                ZStack {
+                    Circle()
+                        .fill(.regularMaterial)
+                        .frame(width: 80, height: 80)
+                        .overlay {
+                            Circle()
+                                .stroke(.quaternary, lineWidth: 1)
+                        }
+                        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+                    
+                    Circle()
+                        .fill(audioRecorder.isRecording ? 
+                              LinearGradient(colors: [.red.opacity(0.8), .red], startPoint: .top, endPoint: .bottom) : 
+                              LinearGradient(colors: [.blue.opacity(0.8), .blue], startPoint: .top, endPoint: .bottom))
+                        .frame(width: 60, height: 60)
+                        .overlay {
+                            Image(systemName: audioRecorder.isRecording ? "stop.fill" : "mic.fill")
+                                .font(.poppins.bold(size: 24))
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+                        }
+                }
+            }
+            .buttonStyle(.plain)
+            .contentShape(Circle())
+            .scaleEffect(audioRecorder.isRecording ? 0.95 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: audioRecorder.isRecording)
+            .accessibilityLabel(audioRecorder.isRecording ? "Stop recording" : "Start recording")
+            .if(isLiquidGlassAvailable) { view in
+                view.glassEffect(.regular.interactive())
             }
         }
-        .buttonStyle(.plain)
-        .contentShape(Circle())
-        .scaleEffect(audioRecorder.isRecording ? 0.95 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: audioRecorder.isRecording)
-        .accessibilityLabel(audioRecorder.isRecording ? "Stop recording" : "Start recording")
-        .if(isLiquidGlassAvailable) { view in
-            view.glassEffect(.regular.interactive())
-        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: audioRecorder.isRecording)
     }
     
     private var recordingStatusView: some View {
@@ -712,7 +796,7 @@ struct HomeView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             } else {
-                Text(audioRecorder.isRecording ? "Recording… \(Int(audioRecorder.recordingDuration))s" : "Tap to start recording")
+                Text(recordingStatusText)
                     .font(.title3)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -747,62 +831,25 @@ struct HomeView: View {
         }
     }
 
-    private var filteredRecordings: [Recording] {
-        var recordings = recordingsManager.recordings
-        
-        // Filter by selected date if one is chosen
-        if let selectedDate = selectedCalendarDate {
-            recordings = recordings.filter { recording in
-                Calendar.current.isDate(recording.date, inSameDayAs: selectedDate)
-            }
-        }
-        
-        // Filter by debounced search query with scopes
-        let query = debouncedSearchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if !query.isEmpty {
-            recordings = recordings.filter { recording in
-                switch searchScope {
-                case .all:
-                    return displayTitle(for: recording).localizedCaseInsensitiveContains(query) ||
-                           recording.fileName.localizedCaseInsensitiveContains(query) ||
-                           (recording.transcript?.localizedCaseInsensitiveContains(query) ?? false) ||
-                           (recording.summary?.localizedCaseInsensitiveContains(query) ?? false)
-                
-                case .transcripts:
-                    return (recording.transcript?.localizedCaseInsensitiveContains(query) ?? false) ||
-                           (recording.summary?.localizedCaseInsensitiveContains(query) ?? false)
-                
-                case .titles:
-                    return displayTitle(for: recording).localizedCaseInsensitiveContains(query) ||
-                           recording.fileName.localizedCaseInsensitiveContains(query)
-                }
-            }
-        }
-        
-        return recordings
-    }
-
     // MARK: - Sticky Header Component
     private var stickyHeader: some View {
         VStack(spacing: 16) {
             // Title row with control buttons
             HStack {
                 Text("Voice Notes")
-                    .font(.system(size: 36, weight: .bold))
+                    .font(.poppins.bold(size: 36))
                 
                 Spacer()
                 
                 HStack(spacing: 8) {
-                    searchButton
                     settingsButton
-                    calendarButton
                 }
             }
             .padding(.top, 8)
             
             // Centered mic button and status
             VStack(spacing: 16) {
-                recordButton
+                recordingControls
                 recordingStatusView
             }
             .frame(maxWidth: .infinity)
@@ -818,230 +865,12 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Horizontal Layout Components
-    private var recordingSection: some View {
-        VStack(spacing: 24) {
-            VStack(spacing: 16) {
-                Text("Voice Notes")
-                    .font(.system(size: 28, weight: .bold))
-                    .multilineTextAlignment(.center)
-                
-                recordButton
-                
-                recordingStatusView
-            }
-            .padding(.top, 40)
-            
-            Spacer()
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-    }
-    
-    private var recordingsListSection: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 12) {
-                HStack {
-                    Text("Recent Recordings")
-                        .font(.title2)
-                        .bold()
-                    
-                    if selectedCalendarDate != nil {
-                        Button("Show All") {
-                            withAnimation(.smooth(duration: 0.4)) {
-                                selectedCalendarDate = nil
-                            }
-                        }
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                    }
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 8) {
-                        searchButton
-                        settingsButton
-                        calendarButton
-                    }
-                    .padding(.trailing, 8)
-                }
-                
-                // Calendar in landscape mode (more compact)
-                if showingCalendar {
-                    LiquidCalendarView(selectedDate: $selectedCalendarDate, recordings: recordingsManager.recordings, startExpanded: true)
-                        .transition(.asymmetric(
-                            insertion: .push(from: .top).combined(with: .opacity),
-                            removal: .push(from: .bottom).combined(with: .opacity)
-                        ))
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 16)
-            .background(Color(.systemGroupedBackground))
-            
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(filteredRecordings) { recording in
-                        Button { selectedRecording = recording } label: {
-                            RecordingListRow(
-                                title: displayTitle(for: recording),
-                                date: recording.date,
-                                duration: recording.duration,
-                                preview: previewText(for: recording),
-                                status: recording.status,
-                                onCancel: recording.status.isProcessing ? {
-                                    recordingsManager.cancelProcessing(for: recording.id)
-                                } : nil,
-                                recording: recording
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .swipeActions(allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                recordingsManager.delete(id: recording.id)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                            
-                            Button {
-                                shareRecordingImmediately(recording)
-                            } label: {
-                                Label("Share", systemImage: "square.and.arrow.up")
-                            }
-                            .tint(.blue)
-                        }
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 20)
-            }
-        }
-    }
-    
-    private var recordingsList: some View {
-        LazyVStack(spacing: 12) {
-            if filteredRecordings.isEmpty {
-                emptyStateView
-            } else {
-                ForEach(filteredRecordings) { recording in
-                    Button { selectedRecording = recording } label: {
-                        RecordingListRow(
-                            title: displayTitle(for: recording),
-                            date: recording.date,
-                            duration: recording.duration,
-                            preview: previewText(for: recording),
-                            status: recording.status,
-                            onCancel: recording.status.isProcessing ? {
-                                recordingsManager.cancelProcessing(for: recording.id)
-                            } : nil,
-                            recording: recording
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .swipeActions(allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            recordingsManager.delete(id: recording.id)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                        
-                        Button {
-                            shareRecordingImmediately(recording)
-                        } label: {
-                            Label("Share", systemImage: "square.and.arrow.up")
-                        }
-                        .tint(.blue)
-                    }
-                }
-            }
-        }
-        .padding(.horizontal)
-        .padding(.bottom, 20)
-    }
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: selectedCalendarDate != nil ? "calendar.badge.exclamationmark" : "mic.slash")
-                .font(.system(size: 48, weight: .light))
-                .foregroundStyle(.tertiary)
-            
-            VStack(spacing: 8) {
-                Text(selectedCalendarDate != nil ? "No recordings for this date" : "No recordings yet")
-                    .font(.title3)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
-                
-                if let selectedDate = selectedCalendarDate {
-                    Text("Try selecting a different date or create a new recording")
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
-                        .multilineTextAlignment(.center)
-                } else {
-                    Text("Tap the record button to create your first voice note")
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
-                        .multilineTextAlignment(.center)
-                }
-            }
-            .padding(.horizontal)
-        }
-        .padding(.vertical, 40)
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(.quaternary, lineWidth: 1)
-                )
-        )
-        .animation(.smooth(duration: 0.6), value: selectedCalendarDate)
-    }
-    
-    private var calendarButton: some View {
+    private var settingsButton: some View {
         Button(action: {
-            withAnimation(.smooth(duration: 0.6, extraBounce: 0.2)) {
-                showingCalendar.toggle()
-            }
+            showingSettings = true
         }) {
-            Image(systemName: showingCalendar ? "calendar.badge.checkmark" : "calendar")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(showingCalendar ? .white : .blue)
-                .frame(width: 40, height: 40)
-                .background {
-                    if showingCalendar {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(LinearGradient(colors: [.blue.opacity(0.8), .blue], startPoint: .top, endPoint: .bottom))
-                    } else {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.regularMaterial)
-                    }
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(.quaternary.opacity(0.6), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
-        }
-        .buttonStyle(.plain)
-        .scaleEffect(showingCalendar ? 0.95 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showingCalendar)
-        .if(isLiquidGlassAvailable) { view in
-            view.glassEffect(.regular)
-        }
-    }
-    
-    private var searchButton: some View {
-        Button(action: {
-            // Light haptic feedback
-            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-            impactFeedback.impactOccurred()
-            
-            // Show search sheet
-            showingSearch = true
-        }) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 18, weight: .medium))
+            Image(systemName: "gearshape.fill")
+                .font(.poppins.medium(size: 18))
                 .foregroundStyle(.secondary)
                 .frame(width: 40, height: 40)
                 .background {
@@ -1060,27 +889,15 @@ struct HomeView: View {
         }
     }
 
-    private var settingsButton: some View {
-        Button(action: {
-            showingSettings = true
-        }) {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 40, height: 40)
-                .background {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.regularMaterial)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(.quaternary.opacity(0.6), lineWidth: 1)
-                        }
-                        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
-                }
-        }
-        .buttonStyle(.plain)
-        .if(isLiquidGlassAvailable) { view in
-            view.glassEffect(.regular)
+    // MARK: - Helper Properties
+    
+    private var recordingStatusText: String {
+        if isPaused {
+            return "Recording paused"
+        } else if audioRecorder.isRecording {
+            return "Recording… \(Int(audioRecorder.recordingDuration))s"
+        } else {
+            return "Tap to start recording"
         }
     }
 
@@ -1111,6 +928,9 @@ struct HomeView: View {
                     audioRecorder.stopRecording()
                 }
                 
+                // Reset pause state when stopping
+                isPaused = false
+                
                 if let fileName = currentRecordingFileName {
                     let newRecording = Recording(fileName: fileName, date: Date(), duration: result.duration, title: "")
                     
@@ -1131,43 +951,28 @@ struct HomeView: View {
                     currentRecordingFileName = nil
                 }
             } else {
+                // Reset pause state when starting new recording
+                isPaused = false
                 currentRecordingFileName = await audioRecorder.startRecording()
             }
         }
     }
-
-    private func displayTitle(for recording: Recording) -> String {
-        if !recording.title.isEmpty {
-            return recording.title
+    
+    private func togglePause() {
+        if isPaused {
+            audioRecorder.resumeRecording()
+            isPaused = false
+        } else {
+            audioRecorder.pauseRecording()
+            isPaused = true
         }
-        let base = recording.fileName
-            .replacingOccurrences(of: ".m4a", with: "")
-            .replacingOccurrences(of: "_", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return base.isEmpty ? "Untitled" : base
-    }
-
-    private func previewText(for recording: Recording) -> String { 
-        if let transcript = recording.transcript, !transcript.isEmpty {
-            return String(transcript.prefix(100)) + (transcript.count > 100 ? "..." : "")
-        }
-        if let summary = recording.summary, !summary.isEmpty {
-            return String(summary.prefix(100)) + (summary.count > 100 ? "..." : "")
-        }
-        return ""
     }
     
-    private func shareRecordingImmediately(_ recording: Recording) {
-        shareItems = ["Transcript wordt nog gemaakt…"]
-        isSharePresented = true
-        
-        Task {
-            let transcript = recording.transcript
-            let summary = recording.summary
-            
-            await MainActor.run {
-                shareItems = [Voice_Notes.makeShareText(for: recording, overrideTranscript: transcript, overrideSummary: summary)]
-            }
+    private var isLiquidGlassAvailable: Bool {
+        if #available(iOS 18.0, *) {
+            return true
+        } else {
+            return false
         }
     }
 }

@@ -25,7 +25,7 @@ extension View {
     }
     
     @available(iOS 18.0, *)
-    func glassEffect(_ effect: GlassEffect = .regular) -> some View {
+    func glassEffect(_ effect: LiquidGlassEffect = .regular) -> some View {
         if #available(iOS 26.0, *) {
             return self.modifier(LiquidGlassModifier(effect: effect))
         } else {
@@ -44,12 +44,12 @@ extension View {
 }
 
 // MARK: - Glass Effect Types
-enum GlassEffect {
+enum LiquidGlassEffect {
     case regular
     case clear
     case tinted(Color)
     
-    func interactive() -> GlassEffect {
+    func interactive() -> LiquidGlassEffect {
         return self // For compatibility
     }
 }
@@ -57,7 +57,7 @@ enum GlassEffect {
 // MARK: - Liquid Glass Modifiers
 @available(iOS 18.0, *)
 struct LiquidGlassModifier: ViewModifier {
-    let effect: GlassEffect
+    let effect: LiquidGlassEffect
     
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
@@ -136,7 +136,7 @@ struct LiquidGlassSearchBar: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 16, weight: .medium))
+                .font(.poppins.medium(size: 16))
                 .foregroundStyle(.tertiary)
             
             TextField(placeholder, text: $text)
@@ -149,7 +149,7 @@ struct LiquidGlassSearchBar: View {
                 }) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.tertiary)
-                        .font(.system(size: 16))
+                        .font(.poppins.regular(size: 16))
                 }
                 .buttonStyle(.plain)
             }
