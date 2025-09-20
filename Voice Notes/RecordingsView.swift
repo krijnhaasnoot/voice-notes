@@ -26,25 +26,39 @@ struct RecordingsView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Calendar (when shown)
-            if showingCalendar {
-                LiquidCalendarView(selectedDate: $selectedCalendarDate, recordings: recordingsManager.recordings, startExpanded: true)
-                    .padding(.horizontal)
-                    .padding(.bottom, 16)
-                    .background(.ultraThinMaterial)
-                    .transition(.asymmetric(
-                        insertion: .push(from: .top).combined(with: .opacity),
-                        removal: .push(from: .bottom).combined(with: .opacity)
-                    ))
-            }
+        ZStack {
+            // Subtle background gradient
+            LinearGradient(
+                colors: [
+                    .clear,
+                    .blue.opacity(0.02),
+                    .purple.opacity(0.01)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
             
-            // Main recordings list
-            Group {
-                if filteredRecordings.isEmpty {
-                    emptyStateView
-                } else {
-                    recordingsListView
+            VStack(spacing: 0) {
+                // Calendar (when shown)
+                if showingCalendar {
+                    LiquidCalendarView(selectedDate: $selectedCalendarDate, recordings: recordingsManager.recordings, startExpanded: true)
+                        .padding(.horizontal)
+                        .padding(.bottom, 16)
+                        .background(.ultraThinMaterial)
+                        .transition(.asymmetric(
+                            insertion: .push(from: .top).combined(with: .opacity),
+                            removal: .push(from: .bottom).combined(with: .opacity)
+                        ))
+                }
+                
+                // Main recordings list
+                Group {
+                    if filteredRecordings.isEmpty {
+                        emptyStateView
+                    } else {
+                        recordingsListView
+                    }
                 }
             }
         }
@@ -73,27 +87,48 @@ struct RecordingsView: View {
     }
     
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: selectedCalendarDate != nil ? "calendar.badge.exclamationmark" : "waveform.slash")
-                .font(.system(size: 48, weight: .light))
-                .foregroundStyle(.tertiary)
+        VStack(spacing: 20) {
+            // Attractive gradient icon background
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.1), .purple.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 100, height: 100)
+                
+                Image(systemName: selectedCalendarDate != nil ? "calendar.badge.exclamationmark" : "mic.badge.plus")
+                    .font(.system(size: 40, weight: .medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
             
-            VStack(spacing: 8) {
-                Text(selectedCalendarDate != nil ? "No recordings for this date" : "No recordings yet")
-                    .font(.title3)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
+            VStack(spacing: 12) {
+                Text(selectedCalendarDate != nil ? "No recordings for this date" : "Ready to capture your thoughts")
+                    .font(.poppins.title2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
                 
                 if let selectedDate = selectedCalendarDate {
                     Text("Try selecting a different date or create a new recording from the Home tab")
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
+                        .font(.poppins.body)
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                        .lineSpacing(2)
                 } else {
-                    Text("Go to the Home tab and tap the record button to create your first voice note")
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
+                    Text("Start your first voice note and let AI organize your thoughts automatically")
+                        .font(.poppins.body)
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                        .lineSpacing(2)
                 }
             }
             .padding(.horizontal)
@@ -105,19 +140,47 @@ struct RecordingsView: View {
                     }
                 }
                 .font(.poppins.headline)
-                .foregroundColor(.blue)
-                .padding(.top, 8)
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [.blue, .blue.opacity(0.8)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .cornerRadius(25)
+                .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
             }
         }
-        .padding(.vertical, 40)
+        .padding(.vertical, 50)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(.quaternary, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(0.8),
+                            .blue.opacity(0.05),
+                            .purple.opacity(0.03)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.blue.opacity(0.2), .purple.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(color: .black.opacity(0.04), radius: 20, y: 8)
         )
         .padding(.horizontal, 20)
         .animation(.smooth(duration: 0.6), value: selectedCalendarDate)
@@ -125,26 +188,95 @@ struct RecordingsView: View {
     
     private var recordingsListView: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
+            LazyVStack(spacing: 16) {
                 // Header with selected date info
                 if selectedCalendarDate != nil {
                     HStack {
-                        Text("Recordings for \(formattedSelectedDate)")
-                            .font(.poppins.headline)
-                            .foregroundColor(.primary)
+                        // Calendar icon with gradient
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.blue.opacity(0.1), .purple.opacity(0.1)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 44, height: 44)
+                            
+                            Image(systemName: "calendar.badge.clock")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.blue, .purple],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "line.3.horizontal.decrease.circle")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.blue.opacity(0.7))
+                                Text("Recordings for")
+                                    .font(.poppins.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Text(formattedSelectedDate)
+                                .font(.poppins.title3)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.blue, .purple],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                        }
                         
                         Spacer()
                         
-                        Button("Show All") {
+                        Button(action: {
                             withAnimation(.smooth(duration: 0.4)) {
                                 selectedCalendarDate = nil
                             }
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "list.bullet.circle.fill")
+                                    .font(.system(size: 14))
+                                Text("Show All")
+                            }
                         }
                         .font(.poppins.caption)
-                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            LinearGradient(
+                                colors: [.blue.opacity(0.8), .blue],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .cornerRadius(20)
+                        .shadow(color: .blue.opacity(0.2), radius: 4, y: 2)
                     }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(.regularMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(.blue.opacity(0.1), lineWidth: 1)
+                            )
+                    )
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 12)
                 }
                 
                 ForEach(filteredRecordings) { recording in

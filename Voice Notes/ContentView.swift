@@ -475,16 +475,55 @@ struct RecordingListRow: View, Equatable {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
+            // Status-based recording icon
+            ZStack {
+                Circle()
+                    .fill(statusColor.opacity(0.1))
+                    .frame(width: 48, height: 48)
+                
+                Image(systemName: statusIcon)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(statusColor)
+            }
+            
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(.poppins.headline)
                     .lineLimit(2)
-                HStack(spacing: 10) {
-                    Text(dateFormatted(date))
-                    HStack(spacing: 4) { Image(systemName: "clock"); Text(timeFormatted(duration)) }
+                
+                HStack(spacing: 12) {
+                    // Enhanced date with calendar icon
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar.circle")
+                            .font(.system(size: 14))
+                            .foregroundColor(.blue.opacity(0.7))
+                        Text(dateFormatted(date))
+                    }
+                    
+                    // Enhanced duration with waveform icon
+                    HStack(spacing: 4) {
+                        Image(systemName: "waveform.circle")
+                            .font(.system(size: 14))
+                            .foregroundColor(.purple.opacity(0.7))
+                        Text(timeFormatted(duration))
+                    }
                 }
                 .font(.poppins.subheadline)
                 .foregroundColor(.secondary)
+                
+                // Preview content with type icons
+                if !preview.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: hasTranscript ? "quote.bubble" : "text.alignleft")
+                            .font(.system(size: 12))
+                            .foregroundColor(.green.opacity(0.7))
+                        
+                        Text(preview)
+                            .font(.poppins.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
                 
                 statusView
             }
@@ -504,12 +543,56 @@ struct RecordingListRow: View, Equatable {
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(.regularMaterial)
-                .overlay {
+                .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(.quaternary.opacity(0.4), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 6)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.blue.opacity(0.15), .purple.opacity(0.1), .clear],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(color: .blue.opacity(0.08), radius: 16, x: 0, y: 8)
+                .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
         }
+    }
+    
+    // MARK: - Icon System Properties
+    
+    private var statusColor: Color {
+        switch status {
+        case .transcribing:
+            return .blue
+        case .summarizing:
+            return .orange
+        case .failed:
+            return .red
+        case .done:
+            return .green
+        case .idle:
+            return .gray
+        }
+    }
+    
+    private var statusIcon: String {
+        switch status {
+        case .transcribing:
+            return "waveform.circle.fill"
+        case .summarizing:
+            return "brain.head.profile.fill"
+        case .failed:
+            return "exclamationmark.triangle.fill"
+        case .done:
+            return "checkmark.circle.fill"
+        case .idle:
+            return "mic.circle.fill"
+        }
+    }
+    
+    private var hasTranscript: Bool {
+        return recording.transcript != nil && !recording.transcript!.isEmpty
     }
     
     @ViewBuilder

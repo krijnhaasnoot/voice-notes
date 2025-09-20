@@ -21,6 +21,9 @@ struct RecordingDetailView: View {
     @State private var selectedActionItems: Set<String> = []
     @State private var quickAddText = ""
     @State private var showingQuickAddField = false
+    @State private var showingSummarySettings = false
+    @State private var selectedSummaryMode: SummaryMode = .personal
+    @State private var selectedSummaryLength: SummaryLength = .standard
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
@@ -58,7 +61,7 @@ struct RecordingDetailView: View {
             .navigationTitle("Recording Details")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarItems(
-                trailing: HStack {
+                trailing: HStack(spacing: 16) {
                     if let recording = recordingsManager.recordings.first(where: { $0.id == recordingId }),
                        let rawSummary = recording.rawSummary, !rawSummary.isEmpty {
                         Button("RAW") {
@@ -75,9 +78,15 @@ struct RecordingDetailView: View {
                             .foregroundColor(.red)
                     }
                     
+                    // Visual separator between delete and done
+                    Rectangle()
+                        .frame(width: 1, height: 20)
+                        .foregroundColor(.secondary.opacity(0.3))
+                    
                     Button("Done") {
                         presentationMode.wrappedValue.dismiss()
                     }
+                    .font(.headline)
                 }
             )
             .alert("Delete Recording", isPresented: $showingDeleteAlert) {
@@ -138,6 +147,14 @@ struct RecordingDetailView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showingToast)
             }
+        }
+        .onAppear {
+            // Load current AI settings
+            let modeString = UserDefaults.standard.string(forKey: "defaultMode") ?? SummaryMode.personal.rawValue
+            let lengthString = UserDefaults.standard.string(forKey: "defaultSummaryLength") ?? SummaryLength.standard.rawValue
+            
+            selectedSummaryMode = SummaryMode(rawValue: modeString) ?? .personal
+            selectedSummaryLength = SummaryLength(rawValue: lengthString) ?? .standard
         }
     }
     
@@ -322,18 +339,26 @@ struct RecordingDetailView: View {
                         .font(.caption)
                         .foregroundColor(.orange)
                 } else if case .failed = recording.status, recording.transcript != nil {
-                    Button("Retry") {
-                        recordingsManager.retrySummarization(for: recording)
-                    }
-                    .font(.caption)
-                    .foregroundColor(.blue)
+                    summaryControlButtons(for: recording)
                 } else if let transcript = recording.transcript, !transcript.isEmpty, recording.summary != nil {
-                    Button("Retry") {
-                        recordingsManager.retrySummarization(for: recording)
+                    summaryControlButtons(for: recording)
+                } else if recording.transcript != nil {
+                    // Show settings button even when waiting for summary
+                    Button(action: { showingSummarySettings = true }) {
+                        Image(systemName: "gearshape")
+                            .font(.caption)
+                            .foregroundColor(.blue)
                     }
-                    .font(.caption)
-                    .foregroundColor(.blue)
                 }
+            }
+            
+            // AI Summary Settings (when shown)
+            if showingSummarySettings {
+                aiSummarySettingsView(for: recording)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
             }
             
             // Show detected mode if available
@@ -833,6 +858,168 @@ struct RecordingDetailView: View {
         quickAddText = ""
         showingQuickAddField = false
         selectedActionItems.removeAll()
+    }
+    
+    // MARK: - AI Summary Settings
+    
+    @ViewBuilder
+    private func summaryControlButtons(for recording: Recording) -> some View {
+        HStack(spacing: 12) {
+            Button(action: { showingSummarySettings.toggle() }) {
+                Image(systemName: "gearshape")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+            }
+            
+            Button("Retry") {
+                retryWithSettings(for: recording)
+            }
+            .font(.caption)
+            .foregroundColor(.blue)
+        }
+    }
+    
+    @ViewBuilder
+    private func aiSummarySettingsView(for recording: Recording) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("AI Summary Settings")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                Spacer()
+                
+                Button("Done") {
+                    withAnimation(.smooth(duration: 0.3)) {
+                        showingSummarySettings = false
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(.blue)
+            }
+            
+            // Summary Mode Picker
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 14))
+                        .foregroundColor(.blue)
+                    Text("Summary Mode")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                
+                Picker("Mode", selection: $selectedSummaryMode) {
+                    ForEach(SummaryMode.allCases, id: \.self) { mode in
+                        HStack {
+                            Text(mode.displayName)
+                                .font(.caption)
+                            Spacer()
+                        }
+                        .tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                .font(.caption)
+                
+                Text(selectedSummaryMode.description)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 2)
+            }
+            
+            // Summary Length Picker
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "text.alignleft")
+                        .font(.system(size: 14))
+                        .foregroundColor(.purple)
+                    Text("Detail Level")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                
+                Picker("Length", selection: $selectedSummaryLength) {
+                    ForEach(SummaryLength.allCases) { length in
+                        HStack {
+                            Text(length.displayName)
+                                .font(.caption)
+                            Spacer()
+                        }
+                        .tag(length)
+                    }
+                }
+                .pickerStyle(.menu)
+                .font(.caption)
+                
+                Text(selectedSummaryLength.description)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 2)
+            }
+            
+            // Retry button with current settings
+            Button(action: {
+                retryWithSettings(for: recording)
+                withAnimation(.smooth(duration: 0.3)) {
+                    showingSummarySettings = false
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise.circle.fill")
+                        .font(.system(size: 16))
+                    Text("Retry with \(selectedSummaryMode.displayName) (\(selectedSummaryLength.displayName))")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        colors: [.blue.opacity(0.8), .blue],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .cornerRadius(20)
+            }
+            .disabled(!hasTranscriptForRetry(recording))
+        }
+        .padding(16)
+        .background(Color.blue.opacity(0.05))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+        )
+    }
+    
+    private func hasTranscriptForRetry(_ recording: Recording) -> Bool {
+        return recording.transcript != nil && !recording.transcript!.isEmpty
+    }
+    
+    private func retryWithSettings(for recording: Recording) {
+        // Store the selected settings temporarily for this retry
+        let currentMode = UserDefaults.standard.string(forKey: "defaultMode")
+        let currentLength = UserDefaults.standard.string(forKey: "defaultSummaryLength")
+        
+        // Temporarily set the selected settings
+        UserDefaults.standard.set(selectedSummaryMode.rawValue, forKey: "defaultMode")
+        UserDefaults.standard.set(selectedSummaryLength.rawValue, forKey: "defaultSummaryLength")
+        
+        // Retry summarization
+        recordingsManager.retrySummarization(for: recording)
+        
+        // Restore original settings after a brief delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if let originalMode = currentMode {
+                UserDefaults.standard.set(originalMode, forKey: "defaultMode")
+            }
+            if let originalLength = currentLength {
+                UserDefaults.standard.set(originalLength, forKey: "defaultSummaryLength")
+            }
+        }
     }
 }
 
