@@ -8,45 +8,35 @@ struct ProviderAuthorizationView: View {
     @State private var isConnecting = false
     @State private var showingManualEntry = false
     @State private var connectionStatus: ConnectionStatus = .notConnected
-    @State private var isLoading = true
+    @State private var isLoading = false
     
     var body: some View {
-        NavigationView {
-            Group {
-                if isLoading {
-                    loadingView
-                } else {
-                    VStack(spacing: 24) {
-                        providerHeaderView
-                        
-                        connectionStatusView
-                        
-                        Spacer()
-                        
-                        connectButtonsView
-                        
-                        Spacer()
-                        
-                        manualEntryOption
-                    }
-                    .padding(.horizontal, 24)
+        Group {
+            if isLoading {
+                loadingView
+            } else {
+                VStack(spacing: 24) {
+                    providerHeaderView
+                    connectionStatusView
+                    Spacer()
+                    connectButtonsView
+                    Spacer()
+                    manualEntryOption
                 }
+                .padding(.horizontal, 24)
             }
-            .navigationTitle("Connect to \(provider.displayName)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onComplete)
-                }
+        }
+        .navigationTitle("Connect to \(provider.displayName)")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel", action: onComplete)
             }
         }
         .sheet(isPresented: $showingManualEntry) {
             ManualAPIKeyView(provider: provider, onComplete: onComplete)
         }
-        .onAppear {
-            initializeForProvider()
-        }
-        .onChange(of: provider) { _ in
+        .task(id: provider) {
             initializeForProvider()
         }
     }
@@ -70,9 +60,8 @@ struct ProviderAuthorizationView: View {
     
     private var providerHeaderView: some View {
         VStack(spacing: 16) {
-            Image(systemName: provider.iconName)
-                .font(.system(size: 64))
-                .foregroundColor(provider.accentColor)
+            provider.iconView(size: 64)
+                .padding(.top, 20)
             
             Text(provider.displayName)
                 .font(.largeTitle)
@@ -249,26 +238,17 @@ struct ProviderAuthorizationView: View {
     
     private func initializeForProvider() {
         // Reset state for new provider
-        isLoading = true
         isConnecting = false
         showingManualEntry = false
         
-        // Simulate loading time and then check connection status
-        Task {
-            // Add a small delay to ensure smooth transition
-            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-            
-            await MainActor.run {
-                // Check connection status
-                if aiSettings.hasApiKey(for: provider) {
-                    connectionStatus = .connected
-                } else {
-                    connectionStatus = .notConnected
-                }
-                
-                isLoading = false
-            }
+        // Check connection status immediately without loading delay
+        if aiSettings.hasApiKey(for: provider) {
+            connectionStatus = .connected
+        } else {
+            connectionStatus = .notConnected
         }
+        
+        isLoading = false
     }
     
     private func simulateOAuthFlow() async throws {
@@ -381,96 +361,92 @@ struct ManualAPIKeyView: View {
     @ObservedObject private var aiSettings = AISettingsStore.shared
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                // Header
-                VStack(spacing: 16) {
-                    Image(systemName: provider.iconName)
-                        .font(.system(size: 48))
-                        .foregroundColor(provider.accentColor)
-                    
-                    Text("Paste Your \(provider.displayName) API Key")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .multilineTextAlignment(.center)
-                    
-                    Text(provider.keyFormatHint)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.horizontal)
-                
-                // API Key Input
-                VStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("API Key")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        SecureField("Paste your API key here", text: $apiKey)
-                            .textFieldStyle(.roundedBorder)
-                            .textContentType(.password)
-                            .font(.system(.body, design: .monospaced))
-                        
-                        if showValidationResult {
-                            HStack {
-                                Image(systemName: validationMessage.contains("✅") ? "checkmark.circle" : "xmark.circle")
-                                    .foregroundColor(validationMessage.contains("✅") ? .green : .red)
-                                
-                                Text(validationMessage)
-                                    .font(.caption)
-                                    .foregroundColor(validationMessage.contains("✅") ? .green : .red)
-                            }
-                        }
-                    }
-                    
-                    Button(action: validateAndSave) {
-                        HStack {
-                            if isValidating {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .tint(.white)
-                            }
-                            
-                            Text(isValidating ? "Validating..." : "Validate & Save")
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(apiKey.isEmpty ? Color.gray : provider.accentColor)
-                        .cornerRadius(12)
-                    }
-                    .disabled(apiKey.isEmpty || isValidating)
-                }
-                .padding(.horizontal)
-                
-                Spacer()
-                
-                // Help Text
-                VStack(spacing: 8) {
-                    Text("Need help finding your API key?")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Button("Open \(provider.developerPortalURL)") {
-                        if let url = URL(string: "https://\(provider.developerPortalURL)") {
-                            UIApplication.shared.open(url)
-                        }
-                    }
+        VStack(spacing: 24) {
+            // Header
+            VStack(spacing: 16) {
+                Image(systemName: provider.iconName)
+                    .font(.system(size: 48))
+                    .foregroundColor(provider.accentColor)
+
+                Text("Paste Your \(provider.displayName) API Key")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+
+                Text(provider.keyFormatHint)
                     .font(.caption)
-                    .foregroundColor(.blue)
-                }
-                .padding(.horizontal)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             }
-            .padding()
-            .navigationTitle("")
-            .navigationBarHidden(true)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onComplete)
+            .padding(.horizontal)
+
+            // API Key Input
+            VStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("API Key")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    SecureField("Paste your API key here", text: $apiKey)
+                        .textFieldStyle(.roundedBorder)
+                        .textContentType(.password)
+                        .font(.system(.body, design: .monospaced))
+
+                    if showValidationResult {
+                        HStack {
+                            Image(systemName: validationMessage.contains("✅") ? "checkmark.circle" : "xmark.circle")
+                                .foregroundColor(validationMessage.contains("✅") ? .green : .red)
+                            Text(validationMessage)
+                                .font(.caption)
+                                .foregroundColor(validationMessage.contains("✅") ? .green : .red)
+                        }
+                    }
                 }
+
+                Button(action: validateAndSave) {
+                    HStack {
+                        if isValidating {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        }
+                        Text(isValidating ? "Validating..." : "Validate & Save")
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(apiKey.isEmpty ? Color.gray : provider.accentColor)
+                    .cornerRadius(12)
+                }
+                .disabled(apiKey.isEmpty || isValidating)
+            }
+            .padding(.horizontal)
+
+            Spacer()
+
+            // Help Text
+            VStack(spacing: 8) {
+                Text("Need help finding your API key?")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Button("Open \(provider.developerPortalURL)") {
+                    if let url = URL(string: "https://\(provider.developerPortalURL)") {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(.blue)
+            }
+            .padding(.horizontal)
+        }
+        .padding()
+        .navigationTitle("")
+        .navigationBarHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel", action: onComplete)
             }
         }
     }
@@ -515,11 +491,11 @@ extension AIProviderType {
         case .appDefault:
             return "brain.head.profile"
         case .openai:
-            return "cpu"
+            return "openai-icon"
         case .anthropic:
-            return "brain"
+            return "Claude_AI_symbol.svg"
         case .gemini:
-            return "star"
+            return "gemini-color"
         }
     }
     
@@ -528,12 +504,48 @@ extension AIProviderType {
         case .appDefault:
             return .blue
         case .openai:
-            return .green
+            return Color(red: 0.07, green: 0.73, blue: 0.62) // OpenAI brand teal
         case .anthropic:
-            return .orange
+            return Color(red: 0.90, green: 0.49, blue: 0.13) // Claude/Anthropic orange
         case .gemini:
-            return .purple
+            return Color(red: 0.26, green: 0.52, blue: 0.96) // Google Blue
         }
+    }
+    
+    var fallbackSystemIcon: String {
+        switch self {
+        case .appDefault:
+            return "brain.head.profile"
+        case .openai:
+            return "cpu"
+        case .anthropic:
+            return "brain"
+        case .gemini:
+            return "star"
+        }
+    }
+    
+    @ViewBuilder
+    func iconView(size: CGFloat = 64) -> some View {
+        Group {
+            if self == .appDefault {
+                Image(systemName: self.iconName)
+                    .font(.system(size: size))
+            } else {
+                // Try to load brand icon, fallback to system icon if not found
+                if UIImage(named: self.iconName) != nil {
+                    Image(self.iconName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: size, height: size)
+                } else {
+                    // Fallback system icons
+                    Image(systemName: self.fallbackSystemIcon)
+                        .font(.system(size: size))
+                }
+            }
+        }
+        .foregroundColor(self.accentColor)
     }
     
     var shortDescription: String {

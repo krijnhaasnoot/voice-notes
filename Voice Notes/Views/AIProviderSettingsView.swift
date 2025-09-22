@@ -12,7 +12,9 @@ struct AIProviderSettingsView: View {
             transparencySection
         }
         .navigationTitle("AI Providers")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showingApiKeySheet) {
             if let provider = selectedProviderForKeyEntry {
                 ProviderAuthorizationView(provider: provider) {

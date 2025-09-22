@@ -5,12 +5,12 @@ class ProcessingManager: ObservableObject {
     @Published var activeOperations: [UUID: ProcessingOperation] = [:]
     
     private let transcriptionService: OpenAITranscriptionService?
-    private let summaryService: SummaryService
+    private let summaryService: EnhancedSummaryService
     
     init() {
         // Load API key from Info.plist instead of UserDefaults
         self.transcriptionService = OpenAITranscriptionService.createFromInfoPlist()
-        self.summaryService = SummaryService()
+        self.summaryService = EnhancedSummaryService.shared
         
         if transcriptionService == nil {
             print("⚠️ ProcessingManager: TranscriptionService not available - check OpenAI API key in Info.plist")

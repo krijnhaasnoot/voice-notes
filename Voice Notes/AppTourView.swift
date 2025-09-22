@@ -23,7 +23,7 @@ struct AppTourView: View {
                     Button("Skip") {
                         onComplete()
                     }
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.poppins.medium(size: 16))
                     .foregroundColor(.blue)
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
@@ -91,7 +91,7 @@ struct AppTourView: View {
                                     currentPage -= 1
                                 }
                             }
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.poppins.medium(size: 16))
                             .foregroundColor(.blue)
                             .frame(width: 100)
                         } else {
@@ -108,7 +108,7 @@ struct AppTourView: View {
                                 }
                             }
                         }
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.poppins.semiBold(size: 16))
                         .foregroundColor(.white)
                         .frame(width: 120, height: 44)
                         .background(
@@ -155,12 +155,12 @@ private struct TourPage: View {
             // Text content
             VStack(spacing: 16) {
                 Text(title)
-                    .font(.system(size: 28, weight: .bold, design: .default))
+                    .font(.poppins.bold(size: 28))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.primary)
                 
                 Text(description)
-                    .font(.system(size: 18, weight: .regular))
+                    .font(.poppins.regular(size: 18))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .lineLimit(nil)

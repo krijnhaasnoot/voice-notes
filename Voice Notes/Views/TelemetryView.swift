@@ -9,16 +9,16 @@ struct TelemetryView: View {
     private let dayOptions = [7, 30, 90]
     
     var body: some View {
-        NavigationView {
-            List {
+        List {
                 periodSelectionSection
                 overallStatsSection
                 providerBreakdownSection
                 dataManagementSection
             }
-            .navigationTitle("Usage Analytics")
-            .navigationBarTitleDisplayMode(.inline)
-        }
+        .navigationTitle("Usage Analytics")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showingExportSheet) {
             if let data = exportData {
                 ShareSheet(items: [data])
@@ -90,6 +90,11 @@ struct TelemetryView: View {
                 showingExportSheet = true
             }
             .disabled(telemetryService.getUsageStats(days: selectedDays).totalRequests == 0)
+            
+            Button("Add Test Data") {
+                telemetryService.addTestData()
+            }
+            .disabled(telemetryService.getUsageStats(days: selectedDays).totalRequests > 50)
             
             Button("Clear Data", role: .destructive) {
                 telemetryService.clearTelemetryData()

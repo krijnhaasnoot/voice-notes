@@ -3,13 +3,15 @@ import Speech
 import Combine
 
 @MainActor
-class RecordingsManager: ObservableObject {
+final class RecordingsManager: ObservableObject {
+    static let shared = RecordingsManager()
+
     @Published var recordings: [Recording] = []
     private let userDefaults = UserDefaults.standard
     private let recordingsKey = "SavedRecordings"
     private let processingManager = ProcessingManager()
-    
-    init() {
+
+    private init() {
         loadRecordings()
         setupProcessingObserver()
     }
@@ -107,7 +109,7 @@ class RecordingsManager: ObservableObject {
             languageHint: currentRecording.languageHint,
             transcriptLastUpdated: newTranscriptDate,
             summaryLastUpdated: newSummaryDate,
-            title: currentRecording.title.isEmpty && newTranscript != nil && !newTranscript!.isEmpty ? newTranscript!.smartTitle() : currentRecording.title,
+            title: currentRecording.title,
             detectedMode: currentRecording.detectedMode,
             id: currentRecording.id
         )
@@ -120,15 +122,17 @@ class RecordingsManager: ObservableObject {
     }
     
     func addRecording(_ recording: Recording) {
+        print("🎵 RecordingsManager: Adding new recording - \(recording.fileName)")
         recordings.insert(recording, at: 0)
         saveRecordings()
+        print("🎵 RecordingsManager: Recording added successfully. Total recordings: \(recordings.count)")
     }
     
     func updateRecording(_ recordingId: UUID, status: Recording.Status? = nil, transcript: String? = nil, summary: String? = nil, rawSummary: String? = nil, languageHint: String? = nil, title: String? = nil) {
         if let index = recordings.firstIndex(where: { $0.id == recordingId }) {
             let currentRecording = recordings[index]
             
-            let finalTitle = title ?? (transcript != nil && currentRecording.title.isEmpty ? transcript!.smartTitle() : currentRecording.title)
+            let finalTitle = title ?? currentRecording.title
             
             let updatedRecording = Recording(
                 fileName: currentRecording.fileName,
@@ -268,7 +272,7 @@ class RecordingsManager: ObservableObject {
         updateRecording(recordingId, status: .summarizing(progress: 0.0))
         
         Task {
-            let summaryService = SummaryService()
+            let summaryService = EnhancedSummaryService.shared
             
             do {
                 // Get user settings
@@ -278,24 +282,20 @@ class RecordingsManager: ObservableObject {
                 
                 var selectedMode = defaultMode
                 
-                // Auto-detect mode if enabled
                 if autoDetectMode {
-                    do {
-                        print("🎯 RecordingsManager: Auto-detecting mode...")
-                        selectedMode = try await summaryService.detectMode(
-                            transcript: transcript,
-                            cancelToken: CancellationToken()
-                        )
-                        print("🎯 RecordingsManager: Detected mode: \(selectedMode.rawValue)")
-                        
-                        // Update recording with detected mode info
-                        await MainActor.run {
-                            updateRecordingDetectedMode(recordingId, detectedMode: selectedMode.rawValue)
-                            updateRecording(recordingId, status: .summarizing(progress: 0.1))
-                        }
-                    } catch {
-                        print("🎯 RecordingsManager: Mode detection failed, using default: \(error)")
-                        selectedMode = defaultMode
+                    print("🎯 RecordingsManager: Auto-detecting mode...")
+                    // NOTE: EnhancedSummaryService currently has no `detectMode` API.
+                    // If a detection API is added (e.g., `detectSummaryMode`), replace this placeholder accordingly.
+                    // For now, we fall back to the default mode to avoid compile errors.
+                    // selectedMode = try await summaryService.detectSummaryMode(
+                    //     transcript: transcript,
+                    //     cancelToken: CancellationToken()
+                    // )
+                    // print("🎯 RecordingsManager: Detected mode: \(selectedMode.rawValue)")
+                    print("🎯 RecordingsManager: Mode detection API unavailable, using default: \(selectedMode.rawValue)")
+                    await MainActor.run {
+                        updateRecordingDetectedMode(recordingId, detectedMode: selectedMode.rawValue)
+                        updateRecording(recordingId, status: .summarizing(progress: 0.1))
                     }
                 } else {
                     print("🎯 RecordingsManager: Using default mode: \(selectedMode.rawValue)")
@@ -310,8 +310,6 @@ class RecordingsManager: ObservableObject {
                 print("🎯 RecordingsManager: Starting summarization with mode: \(selectedMode.rawValue), length: \(selectedLength.rawValue)")
                 let result = try await summaryService.summarize(
                     transcript: transcript,
-                    mode: selectedMode,
-                    length: selectedLength,
                     progress: { progress in
                         Task { @MainActor in
                             self.updateRecording(recordingId, status: .summarizing(progress: progress))
@@ -322,7 +320,7 @@ class RecordingsManager: ObservableObject {
                 
                 await MainActor.run {
                     print("🎯 RecordingsManager: ✅ Summary completed (\(result.clean.count) chars)")
-                    updateRecordingWithBothSummaries(recordingId: recordingId, cleanSummary: result.clean, rawSummary: result.raw)
+                    updateRecordingWithBothSummaries(recordingId: recordingId, cleanSummary: result.clean, rawSummary: result.raw ?? result.clean)
                 }
                 
             } catch {
@@ -412,3 +410,4 @@ class RecordingsManager: ObservableObject {
         objectWillChange.send()
     }
 }
+

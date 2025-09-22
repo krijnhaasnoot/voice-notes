@@ -6,19 +6,49 @@
 //
 
 import SwiftUI
+import Foundation
+import AVFoundation
+#if canImport(WatchConnectivity)
+import WatchConnectivity
+#endif
 
 @main
 struct Voice_NotesApp: App {
     @StateObject private var documentStore = DocumentStore()
     
     init() {
+        // Initialize singletons immediately
+        let recorder = AudioRecorder.shared
+        let manager = RecordingsManager.shared
+        
+        print("📱 APP: Voice Notes app starting...")
+        print("📱 APP: Bundle ID: \(Bundle.main.bundleIdentifier ?? "unknown")")
+        print("📱 APP: Singletons initialized")
+        
+        // Ensure WC manager is initialized and wired immediately at app startup
+        #if canImport(WatchConnectivity)
+        let bridge = WatchConnectivityManager.shared
+        bridge.setAudioRecorder(recorder)
+        bridge.setRecordingsManager(manager)
+        print("📱 APP: WatchConnectivity manager initialized and wired")
+        
+        // Run connection diagnostics after a brief delay to allow activation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            bridge.diagnoseConnectionIssue()
+        }
+        #endif
+        
         configureLiquidNavigationBar()
+        
+        print("📱 APP: App initialization complete")
     }
     
     var body: some Scene {
         WindowGroup {
             AnimatedSplashView()
                 .environmentObject(documentStore)
+                .environmentObject(AudioRecorder.shared)
+                .environmentObject(RecordingsManager.shared)
         }
     }
     
@@ -57,12 +87,12 @@ struct Voice_NotesApp: App {
         navBar.compactAppearance = standardAppearance
         navBar.scrollEdgeAppearance = largeTitleAppearance
         if #available(iOS 15.0, *) {
-            navBar.compactScrollEdgeAppearance = standardAppearance
+            navBar.compactScrollEdgeAppearance = largeTitleAppearance
         }
         
         // Additional styling
         navBar.isTranslucent = true
         navBar.tintColor = UIColor.systemBlue
-        navBar.prefersLargeTitles = false // Let individual views control this
+        navBar.prefersLargeTitles = true // Enable large titles globally
     }
 }

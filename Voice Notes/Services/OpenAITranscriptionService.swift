@@ -272,6 +272,23 @@ actor OpenAITranscriptionService {
         return "Speaker \(speakerNumber)"
     }
     
+    private func loadFirstAudioTrack(from asset: AVURLAsset) async throws -> AVAssetTrack {
+        do {
+            let tracks = try await asset.loadTracks(withMediaType: .audio)
+            if let first = tracks.first {
+                return first
+            } else {
+                throw TranscriptionError.networkError(NSError(
+                    domain: "AudioCompression",
+                    code: -3,
+                    userInfo: [NSLocalizedDescriptionKey: "No audio track found in source file"]
+                ))
+            }
+        } catch {
+            throw TranscriptionError.networkError(error)
+        }
+    }
+    
     private func compressAudioFile(_ sourceURL: URL, targetSizeBytes: Int64) async throws -> URL {
         let outputURL = sourceURL.appendingPathExtension("compressed.m4a")
         
@@ -279,131 +296,138 @@ actor OpenAITranscriptionService {
         try? FileManager.default.removeItem(at: outputURL)
         
         return try await withCheckedThrowingContinuation { continuation in
-            let asset = AVAsset(url: sourceURL)
+            let asset = AVURLAsset(url: sourceURL)
             
-            // Use AVAssetWriter for custom audio compression
-            guard let assetWriter = try? AVAssetWriter(outputURL: outputURL, fileType: .m4a) else {
-                continuation.resume(throwing: TranscriptionError.networkError(NSError(
-                    domain: "AudioCompression", 
-                    code: -1, 
-                    userInfo: [NSLocalizedDescriptionKey: "Could not create asset writer"]
-                )))
-                return
-            }
-            
-            // Configure compression settings for smaller file size
-            let compressionSettings: [String: Any] = [
-                AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: 16000, // Lower sample rate for speech
-                AVEncoderBitRateKey: 32000, // Lower bitrate
-                AVNumberOfChannelsKey: 1 // Mono for speech
-            ]
-            
-            let assetWriterInput = AVAssetWriterInput(mediaType: .audio, outputSettings: compressionSettings)
-            assetWriterInput.expectsMediaDataInRealTime = false
-            
-            guard assetWriter.canAdd(assetWriterInput) else {
-                continuation.resume(throwing: TranscriptionError.networkError(NSError(
-                    domain: "AudioCompression", 
-                    code: -2, 
-                    userInfo: [NSLocalizedDescriptionKey: "Cannot add audio input to writer"]
-                )))
-                return
-            }
-            
-            assetWriter.add(assetWriterInput)
-            
-            // Get audio track from source
-            guard let audioTrack = asset.tracks(withMediaType: .audio).first else {
-                continuation.resume(throwing: TranscriptionError.networkError(NSError(
-                    domain: "AudioCompression", 
-                    code: -3, 
-                    userInfo: [NSLocalizedDescriptionKey: "No audio track found in source file"]
-                )))
-                return
-            }
-            
-            let assetReaderOutput = AVAssetReaderTrackOutput(track: audioTrack, outputSettings: [
-                AVFormatIDKey: kAudioFormatLinearPCM,
-                AVSampleRateKey: 16000,
-                AVNumberOfChannelsKey: 1,
-                AVLinearPCMBitDepthKey: 16,
-                AVLinearPCMIsFloatKey: false,
-                AVLinearPCMIsBigEndianKey: false,
-                AVLinearPCMIsNonInterleaved: false
-            ])
-            
-            guard let assetReader = try? AVAssetReader(asset: asset) else {
-                continuation.resume(throwing: TranscriptionError.networkError(NSError(
-                    domain: "AudioCompression", 
-                    code: -4, 
-                    userInfo: [NSLocalizedDescriptionKey: "Could not create asset reader"]
-                )))
-                return
-            }
-            
-            guard assetReader.canAdd(assetReaderOutput) else {
-                continuation.resume(throwing: TranscriptionError.networkError(NSError(
-                    domain: "AudioCompression", 
-                    code: -5, 
-                    userInfo: [NSLocalizedDescriptionKey: "Cannot add audio output to reader"]
-                )))
-                return
-            }
-            
-            assetReader.add(assetReaderOutput)
-            
-            // Start writing
-            assetWriter.startWriting()
-            assetReader.startReading()
-            assetWriter.startSession(atSourceTime: .zero)
-            
-            let processingQueue = DispatchQueue(label: "audio.compression")
-            
-            assetWriterInput.requestMediaDataWhenReady(on: processingQueue) {
-                while assetWriterInput.isReadyForMoreMediaData {
-                    if let sampleBuffer = assetReaderOutput.copyNextSampleBuffer() {
-                        if !assetWriterInput.append(sampleBuffer) {
-                            print("Failed to append sample buffer")
-                            break
-                        }
-                    } else {
-                        assetWriterInput.markAsFinished()
-                        break
+            Task {
+                do {
+                    // Load audio track asynchronously to avoid deprecated API
+                    let audioTrack = try await self.loadFirstAudioTrack(from: asset)
+                    
+                    // Use AVAssetWriter for custom audio compression
+                    guard let assetWriter = try? AVAssetWriter(outputURL: outputURL, fileType: .m4a) else {
+                        continuation.resume(throwing: TranscriptionError.networkError(NSError(
+                            domain: "AudioCompression", 
+                            code: -1, 
+                            userInfo: [NSLocalizedDescriptionKey: "Could not create asset writer"]
+                        )))
+                        return
                     }
-                }
-                
-                if assetReader.status == .completed {
-                    assetWriter.finishWriting {
-                        switch assetWriter.status {
-                        case .completed:
-                            continuation.resume(returning: outputURL)
-                        case .failed:
-                            let error = assetWriter.error ?? NSError(
-                                domain: "AudioCompression", 
-                                code: -6, 
-                                userInfo: [NSLocalizedDescriptionKey: "Writing failed with unknown error"]
+                    
+                    // Configure compression settings for smaller file size
+                    let compressionSettings: [String: Any] = [
+                        AVFormatIDKey: kAudioFormatMPEG4AAC,
+                        AVSampleRateKey: 16000, // Lower sample rate for speech
+                        AVEncoderBitRateKey: 32000, // Lower bitrate
+                        AVNumberOfChannelsKey: 1 // Mono for speech
+                    ]
+                    
+                    let assetWriterInput = AVAssetWriterInput(mediaType: .audio, outputSettings: compressionSettings)
+                    assetWriterInput.expectsMediaDataInRealTime = false
+                    
+                    guard assetWriter.canAdd(assetWriterInput) else {
+                        continuation.resume(throwing: TranscriptionError.networkError(NSError(
+                            domain: "AudioCompression", 
+                            code: -2, 
+                            userInfo: [NSLocalizedDescriptionKey: "Cannot add audio input to writer"]
+                        )))
+                        return
+                    }
+                    
+                    assetWriter.add(assetWriterInput)
+                    
+                    // Reader output settings
+                    let assetReaderOutput = AVAssetReaderTrackOutput(track: audioTrack, outputSettings: [
+                        AVFormatIDKey: kAudioFormatLinearPCM,
+                        AVSampleRateKey: 16000,
+                        AVNumberOfChannelsKey: 1,
+                        AVLinearPCMBitDepthKey: 16,
+                        AVLinearPCMIsFloatKey: false,
+                        AVLinearPCMIsBigEndianKey: false,
+                        AVLinearPCMIsNonInterleaved: false
+                    ])
+                    
+                    guard let assetReader = try? AVAssetReader(asset: asset) else {
+                        continuation.resume(throwing: TranscriptionError.networkError(NSError(
+                            domain: "AudioCompression", 
+                            code: -4, 
+                            userInfo: [NSLocalizedDescriptionKey: "Could not create asset reader"]
+                        )))
+                        return
+                    }
+                    
+                    guard assetReader.canAdd(assetReaderOutput) else {
+                        continuation.resume(throwing: TranscriptionError.networkError(NSError(
+                            domain: "AudioCompression", 
+                            code: -5, 
+                            userInfo: [NSLocalizedDescriptionKey: "Cannot add audio output to reader"]
+                        )))
+                        return
+                    }
+                    
+                    assetReader.add(assetReaderOutput)
+                    
+                    // Start writing
+                    assetWriter.startWriting()
+                    assetReader.startReading()
+                    assetWriter.startSession(atSourceTime: .zero)
+                    
+                    let processingQueue = DispatchQueue(label: "audio.compression")
+
+                    // Create nonisolated aliases for use inside the closure
+                    nonisolated(unsafe) let writerInput = assetWriterInput
+                    nonisolated(unsafe) let readerOutput = assetReaderOutput
+                    nonisolated(unsafe) let assetReaderRef = assetReader
+                    nonisolated(unsafe) let assetWriterRef = assetWriter
+
+                    assetWriterInput.requestMediaDataWhenReady(on: processingQueue) { [writerInput, readerOutput, assetReaderRef, assetWriterRef] in
+                        while writerInput.isReadyForMoreMediaData {
+                            if let sampleBuffer = readerOutput.copyNextSampleBuffer() {
+                                if !writerInput.append(sampleBuffer) {
+                                    print("Failed to append sample buffer")
+                                    break
+                                }
+                            } else {
+                                writerInput.markAsFinished()
+                                break
+                            }
+                        }
+
+                        if assetReaderRef.status == .completed {
+                            assetWriterRef.finishWriting {
+                                switch assetWriterRef.status {
+                                case .completed:
+                                    continuation.resume(returning: outputURL)
+                                case .failed:
+                                    let error = assetWriterRef.error ?? NSError(
+                                        domain: "AudioCompression",
+                                        code: -6,
+                                        userInfo: [NSLocalizedDescriptionKey: "Writing failed with unknown error"]
+                                    )
+                                    continuation.resume(throwing: TranscriptionError.networkError(error))
+                                case .cancelled:
+                                    continuation.resume(throwing: TranscriptionError.cancelled)
+                                default:
+                                    continuation.resume(throwing: TranscriptionError.networkError(NSError(
+                                        domain: "AudioCompression",
+                                        code: -7,
+                                        userInfo: [NSLocalizedDescriptionKey: "Writer ended with status: \(assetWriterRef.status.rawValue)"]
+                                    )))
+                                }
+                            }
+                        } else if assetReaderRef.status == .failed {
+                            let error = assetReaderRef.error ?? NSError(
+                                domain: "AudioCompression",
+                                code: -8,
+                                userInfo: [NSLocalizedDescriptionKey: "Reading failed with unknown error"]
                             )
                             continuation.resume(throwing: TranscriptionError.networkError(error))
-                        case .cancelled:
-                            continuation.resume(throwing: TranscriptionError.cancelled)
-                        default:
-                            continuation.resume(throwing: TranscriptionError.networkError(NSError(
-                                domain: "AudioCompression", 
-                                code: -7, 
-                                userInfo: [NSLocalizedDescriptionKey: "Writer ended with status: \(assetWriter.status.rawValue)"]
-                            )))
                         }
                     }
-                } else if assetReader.status == .failed {
-                    let error = assetReader.error ?? NSError(
-                        domain: "AudioCompression", 
-                        code: -8, 
-                        userInfo: [NSLocalizedDescriptionKey: "Reading failed with unknown error"]
-                    )
-                    continuation.resume(throwing: TranscriptionError.networkError(error))
+                } catch {
+                    continuation.resume(throwing: error)
                 }
             }
         }
     }
 }
+

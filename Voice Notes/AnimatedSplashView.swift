@@ -19,7 +19,7 @@ struct AnimatedSplashView: View {
                         .font(.system(size: 100, weight: .light))
                         .foregroundColor(.blue)
                     Text("Voice Notes")
-                        .font(.title2)
+                        .font(.poppins.title2)
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
                 }

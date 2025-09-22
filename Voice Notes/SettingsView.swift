@@ -49,7 +49,7 @@ struct SettingsView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("AI Provider")) {
                 NavigationLink(destination: AIProviderSettingsView()) {
@@ -65,12 +65,6 @@ struct SettingsView: View {
                                 .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                         }
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
                     }
                 }
                 .padding(.vertical, 4)
@@ -88,12 +82,6 @@ struct SettingsView: View {
                                 .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                         }
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
                     }
                 }
                 .padding(.vertical, 4)
@@ -316,6 +304,8 @@ struct SettingsView: View {
                 showingTour = false
             })
         }
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         }
     }
 }

@@ -43,6 +43,8 @@ enum SummaryMode: String, CaseIterable, Identifiable {
     case techTeam = "techTeam"
     case planning = "planning"
     case alignment = "alignment"
+    case brainstorm = "brainstorm"
+    case lecture = "lecture"
     case personal = "personal"
     
     var id: String { rawValue }
@@ -54,6 +56,8 @@ enum SummaryMode: String, CaseIterable, Identifiable {
         case .techTeam:    return "Tech Team"
         case .planning:    return "Planning"
         case .alignment:   return "Alignment / 1:1"
+        case .brainstorm:  return "Brainstorm Session"
+        case .lecture:     return "Lecture / Learning"
         case .personal:    return "Personal / Other"
         }
     }
@@ -77,6 +81,12 @@ enum SummaryMode: String, CaseIterable, Identifiable {
             
         case .alignment:
             return "Summarize this alignment conversation. Use sections: **Title**, **Summary**, **Main Topics**, **Decisions / Next Steps**. Informal but clear tone. " + lengthInstruction + " " + baseFormatting
+            
+        case .brainstorm:
+            return "Summarize this brainstorming session. Use sections: **Session Title**, **Challenge / Goal**, **Ideas Generated**, **Best Ideas**, **Next Steps**. Capture creative energy and group thinking patterns. Organize ideas by theme or priority. " + lengthInstruction + " " + baseFormatting
+            
+        case .lecture:
+            return "Summarize this lecture or learning session. Use sections: **Topic**, **Key Concepts**, **Main Points**, **Examples / Case Studies**, **Takeaways**. Focus on educational content and learning objectives. Structure for study reference. " + lengthInstruction + " " + baseFormatting
             
         case .personal:
             return "Summarize this conversation in simple language. Use sections: **Title**, **Summary**, **Key Points**. Keep it light and personal. " + lengthInstruction + " " + baseFormatting
@@ -122,9 +132,11 @@ actor SummaryService {
         - Tech Team: Technical team meetings and development discussions
         - Planning: Planning and project meetings
         - Alignment / 1:1: Strategic alignment and coordination sessions
+        - Brainstorm Session: Creative brainstorming and ideation discussions
+        - Lecture / Learning: Educational content, presentations, or learning sessions
         - Personal / Other: General conversations that don't fit other categories
         
-        Respond with ONLY the mode name: Primary Care (GP), Dentist, Tech Team, Planning, Alignment / 1:1, or Personal / Other
+        Respond with ONLY the mode name: Primary Care (GP), Dentist, Tech Team, Planning, Alignment / 1:1, Brainstorm Session, Lecture / Learning, or Personal / Other
         """
 
         let userPrompt = """

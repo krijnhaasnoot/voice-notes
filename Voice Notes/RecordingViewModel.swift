@@ -13,7 +13,7 @@ class RecordingViewModel: ObservableObject {
     @Published var status: RecordingStatus = .idle
     
     private let transcriptionService: OpenAITranscriptionService?
-    private let summaryService: SummaryService
+    private let summaryService: EnhancedSummaryService
     private var currentCancelToken = CancellationToken()
     
     enum RecordingStatus {
@@ -26,7 +26,7 @@ class RecordingViewModel: ObservableObject {
     
     init() {
         self.transcriptionService = OpenAITranscriptionService.createFromInfoPlist()
-        self.summaryService = SummaryService()
+        self.summaryService = EnhancedSummaryService.shared
         
         if transcriptionService == nil {
             print("⚠️ RecordingViewModel: OpenAI API key not configured")

@@ -32,8 +32,9 @@ class AppRouter: ObservableObject {
 // MARK: - Root View
 struct RootView: View {
     @StateObject private var appRouter = AppRouter()
-    @StateObject private var audioRecorder = AudioRecorder()
-    @StateObject private var recordingsManager = RecordingsManager()
+    @EnvironmentObject var audioRecorder: AudioRecorder
+    @EnvironmentObject var recordingsManager: RecordingsManager
+    @StateObject private var watchBridge = WatchConnectivityManager.shared
     @EnvironmentObject var documentStore: DocumentStore
     @AppStorage("hasCompletedTour") private var hasCompletedTour = false
     @AppStorage("useCompactView") private var useCompactView = true
@@ -64,6 +65,7 @@ struct RootView: View {
                 Label(Tab.recordings.title, systemImage: Tab.recordings.systemImage)
             }
             .tag(Tab.recordings)
+            .badge(watchBridge.hasNewFromWatch ? "●" : nil)
             
             // Lists Tab
             NavigationStack {
@@ -116,6 +118,7 @@ struct DocumentsView: View {
         .navigationTitle("Lists")
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showingCreateSheet = true }) {
@@ -406,11 +409,75 @@ struct SearchView: View {
         guard !searchText.isEmpty else { return [] }
         
         return recordingsManager.recordings.filter { recording in
-            recording.title.localizedCaseInsensitiveContains(searchText) ||
+            displayTitle(for: recording).localizedCaseInsensitiveContains(searchText) ||
             recording.fileName.localizedCaseInsensitiveContains(searchText) ||
             (recording.transcript?.localizedCaseInsensitiveContains(searchText) ?? false) ||
             (recording.summary?.localizedCaseInsensitiveContains(searchText) ?? false)
         }
+    }
+    
+    // MARK: - Helper Functions for Search
+    
+    private func displayTitle(for recording: Recording) -> String {
+        // 1. Use explicit title if set
+        if !recording.title.isEmpty {
+            return recording.title
+        }
+        
+        // 2. Extract title from AI summary if available
+        if let summary = recording.summary, !summary.isEmpty {
+            if let aiTitle = extractTitleFromSummary(summary) {
+                return aiTitle
+            }
+        }
+        
+        // 3. Fall back to formatted filename
+        let base = recording.fileName
+            .replacingOccurrences(of: ".m4a", with: "")
+            .replacingOccurrences(of: "_", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return base.isEmpty ? "Untitled" : base
+    }
+    
+    private func extractTitleFromSummary(_ summary: String) -> String? {
+        let lines = summary.components(separatedBy: .newlines)
+        
+        // Look for common title patterns from AI summaries
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Match patterns like "**Title**", "**Session Title**", "**Topic**"
+            if trimmed.hasPrefix("**") && trimmed.contains("**") {
+                // Extract text after the first title-like pattern
+                if trimmed.contains("Title") || trimmed.contains("Topic") || trimmed.contains("Session") {
+                    // Look for the next non-empty line as the actual title content
+                    if let titleIndex = lines.firstIndex(of: line) {
+                        let nextIndex = titleIndex + 1
+                        if nextIndex < lines.count {
+                            let titleContent = lines[nextIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !titleContent.isEmpty && !titleContent.hasPrefix("**") {
+                                return titleContent.count > 50 ? String(titleContent.prefix(50)) + "..." : titleContent
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Alternative: Look for first non-header line if it starts after a title marker
+            if trimmed.hasPrefix("**Title**") || trimmed.hasPrefix("**Session Title**") || trimmed.hasPrefix("**Topic**") {
+                // Skip this header line and get the next meaningful content
+                if let titleIndex = lines.firstIndex(of: line) {
+                    for i in (titleIndex + 1)..<lines.count {
+                        let content = lines[i].trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !content.isEmpty && !content.hasPrefix("**") {
+                            return content.count > 50 ? String(content.prefix(50)) + "..." : content
+                        }
+                    }
+                }
+            }
+        }
+        
+        return nil
     }
     
     private var filteredDocuments: [Document] {

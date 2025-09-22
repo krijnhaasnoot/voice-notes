@@ -124,6 +124,47 @@ class TelemetryService: TelemetryTracker {
             print("📊 Telemetry data cleared")
         }
     }
+    
+    // MARK: - Development/Testing Methods
+    
+    func addTestData() {
+        // Add some sample telemetry data for testing
+        let providers = ["app_default", "openai", "anthropic", "gemini"]
+        let now = Date()
+        
+        for i in 0..<20 {
+            let provider = providers.randomElement() ?? "app_default"
+            let success = Bool.random() && (provider != "gemini" || i % 3 == 0) // Make Gemini occasionally fail
+            let processingTime = Int.random(in: 1000...5000)
+            let transcriptLength = Int.random(in: 500...3000)
+            let summaryLength = Int.random(in: 100...800)
+            let date = Calendar.current.date(byAdding: .day, value: -Int.random(in: 0...29), to: now) ?? now
+            
+            let telemetry = SummaryTelemetry(
+                providerId: provider,
+                success: success,
+                fallbackUsed: !success && Bool.random(),
+                processingTimeMs: processingTime,
+                transcriptLength: transcriptLength,
+                summaryLength: summaryLength
+            )
+            
+            // Manually set timestamp for test data
+            let testTelemetry = SummaryTelemetry(
+                providerId: telemetry.providerId,
+                success: telemetry.success,
+                fallbackUsed: telemetry.fallbackUsed,
+                processingTimeMs: telemetry.processingTimeMs,
+                transcriptLength: telemetry.transcriptLength,
+                summaryLength: telemetry.summaryLength
+            )
+            
+            telemetryEntries.append(testTelemetry)
+        }
+        
+        persistTelemetry()
+        print("📊 Added test telemetry data")
+    }
 }
 
 // MARK: - Usage Statistics

@@ -1078,10 +1078,7 @@ struct RecordingDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     // Provider icon and name
-                    Image(systemName: currentProvider(for: recording).iconName)
-                        .font(.caption)
-                        .foregroundColor(currentProvider(for: recording).accentColor)
-                        .frame(width: 16)
+                    currentProvider(for: recording).iconView(size: 16)
                     
                     Text(currentProvider(for: recording).displayName)
                         .font(.poppins.caption)

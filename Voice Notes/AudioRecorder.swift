@@ -1,12 +1,19 @@
-import Foundation
 import AVFoundation
+import SwiftUI
 import UIKit
+#if canImport(WatchConnectivity)
+import WatchConnectivity
+#endif
 
 @MainActor
-class AudioRecorder: NSObject, ObservableObject {
+final class AudioRecorder: NSObject, ObservableObject {
+    static let shared = AudioRecorder()   // <-- singleton
+
     private var audioRecorder: AVAudioRecorder?
-    private var audioSession: AVAudioSession = AVAudioSession.sharedInstance()
-    
+    private let audioSession = AVAudioSession.sharedInstance()
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    private let maxRecordingDuration: TimeInterval = 3600
+
     @Published var isRecording = false
     @Published var recordingDuration: TimeInterval = 0
     @Published var permissionStatus: AVAudioSession.RecordPermission = .undetermined
@@ -15,13 +22,37 @@ class AudioRecorder: NSObject, ObservableObject {
     private var recordingTimer: Timer?
     private var recordingStartTime: Date?
     private var currentRecordingURL: URL?
-    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
-    private let maxRecordingDuration: TimeInterval = 3600 // 1 hour limit
     
-    override init() {
+#if canImport(WatchConnectivity)
+    private var wcManager: WatchConnectivityManager?
+#endif
+
+    private override init() {             // <-- private init
         super.init()
-        self.permissionStatus = audioSession.recordPermission
+        if #available(iOS 17.0, *) {
+            // Map AVAudioApplication permission to AVAudioSession.RecordPermission for published state
+            let appPerm = AVAudioApplication.shared.recordPermission
+            switch appPerm {
+            case .undetermined: self.permissionStatus = .undetermined
+            case .denied: self.permissionStatus = .denied
+            case .granted: self.permissionStatus = .granted
+            @unknown default: self.permissionStatus = .denied
+            }
+        } else {
+            self.permissionStatus = audioSession.recordPermission
+        }
         setupNotifications()
+#if canImport(WatchConnectivity)
+        if WCSession.isSupported() {
+            // Initialize WatchConnectivity manager if publicly initializable
+            if let manager = (WatchConnectivityManager.self as AnyObject) as? Any {
+                // Attempt to use a shared or default instance if available; otherwise skip
+                // NOTE: If WatchConnectivityManager provides a shared instance, replace the next line with it.
+                // wcManager = WatchConnectivityManager.shared
+            }
+            wcManager?.setAudioRecorder(self)
+        }
+#endif
     }
     
     private func setupNotifications() {
@@ -105,11 +136,22 @@ class AudioRecorder: NSObject, ObservableObject {
     }
     
     func requestPermission() async -> Bool {
-        return await withCheckedContinuation { continuation in
-            audioSession.requestRecordPermission { granted in
-                Task { @MainActor in
-                    self.permissionStatus = granted ? .granted : .denied
-                    continuation.resume(returning: granted)
+        if #available(iOS 17.0, *) {
+            return await withCheckedContinuation { continuation in
+                AVAudioApplication.requestRecordPermission { granted in
+                    Task { @MainActor in
+                        self.permissionStatus = granted ? .granted : .denied
+                        continuation.resume(returning: granted)
+                    }
+                }
+            }
+        } else {
+            return await withCheckedContinuation { continuation in
+                audioSession.requestRecordPermission { granted in
+                    Task { @MainActor in
+                        self.permissionStatus = granted ? AVAudioSession.RecordPermission.granted : AVAudioSession.RecordPermission.denied
+                        continuation.resume(returning: granted)
+                    }
                 }
             }
         }
@@ -117,7 +159,18 @@ class AudioRecorder: NSObject, ObservableObject {
     
     func ensureMicReady() async -> Bool {
         // Check permission first
-        let currentPermission = audioSession.recordPermission
+        let currentPermission: AVAudioSession.RecordPermission
+        if #available(iOS 17.0, *) {
+            let appPerm = AVAudioApplication.shared.recordPermission
+            switch appPerm {
+            case .undetermined: currentPermission = .undetermined
+            case .denied: currentPermission = .denied
+            case .granted: currentPermission = .granted
+            @unknown default: currentPermission = .denied
+            }
+        } else {
+            currentPermission = audioSession.recordPermission
+        }
         print("🎵 Current permission: \(currentPermission.rawValue)")
         
         switch currentPermission {
@@ -239,6 +292,8 @@ class AudioRecorder: NSObject, ObservableObject {
                 }
             }
             
+            notifyWatch()
+            
             return fileName
             
         } catch {
@@ -259,6 +314,8 @@ class AudioRecorder: NSObject, ObservableObject {
         endBackgroundTask()
         
         isRecording = false
+        
+        notifyWatch()
         
         let finalDuration = recordingDuration
         recordingDuration = 0
@@ -301,6 +358,8 @@ class AudioRecorder: NSObject, ObservableObject {
         recorder.pause()
         recordingTimer?.invalidate()
         recordingTimer = nil
+        
+        notifyWatch()
     }
     
     func resumeRecording() {
@@ -328,6 +387,8 @@ class AudioRecorder: NSObject, ObservableObject {
                 }
             }
         }
+        
+        notifyWatch()
     }
     
     func getDocumentsDirectory() -> URL {
@@ -369,6 +430,13 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
+    @MainActor
+    private func notifyWatch() {
+#if canImport(WatchConnectivity)
+        wcManager?.sendStatus(isRecording: self.isRecording, duration: self.recordingDuration)
+#endif
+    }
+    
     deinit {
         // Clean up background task from deinit (non-MainActor context)
         if backgroundTaskID != .invalid {
@@ -390,6 +458,7 @@ extension AudioRecorder: AVAudioRecorderDelegate {
                 self.recordingTimer?.invalidate()
                 self.recordingTimer = nil
                 self.lastError = "Recording failed to complete properly"
+                self.notifyWatch()
             }
         }
     }
@@ -404,7 +473,7 @@ extension AudioRecorder: AVAudioRecorderDelegate {
             self.recordingTimer?.invalidate()
             self.recordingTimer = nil
             self.lastError = "Recording encoding error: \(error?.localizedDescription ?? "unknown")"
+            self.notifyWatch()
         }
     }
 }
-
