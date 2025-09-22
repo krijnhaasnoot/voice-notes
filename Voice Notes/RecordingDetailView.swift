@@ -49,7 +49,7 @@ struct RecordingDetailView: View {
                 } else {
                     VStack {
                         Text("Recording not found")
-                            .font(.headline)
+                            .font(.poppins.headline)
                             .foregroundColor(.secondary)
                         Button("Close") {
                             presentationMode.wrappedValue.dismiss()
@@ -67,7 +67,7 @@ struct RecordingDetailView: View {
                         Button("RAW") {
                             showingRawSummary = true
                         }
-                        .font(.caption)
+                        .font(.poppins.caption)
                         .foregroundColor(.blue)
                     }
                     
@@ -86,7 +86,7 @@ struct RecordingDetailView: View {
                     Button("Done") {
                         presentationMode.wrappedValue.dismiss()
                     }
-                    .font(.headline)
+                    .font(.poppins.headline)
                 }
             )
             .alert("Delete Recording", isPresented: $showingDeleteAlert) {
@@ -162,17 +162,17 @@ struct RecordingDetailView: View {
         HStack(spacing: 12) {
             Button(action: { togglePlayback(recording) }) {
                 Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 40, weight: .regular))
+                    .font(.poppins.regular(size: 40))
                     .foregroundColor(.blue)
             }
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(recording.title.isEmpty ? recording.fileName.replacingOccurrences(of: ".m4a", with: "") : recording.title)
-                    .font(.headline)
+                    .font(.poppins.headline)
                     .lineLimit(1)
                 Text(recording.formattedDate)
-                    .font(.caption)
+                    .font(.poppins.caption)
                     .foregroundColor(.secondary)
             }
 
@@ -183,7 +183,7 @@ struct RecordingDetailView: View {
     private func recordingInfoSection(_ recording: Recording) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Recording Information")
-                .font(.headline)
+                .font(.poppins.headline)
                 .fontWeight(.semibold)
             
             InfoRow(label: "Date & Time", value: recording.formattedDate)
@@ -199,20 +199,20 @@ struct RecordingDetailView: View {
     private func playbackSection(_ recording: Recording) -> some View {
         VStack(spacing: 12) {
             Text("Playback")
-                .font(.headline)
+                .font(.poppins.headline)
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
             Button(action: { togglePlayback(recording) }) {
                 HStack {
                     Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 50))
+                        .font(.poppins.regular(size: 50))
                     
                     VStack(alignment: .leading) {
                         Text(isPlaying ? "Playing" : "Play Recording")
-                            .font(.headline)
+                            .font(.poppins.headline)
                         Text(recording.formattedDuration)
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundColor(.secondary)
                     }
                     
@@ -230,7 +230,7 @@ struct RecordingDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Transcript")
-                    .font(.headline)
+                    .font(.poppins.headline)
                     .fontWeight(.semibold)
                 
                 Spacer()
@@ -242,13 +242,13 @@ struct RecordingDetailView: View {
                                 isEditingTranscript = false
                                 editedTranscript = ""
                             }
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundColor(.secondary)
                             
                             Button("Save") {
                                 saveTranscriptEdits(for: recording)
                             }
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundColor(.blue)
                             .fontWeight(.medium)
                         }
@@ -256,20 +256,20 @@ struct RecordingDetailView: View {
                         Button("Edit") {
                             startEditingTranscript(transcript)
                         }
-                        .font(.caption)
+                        .font(.poppins.caption)
                         .foregroundColor(.blue)
                     }
                 } else if case .transcribing(let progress) = recording.status {
                     ProgressView(value: progress)
                         .frame(width: 60)
                     Text("\(Int(progress * 100))%")
-                        .font(.caption)
+                        .font(.poppins.caption)
                         .foregroundColor(.blue)
                 } else if case .failed = recording.status, recording.transcript == nil {
                     Button("Retry") {
                         recordingsManager.retryTranscription(for: recording)
                     }
-                    .font(.caption)
+                    .font(.poppins.caption)
                     .foregroundColor(.blue)
                 }
             }
@@ -277,14 +277,14 @@ struct RecordingDetailView: View {
             if let transcript = recording.transcript, !transcript.isEmpty {
                 if isEditingTranscript {
                     TextEditor(text: $editedTranscript)
-                        .font(.body)
+                        .font(.poppins.body)
                         .padding(8)
                         .background(Color.secondary.opacity(0.05))
                         .cornerRadius(8)
                         .frame(minHeight: 100)
                 } else {
                     Text(transcript)
-                        .font(.body)
+                        .font(.poppins.body)
                         .textSelection(.enabled)
                         .padding()
                         .background(Color.secondary.opacity(0.05))
@@ -304,11 +304,11 @@ struct RecordingDetailView: View {
                             .foregroundColor(.red)
                         Text("Transcription failed")
                             .foregroundColor(.red)
-                            .font(.caption)
+                            .font(.poppins.caption)
                     }
                     Text(reason)
                         .foregroundColor(.secondary)
-                        .font(.caption)
+                        .font(.poppins.caption)
                 }
                 .padding()
             } else {
@@ -327,7 +327,7 @@ struct RecordingDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("AI Summary")
-                    .font(.headline)
+                    .font(.poppins.headline)
                     .fontWeight(.semibold)
                 
                 Spacer()
@@ -336,7 +336,7 @@ struct RecordingDetailView: View {
                     ProgressView(value: progress)
                         .frame(width: 60)
                     Text("\(Int(progress * 100))%")
-                        .font(.caption)
+                        .font(.poppins.caption)
                         .foregroundColor(.orange)
                 } else if case .failed = recording.status, recording.transcript != nil {
                     summaryControlButtons(for: recording)
@@ -346,7 +346,7 @@ struct RecordingDetailView: View {
                     // Show settings button even when waiting for summary
                     Button(action: { showingSummarySettings = true }) {
                         Image(systemName: "gearshape")
-                            .font(.caption)
+                            .font(.poppins.caption)
                             .foregroundColor(.blue)
                     }
                 }
@@ -366,9 +366,9 @@ struct RecordingDetailView: View {
                 HStack {
                     Image(systemName: "brain.head.profile")
                         .foregroundColor(.blue)
-                        .font(.caption)
+                        .font(.poppins.caption)
                     Text("Detected mode: \(detectedMode)")
-                        .font(.caption)
+                        .font(.poppins.caption)
                         .foregroundColor(.secondary)
                     Spacer()
                 }
@@ -380,7 +380,7 @@ struct RecordingDetailView: View {
             
             if let summary = recording.summary, !summary.isEmpty {
                 FormattedSummaryText(summary: summary)
-                    .font(.body)
+                    .font(.poppins.body)
                     .textSelection(.enabled)
                     .padding()
                     .background(Color.blue.opacity(0.1))
@@ -399,11 +399,11 @@ struct RecordingDetailView: View {
                             .foregroundColor(.red)
                         Text("Summary generation failed")
                             .foregroundColor(.red)
-                            .font(.caption)
+                            .font(.poppins.caption)
                     }
                     Text(reason)
                         .foregroundColor(.secondary)
-                        .font(.caption)
+                        .font(.poppins.caption)
                 }
                 .padding()
             } else if recording.transcript != nil {
@@ -459,7 +459,7 @@ struct RecordingDetailView: View {
     private func shareSection(_ recording: Recording) -> some View {
         VStack(spacing: 12) {
             Text("Actions")
-                .font(.headline)
+                .font(.poppins.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
             VStack(spacing: 8) {
@@ -509,14 +509,14 @@ struct RecordingDetailView: View {
             return AnyView(
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Action Items")
-                        .font(.headline)
+                        .font(.poppins.headline)
                         .fontWeight(.semibold)
                         HStack {
                         Image(systemName: "info.circle")
                             .foregroundColor(.secondary)
-                            .font(.caption)
+                            .font(.poppins.caption)
                         Text("No action items detected")
-                            .font(.subheadline)
+                            .font(.poppins.subheadline)
                             .foregroundColor(.secondary)
                     }
                     .padding(.horizontal, 12)
@@ -534,7 +534,7 @@ struct RecordingDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("Action Items")
-                        .font(.headline)
+                        .font(.poppins.headline)
                         .fontWeight(.semibold)
                     
                     Spacer()
@@ -544,7 +544,7 @@ struct RecordingDetailView: View {
                         showingQuickAddField.toggle()
                     }) {
                         Image(systemName: "plus.circle")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.poppins.medium(size: 16))
                             .foregroundColor(.blue)
                     }
                     
@@ -556,11 +556,11 @@ struct RecordingDetailView: View {
                             selectedActionItems = Set(actionItems)
                         }
                     }
-                    .font(.caption)
+                    .font(.poppins.caption)
                     .foregroundColor(.blue)
                     
                     Text("(\(actionItems.count))")
-                        .font(.caption)
+                        .font(.poppins.caption)
                         .foregroundColor(.secondary)
                 }
                 
@@ -625,7 +625,7 @@ struct RecordingDetailView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(toastMessage)
-                    .font(.body)
+                    .font(.poppins.body)
                     .fontWeight(.medium)
                     .foregroundColor(.white)
             }
@@ -638,7 +638,7 @@ struct RecordingDetailView: View {
                         documentStore.undoLastAdd()
                         showingToast = false
                     }
-                    .font(.body)
+                    .font(.poppins.body)
                     .fontWeight(.semibold)
                     .foregroundColor(.yellow)
                 }
@@ -649,7 +649,7 @@ struct RecordingDetailView: View {
                         showingToast = false
                         documentStore.markOpened(docId)
                     }
-                    .font(.body)
+                    .font(.poppins.body)
                     .fontWeight(.semibold)
                     .foregroundColor(.blue)
                 }
@@ -684,20 +684,34 @@ struct RecordingDetailView: View {
         var items: [String] = []
         let lines = summary.components(separatedBy: .newlines)
         
+        // Common section headers to exclude
+        let sectionHeaders = [
+            "title", "session title", "topic", "subject",
+            "summary", "overview", "description",
+            "action items", "actions", "next steps", "todo", "tasks",
+            "key points", "main points", "highlights",
+            "decisions", "conclusions", "outcomes",
+            "participants", "attendees",
+            "agenda", "notes", "takeaways",
+            "challenge", "goal", "objective",
+            "ideas generated", "best ideas",
+            "key concepts", "examples", "case studies"
+        ]
+        
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             
             // Look for bullet points or numbered items
             if trimmed.hasPrefix("•") || trimmed.hasPrefix("-") || trimmed.hasPrefix("*") {
                 let item = trimmed.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
-                if !item.isEmpty && item.count > 3 {
+                if !item.isEmpty && item.count > 3 && !isSectionHeaderSimple(item, headers: sectionHeaders) {
                     items.append(item)
                 }
             } else if let regex = try? NSRegularExpression(pattern: "^\\d+\\.", options: []) {
                 let range = NSRange(location: 0, length: trimmed.count)
                 if regex.firstMatch(in: trimmed, options: [], range: range) != nil {
                     let item = regex.stringByReplacingMatches(in: trimmed, options: [], range: range, withTemplate: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !item.isEmpty && item.count > 3 {
+                    if !item.isEmpty && item.count > 3 && !isSectionHeaderSimple(item, headers: sectionHeaders) {
                         items.append(item)
                     }
                 }
@@ -705,6 +719,30 @@ struct RecordingDetailView: View {
         }
         
         return Array(items.prefix(10))
+    }
+    
+    private func isSectionHeaderSimple(_ text: String, headers: [String]) -> Bool {
+        let lowercased = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Check if the text exactly matches or starts with a section header
+        for header in headers {
+            if lowercased == header || lowercased.hasPrefix(header + ":") {
+                return true
+            }
+        }
+        
+        // Check if it looks like a markdown header (contains only header words)
+        let words = lowercased.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        if words.count <= 3 { // Short phrases are likely headers
+            let joinedWords = words.joined(separator: " ")
+            for header in headers {
+                if joinedWords.contains(header) || header.contains(joinedWords) {
+                    return true
+                }
+            }
+        }
+        
+        return false
     }
     
     private func parseActionItemsFromTranscript(_ transcript: String) -> [String] {
@@ -867,14 +905,14 @@ struct RecordingDetailView: View {
         HStack(spacing: 12) {
             Button(action: { showingSummarySettings.toggle() }) {
                 Image(systemName: "gearshape")
-                    .font(.caption)
+                    .font(.poppins.caption)
                     .foregroundColor(.blue)
             }
             
             Button("Retry") {
                 retryWithSettings(for: recording)
             }
-            .font(.caption)
+            .font(.poppins.caption)
             .foregroundColor(.blue)
         }
     }
@@ -884,7 +922,7 @@ struct RecordingDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("AI Summary Settings")
-                    .font(.subheadline)
+                    .font(.poppins.subheadline)
                     .fontWeight(.medium)
                 
                 Spacer()
@@ -894,7 +932,7 @@ struct RecordingDetailView: View {
                         showingSummarySettings = false
                     }
                 }
-                .font(.caption)
+                .font(.poppins.caption)
                 .foregroundColor(.blue)
             }
             
@@ -902,10 +940,10 @@ struct RecordingDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Image(systemName: "brain.head.profile")
-                        .font(.system(size: 14))
+                        .font(.poppins.regular(size: 14))
                         .foregroundColor(.blue)
-                    Text("Summary Mode")
-                        .font(.caption)
+                    Text("AI Summary Mode")
+                        .font(.poppins.caption)
                         .fontWeight(.medium)
                 }
                 
@@ -913,14 +951,14 @@ struct RecordingDetailView: View {
                     ForEach(SummaryMode.allCases, id: \.self) { mode in
                         HStack {
                             Text(mode.displayName)
-                                .font(.caption)
+                                .font(.poppins.caption)
                             Spacer()
                         }
                         .tag(mode)
                     }
                 }
                 .pickerStyle(.menu)
-                .font(.caption)
+                .font(.poppins.caption)
                 
                 Text(selectedSummaryMode.description)
                     .font(.caption2)
@@ -932,10 +970,10 @@ struct RecordingDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Image(systemName: "text.alignleft")
-                        .font(.system(size: 14))
+                        .font(.poppins.regular(size: 14))
                         .foregroundColor(.purple)
                     Text("Detail Level")
-                        .font(.caption)
+                        .font(.poppins.caption)
                         .fontWeight(.medium)
                 }
                 
@@ -943,20 +981,23 @@ struct RecordingDetailView: View {
                     ForEach(SummaryLength.allCases) { length in
                         HStack {
                             Text(length.displayName)
-                                .font(.caption)
+                                .font(.poppins.caption)
                             Spacer()
                         }
                         .tag(length)
                     }
                 }
                 .pickerStyle(.menu)
-                .font(.caption)
+                .font(.poppins.caption)
                 
                 Text(selectedSummaryLength.description)
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .padding(.top, 2)
             }
+            
+            // AI Provider Section
+            aiProviderSection(for: recording)
             
             // Retry button with current settings
             Button(action: {
@@ -967,9 +1008,9 @@ struct RecordingDetailView: View {
             }) {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.clockwise.circle.fill")
-                        .font(.system(size: 16))
+                        .font(.poppins.regular(size: 16))
                     Text("Retry with \(selectedSummaryMode.displayName) (\(selectedSummaryLength.displayName))")
-                        .font(.caption)
+                        .font(.poppins.caption)
                         .fontWeight(.medium)
                 }
                 .foregroundColor(.white)
@@ -1019,6 +1060,87 @@ struct RecordingDetailView: View {
             if let originalLength = currentLength {
                 UserDefaults.standard.set(originalLength, forKey: "defaultSummaryLength")
             }
+        }
+    }
+    
+    @ViewBuilder
+    private func aiProviderSection(for recording: Recording) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "cpu")
+                    .font(.poppins.regular(size: 14))
+                    .foregroundColor(.green)
+                Text("AI Provider")
+                    .font(.poppins.caption)
+                    .fontWeight(.medium)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    // Provider icon and name
+                    Image(systemName: currentProvider(for: recording).iconName)
+                        .font(.caption)
+                        .foregroundColor(currentProvider(for: recording).accentColor)
+                        .frame(width: 16)
+                    
+                    Text(currentProvider(for: recording).displayName)
+                        .font(.poppins.caption)
+                        .fontWeight(.medium)
+                    
+                    Spacer()
+                    
+                    // Status indicator
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(providerStatus(for: recording).color)
+                            .frame(width: 8, height: 8)
+                        
+                        Text(providerStatus(for: recording).text)
+                            .font(.caption2)
+                            .foregroundColor(providerStatus(for: recording).color)
+                    }
+                }
+                
+                Text(providerDescription(for: recording))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 2)
+                
+                if let recordingProvider = recording.aiProviderType {
+                    Text("This recording will use: \(recordingProvider.displayName)")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                        .padding(.top, 2)
+                }
+            }
+            .padding(8)
+            .background(Color.green.opacity(0.05))
+            .cornerRadius(8)
+        }
+    }
+    
+    private func currentProvider(for recording: Recording) -> AIProviderType {
+        // Check if recording has specific provider, otherwise use global setting
+        return recording.aiProviderType ?? AISettingsStore.shared.selectedProvider
+    }
+    
+    private func providerStatus(for recording: Recording) -> (color: Color, text: String) {
+        let aiSettings = AISettingsStore.shared
+        let provider = currentProvider(for: recording)
+        if aiSettings.canUseProvider(provider) {
+            return (.green, "Connected")
+        } else if provider.requiresApiKey {
+            return (.orange, "Not configured")
+        } else {
+            return (.blue, "Ready")
+        }
+    }
+    
+    private func providerDescription(for recording: Recording) -> String {
+        if recording.aiProviderType != nil {
+            return "This recording has a specific provider override"
+        } else {
+            return "Using global default: \(currentProvider(for: recording).displayName)"
         }
     }
 }
@@ -1151,9 +1273,9 @@ struct SaveToDocumentsSheet: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text("Extracting action items...")
-                .font(.headline)
+                .font(.poppins.headline)
             Text("Analyzing recording content")
-                .font(.caption)
+                .font(.poppins.caption)
                 .foregroundColor(.secondary)
             Spacer()
         }
@@ -1165,15 +1287,15 @@ struct SaveToDocumentsSheet: View {
             Spacer()
             
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 60))
+                .font(.poppins.regular(size: 60))
                 .foregroundColor(.green)
             
             Text("Saved Successfully!")
-                .font(.title2)
+                .font(.poppins.title2)
                 .fontWeight(.semibold)
             
             Text("\(extractedItems.count) items added to list")
-                .font(.body)
+                .font(.poppins.body)
                 .foregroundColor(.secondary)
             
             Spacer()
@@ -1210,7 +1332,7 @@ struct SaveToDocumentsSheet: View {
     private var suggestedSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Suggested")
-                .font(.headline)
+                .font(.poppins.headline)
             
             if let suggested = suggestedDocument {
                 Button(action: {
@@ -1222,11 +1344,11 @@ struct SaveToDocumentsSheet: View {
                         
                         VStack(alignment: .leading) {
                             Text(suggested.title)
-                                .font(.body)
+                                .font(.poppins.body)
                                 .fontWeight(.medium)
                                 .multilineTextAlignment(.leading)
                             Text("Smart match • \(suggested.itemCount) items")
-                                .font(.caption)
+                                .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                         }
                         
@@ -1251,10 +1373,10 @@ struct SaveToDocumentsSheet: View {
                         
                         VStack(alignment: .leading) {
                             Text("To-Do — Personal")
-                                .font(.body)
+                                .font(.poppins.body)
                                 .fontWeight(.medium)
                             Text("Create new document")
-                                .font(.caption)
+                                .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                         }
                         
@@ -1284,7 +1406,7 @@ struct SaveToDocumentsSheet: View {
     private var extractedItemsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Selected Items (\(extractedItems.count))")
-                .font(.headline)
+                .font(.poppins.headline)
             
             if extractedItems.isEmpty {
                 HStack {
@@ -1301,10 +1423,10 @@ struct SaveToDocumentsSheet: View {
                     ForEach(Array(extractedItems.enumerated()), id: \.offset) { _, item in
                         HStack {
                             Image(systemName: "circle")
-                                .font(.caption)
+                                .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                             Text(item)
-                                .font(.body)
+                                .font(.poppins.body)
                             Spacer()
                         }
                         .padding(.horizontal, 12)
@@ -1320,7 +1442,7 @@ struct SaveToDocumentsSheet: View {
     private var recentDocumentsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Recent Lists (Today)")
-                .font(.headline)
+                .font(.poppins.headline)
             
             LazyVStack(spacing: 8) {
                 ForEach(recentDocuments) { document in
@@ -1333,11 +1455,11 @@ struct SaveToDocumentsSheet: View {
                             
                             VStack(alignment: .leading) {
                                 Text(document.title)
-                                    .font(.body)
+                                    .font(.poppins.body)
                                     .fontWeight(.medium)
                                     .multilineTextAlignment(.leading)
                                 Text("\(document.itemCount) items")
-                                    .font(.caption)
+                                    .font(.poppins.caption)
                                     .foregroundColor(.secondary)
                             }
                             
@@ -1360,7 +1482,7 @@ struct SaveToDocumentsSheet: View {
     private var documentTypesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Create New List")
-                .font(.headline)
+                .font(.poppins.headline)
             
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
                 ForEach(DocumentType.allCases, id: \.self) { type in
@@ -1369,10 +1491,10 @@ struct SaveToDocumentsSheet: View {
                     }) {
                         VStack(spacing: 8) {
                             Image(systemName: type.systemImage)
-                                .font(.system(size: 24))
+                                .font(.poppins.regular(size: 24))
                                 .foregroundColor(type.color)
                             Text(type.displayName)
-                                .font(.caption)
+                                .font(.poppins.caption)
                                 .fontWeight(.medium)
                         }
                         .frame(height: 80)
@@ -1413,20 +1535,34 @@ struct SaveToDocumentsSheet: View {
         var items: [String] = []
         let lines = summary.components(separatedBy: .newlines)
         
+        // Common section headers to exclude
+        let sectionHeaders = [
+            "title", "session title", "topic", "subject",
+            "summary", "overview", "description",
+            "action items", "actions", "next steps", "todo", "tasks",
+            "key points", "main points", "highlights",
+            "decisions", "conclusions", "outcomes",
+            "participants", "attendees",
+            "agenda", "notes", "takeaways",
+            "challenge", "goal", "objective",
+            "ideas generated", "best ideas",
+            "key concepts", "examples", "case studies"
+        ]
+        
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             
             // Look for bullet points or numbered items
             if trimmed.hasPrefix("•") || trimmed.hasPrefix("-") || trimmed.hasPrefix("*") {
                 let item = trimmed.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
-                if !item.isEmpty && item.count > 3 {
+                if !item.isEmpty && item.count > 3 && !isSectionHeader(item, headers: sectionHeaders) {
                     items.append(item)
                 }
             } else if let regex = try? NSRegularExpression(pattern: "^\\d+\\.", options: []) {
                 let range = NSRange(location: 0, length: trimmed.count)
                 if regex.firstMatch(in: trimmed, options: [], range: range) != nil {
                     let item = regex.stringByReplacingMatches(in: trimmed, options: [], range: range, withTemplate: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !item.isEmpty && item.count > 3 {
+                    if !item.isEmpty && item.count > 3 && !isSectionHeader(item, headers: sectionHeaders) {
                         items.append(item)
                     }
                 }
@@ -1434,6 +1570,30 @@ struct SaveToDocumentsSheet: View {
         }
         
         return Array(items.prefix(10)) // Limit to 10 items
+    }
+    
+    private func isSectionHeader(_ text: String, headers: [String]) -> Bool {
+        let lowercased = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Check if the text exactly matches or starts with a section header
+        for header in headers {
+            if lowercased == header || lowercased.hasPrefix(header + ":") {
+                return true
+            }
+        }
+        
+        // Check if it looks like a markdown header (contains only header words)
+        let words = lowercased.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        if words.count <= 3 { // Short phrases are likely headers
+            let joinedWords = words.joined(separator: " ")
+            for header in headers {
+                if joinedWords.contains(header) || header.contains(joinedWords) {
+                    return true
+                }
+            }
+        }
+        
+        return false
     }
     
     private func parseActionItemsFromTranscript(_ transcript: String) -> [String] {
@@ -1503,13 +1663,13 @@ struct ActionItemRow: View {
             // Selection checkbox
             Button(action: onSelectionToggle) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.poppins.medium(size: 18))
                     .foregroundColor(isSelected ? .blue : .secondary)
             }
             .buttonStyle(.plain)
             
             Text(item)
-                .font(.body)
+                .font(.poppins.body)
                 .multilineTextAlignment(.leading)
                 .foregroundColor(isSelected ? .primary : .secondary)
             

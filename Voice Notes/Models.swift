@@ -14,8 +14,9 @@ struct Recording: Identifiable, Codable {
     let summaryLastUpdated: Date?
     let title: String
     let detectedMode: String?
+    let preferredSummaryProvider: String? // AIProviderType.rawValue
     
-    init(fileName: String, date: Date = Date(), duration: TimeInterval = 0, transcript: String? = nil, summary: String? = nil, rawSummary: String? = nil, status: Status = .idle, languageHint: String? = nil, transcriptLastUpdated: Date? = nil, summaryLastUpdated: Date? = nil, title: String = "", detectedMode: String? = nil, id: UUID = UUID()) {
+    init(fileName: String, date: Date = Date(), duration: TimeInterval = 0, transcript: String? = nil, summary: String? = nil, rawSummary: String? = nil, status: Status = .idle, languageHint: String? = nil, transcriptLastUpdated: Date? = nil, summaryLastUpdated: Date? = nil, title: String = "", detectedMode: String? = nil, preferredSummaryProvider: String? = nil, id: UUID = UUID()) {
         self.id = id
         self.fileName = fileName
         self.date = date
@@ -29,6 +30,35 @@ struct Recording: Identifiable, Codable {
         self.summaryLastUpdated = summaryLastUpdated
         self.title = title
         self.detectedMode = detectedMode
+        self.preferredSummaryProvider = preferredSummaryProvider
+    }
+    
+    // Convenience computed property for AI provider
+    var aiProviderType: AIProviderType? {
+        get {
+            guard let providerString = preferredSummaryProvider else { return nil }
+            return AIProviderType(rawValue: providerString)
+        }
+    }
+    
+    // Method to create a copy with different provider
+    func withProvider(_ provider: AIProviderType?) -> Recording {
+        return Recording(
+            fileName: fileName,
+            date: date,
+            duration: duration,
+            transcript: transcript,
+            summary: summary,
+            rawSummary: rawSummary,
+            status: status,
+            languageHint: languageHint,
+            transcriptLastUpdated: transcriptLastUpdated,
+            summaryLastUpdated: summaryLastUpdated,
+            title: title,
+            detectedMode: detectedMode,
+            preferredSummaryProvider: provider?.rawValue,
+            id: id
+        )
     }
     
     enum Status: Codable, Equatable {

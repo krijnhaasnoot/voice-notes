@@ -14,6 +14,10 @@ extension SummaryMode {
             return "For planning and project meetings"
         case .alignment:
             return "For alignment and strategic sessions"
+        case .brainstorm:
+            return "For creative brainstorming and ideation sessions"
+        case .lecture:
+            return "For lectures, talks, and learning content"
         case .personal:
             return "For personal conversations and general topics"
         }
@@ -45,14 +49,63 @@ struct SettingsView: View {
     }
     
     var body: some View {
-        Form {
-                Section(header: Text("Summary Settings")) {
-                    // Default Mode Picker
+        NavigationView {
+            Form {
+                Section(header: Text("AI Provider")) {
+                NavigationLink(destination: AIProviderSettingsView()) {
+                    HStack {
+                        Image(systemName: "brain.head.profile")
+                            .foregroundColor(.blue)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("AI Provider Settings")
+                                .font(.poppins.body)
+                            
+                            Text("Configure OpenAI, Claude, or Gemini")
+                                .font(.poppins.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                    }
+                }
+                .padding(.vertical, 4)
+                
+                NavigationLink(destination: TelemetryView()) {
+                    HStack {
+                        Image(systemName: "chart.bar.xaxis")
+                            .foregroundColor(.blue)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Usage Analytics")
+                                .font(.poppins.body)
+                            
+                            Text("View AI provider performance stats")
+                                .font(.poppins.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            
+            Section(header: Text("Summary Settings")) {
+                    // AI Summary Mode Picker
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Default Mode")
+                        Text("AI Summary Mode")
                             .font(.poppins.headline)
                         
-                        Picker("Default Mode", selection: Binding(
+                        Picker("AI Summary Mode", selection: Binding(
                             get: { selectedMode },
                             set: { defaultMode = $0.rawValue }
                         )) {
@@ -262,6 +315,7 @@ struct SettingsView: View {
             AppTourView(onComplete: {
                 showingTour = false
             })
+        }
         }
     }
 }
