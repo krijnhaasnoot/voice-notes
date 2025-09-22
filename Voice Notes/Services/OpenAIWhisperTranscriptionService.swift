@@ -7,10 +7,17 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
     private let baseURL = "https://api.openai.com/v1/audio/transcriptions"
     private let model: String
     private let maxFileSize: Int64 = 25 * 1024 * 1024 // 25MB limit
+    private let urlSession: URLSession
     
     init(apiKey: String, model: String = "whisper-1") {
         self.apiKey = apiKey
         self.model = model
+        
+        // Create custom URLSession with extended timeouts for long audio processing
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300.0 // 5 minutes for request timeout
+        config.timeoutIntervalForResource = 1800.0 // 30 minutes for resource timeout (long audio processing)
+        self.urlSession = URLSession(configuration: config)
     }
     
     func transcribe(
@@ -33,15 +40,26 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
             throw TranscriptionError.apiKeyMissing
         }
         
-        let audioData = try Data(contentsOf: url)
+        var processedURL = url
+        var audioData = try Data(contentsOf: url)
         
-        // Check file size limit
-        guard audioData.count <= maxFileSize else {
-            throw TranscriptionError.networkError(NSError(
-                domain: "OpenAIWhisper", 
-                code: 413, 
-                userInfo: [NSLocalizedDescriptionKey: "File size exceeds 25MB limit"]
-            ))
+        // Check if file needs compression for size limit
+        if audioData.count > maxFileSize {
+            print("🔤 ⚠️ File too large: \(audioData.count) bytes (max: \(maxFileSize))")
+            print("🔤 🔄 Attempting to compress audio for transcription...")
+            
+            do {
+                processedURL = try await compressAudioFile(url, targetSizeBytes: maxFileSize)
+                audioData = try Data(contentsOf: processedURL)
+                print("🔤 ✅ Compressed audio: \(audioData.count) bytes")
+            } catch {
+                print("🔤 ❌ Compression failed: \(error)")
+                throw TranscriptionError.networkError(NSError(
+                    domain: "OpenAIWhisper",
+                    code: 413,
+                    userInfo: [NSLocalizedDescriptionKey: "File size exceeds 25MB limit (\(audioData.count/1024/1024)MB) and compression failed"]
+                ))
+            }
         }
         let fileName = url.lastPathComponent
         
@@ -57,7 +75,7 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
         
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: \(contentType(for: url))\r\n\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(contentType(for: processedURL))\r\n\r\n".data(using: .utf8)!)
         body.append(audioData)
         body.append("\r\n".data(using: .utf8)!)
         
@@ -83,7 +101,7 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
         }
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await urlSession.data(for: request)
             
             progress(0.9)
             
@@ -103,6 +121,13 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
                 }
                 
                 progress(1.0)
+                
+                // Cleanup compressed file if we created one
+                if processedURL != url {
+                    try? FileManager.default.removeItem(at: processedURL)
+                    print("🔤 🧹 Cleaned up compressed file")
+                }
+                
                 return transcript
                 
             case 401:
@@ -132,6 +157,12 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
             }
             
         } catch {
+            // Cleanup compressed file if we created one
+            if processedURL != url {
+                try? FileManager.default.removeItem(at: processedURL)
+                print("🔤 🧹 Cleaned up compressed file after error")
+            }
+            
             if cancelToken.isCancelled {
                 throw TranscriptionError.cancelled
             }
@@ -157,6 +188,53 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
             return "audio/aac"
         default:
             return "application/octet-stream"
+        }
+    }
+    
+    private func compressAudioFile(_ sourceURL: URL, targetSizeBytes: Int64) async throws -> URL {
+        let outputURL = sourceURL.appendingPathExtension("compressed")
+        
+        // Remove existing compressed file if it exists
+        try? FileManager.default.removeItem(at: outputURL)
+        
+        // Set up the asset and export session
+        let asset = AVURLAsset(url: sourceURL)
+        
+        // Use a lower quality preset for better compression
+        guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetLowQuality) else {
+            throw TranscriptionError.networkError(NSError(
+                domain: "AudioCompression", 
+                code: -1, 
+                userInfo: [NSLocalizedDescriptionKey: "Could not create export session"]
+            ))
+        }
+        
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .m4a
+        
+        // Use async/await wrapper for the export operation
+        return try await withCheckedThrowingContinuation { continuation in
+            exportSession.exportAsynchronously {
+                switch exportSession.status {
+                case .completed:
+                    continuation.resume(returning: outputURL)
+                case .failed:
+                    let error = exportSession.error ?? NSError(
+                        domain: "AudioCompression", 
+                        code: -2, 
+                        userInfo: [NSLocalizedDescriptionKey: "Export failed with unknown error"]
+                    )
+                    continuation.resume(throwing: TranscriptionError.networkError(error))
+                case .cancelled:
+                    continuation.resume(throwing: TranscriptionError.cancelled)
+                default:
+                    continuation.resume(throwing: TranscriptionError.networkError(NSError(
+                        domain: "AudioCompression", 
+                        code: -3, 
+                        userInfo: [NSLocalizedDescriptionKey: "Export session ended with status: \(exportSession.status.rawValue)"]
+                    )))
+                }
+            }
         }
     }
 }
