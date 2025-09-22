@@ -10,7 +10,6 @@ struct RecordingDetailView: View {
     @State private var showingDeleteAlert = false
     @State private var isSharePresented = false
     @State private var shareItems: [Any] = ["Transcript wordt nog gemaakt…"]
-    @State private var showingRawSummary = false
     @State private var isEditingTranscript = false
     @State private var editedTranscript = ""
     @State private var showingSaveToDocuments = false
@@ -35,8 +34,8 @@ struct RecordingDetailView: View {
                             headerSection(recording)
                             recordingInfoSection(recording)
                             playbackSection(recording)
-                            transcriptSection(recording)
                             summarySection(recording)
+                            transcriptSection(recording)
                             actionItemsSection(recording)
                             
                             // Share/Copy buttons at bottom
@@ -62,15 +61,6 @@ struct RecordingDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarItems(
                 trailing: HStack(spacing: 16) {
-                    if let recording = recordingsManager.recordings.first(where: { $0.id == recordingId }),
-                       let rawSummary = recording.rawSummary, !rawSummary.isEmpty {
-                        Button("RAW") {
-                            showingRawSummary = true
-                        }
-                        .font(.poppins.caption)
-                        .foregroundColor(.blue)
-                    }
-                    
                     Button(action: {
                         showingDeleteAlert = true
                     }) {
@@ -100,26 +90,6 @@ struct RecordingDetailView: View {
         }
         .sheet(isPresented: $isSharePresented) {
             ShareSheet(items: shareItems)
-        }
-        .sheet(isPresented: $showingRawSummary) {
-            if let recording = recordingsManager.recordings.first(where: { $0.id == recordingId }),
-               let rawSummary = recording.rawSummary {
-                NavigationView {
-                    ScrollView {
-                        Text(rawSummary)
-                            .font(.system(.body, design: .monospaced))
-                            .padding()
-                            .textSelection(.enabled)
-                    }
-                    .navigationTitle("Raw AI Output")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbarBackground(.clear, for: .navigationBar)
-                    .toolbarBackground(.visible, for: .navigationBar)
-                    .navigationBarItems(trailing: Button("Done") {
-                        showingRawSummary = false
-                    })
-                }
-            }
         }
         .sheet(isPresented: $showingSaveToDocuments) {
             if let recording = recordingsManager.recordings.first(where: { $0.id == recordingId }) {
