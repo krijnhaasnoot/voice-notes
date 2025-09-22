@@ -3,7 +3,7 @@ import SwiftUI
 struct AIProviderSettingsView: View {
     @StateObject private var aiSettings = AISettingsStore.shared
     @State private var showingApiKeySheet = false
-    @State private var selectedProviderForKeyEntry: AIProviderType?
+    @State private var selectedProviderForKeyEntry: AIProviderType = .openai
     
     var body: some View {
         Form {
@@ -16,10 +16,9 @@ struct AIProviderSettingsView: View {
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showingApiKeySheet) {
-            if let provider = selectedProviderForKeyEntry {
-                ProviderAuthorizationView(provider: provider) {
+            NavigationStack {
+                ProviderAuthorizationView(provider: selectedProviderForKeyEntry) {
                     showingApiKeySheet = false
-                    selectedProviderForKeyEntry = nil
                 }
             }
         }
@@ -69,7 +68,10 @@ struct AIProviderSettingsView: View {
                     onConfigureTapped: {
                         print("🔑 Setting up API key entry for: \(provider.displayName)")
                         selectedProviderForKeyEntry = provider
-                        showingApiKeySheet = true
+                        // Use a tiny delay to ensure state is set before sheet presentation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                            showingApiKeySheet = true
+                        }
                     },
                     onRemoveTapped: {
                         aiSettings.removeApiKey(for: provider)

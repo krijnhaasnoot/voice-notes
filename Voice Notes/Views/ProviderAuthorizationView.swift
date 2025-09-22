@@ -8,7 +8,7 @@ struct ProviderAuthorizationView: View {
     @State private var isConnecting = false
     @State private var showingManualEntry = false
     @State private var connectionStatus: ConnectionStatus = .notConnected
-    @State private var isLoading = false
+    @State private var isLoading = true
     
     var body: some View {
         Group {
@@ -34,7 +34,9 @@ struct ProviderAuthorizationView: View {
             }
         }
         .sheet(isPresented: $showingManualEntry) {
-            ManualAPIKeyView(provider: provider, onComplete: onComplete)
+            NavigationStack {
+                ManualAPIKeyView(provider: provider, onComplete: onComplete)
+            }
         }
         .task(id: provider) {
             initializeForProvider()
@@ -44,16 +46,27 @@ struct ProviderAuthorizationView: View {
     // MARK: - Loading View
     
     private var loadingView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
+            // Show provider icon and name immediately
+            provider.iconView(size: 64)
+                .padding(.top, 40)
+            
+            Text(provider.displayName)
+                .font(.largeTitle)
+                .fontWeight(.bold)
+            
+            Text("Loading connection details...")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .padding(.bottom, 20)
+            
             ProgressView()
                 .controlSize(.large)
             
-            Text("Loading \(provider.displayName) settings...")
-                .font(.headline)
-                .foregroundColor(.secondary)
+            Spacer()
         }
+        .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
     }
     
     // MARK: - Provider Header
@@ -241,14 +254,25 @@ struct ProviderAuthorizationView: View {
         isConnecting = false
         showingManualEntry = false
         
-        // Check connection status immediately without loading delay
-        if aiSettings.hasApiKey(for: provider) {
-            connectionStatus = .connected
-        } else {
-            connectionStatus = .notConnected
+        // Show loading state briefly to prevent white screen
+        Task {
+            // Small delay to ensure UI renders
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            await MainActor.run {
+                // Check connection status
+                if aiSettings.hasApiKey(for: provider) {
+                    connectionStatus = .connected
+                } else {
+                    connectionStatus = .notConnected
+                }
+                
+                // Hide loading with animation
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isLoading = false
+                }
+            }
         }
-        
-        isLoading = false
     }
     
     private func simulateOAuthFlow() async throws {
