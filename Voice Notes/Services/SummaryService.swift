@@ -45,6 +45,7 @@ enum SummaryMode: String, CaseIterable, Identifiable {
     case alignment = "alignment"
     case brainstorm = "brainstorm"
     case lecture = "lecture"
+    case interview = "interview"
     case personal = "personal"
     
     var id: String { rawValue }
@@ -58,7 +59,8 @@ enum SummaryMode: String, CaseIterable, Identifiable {
         case .alignment:   return "Alignment / 1:1"
         case .brainstorm:  return "Brainstorm Session"
         case .lecture:     return "Lecture / Learning"
-        case .personal:    return "Personal / Other"
+        case .interview:   return "Interview"
+        case .personal:    return "General Summary"
         }
     }
     
@@ -68,28 +70,31 @@ enum SummaryMode: String, CaseIterable, Identifiable {
         
         switch self {
         case .primaryCare:
-            return "Summarize this primary care consultation in clear language. Use sections: **Chief Complaint**, **Exam/Findings**, **Advice/Treatment**, **Follow-up**. Be factual and concise; no interpretations not stated in the recording. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this primary care consultation in a clear and structured way. Start with patient context and presenting complaint. Identify the healthcare provider and patient interaction. Highlight clinical findings, diagnosis, and treatment decisions. Extract key medical themes, clinical decisions, follow-up questions, and next steps. Use medical headings and bullet points to keep it organized. Keep it factual and concise; do not add clinical interpretations not stated in the recording. Maintain a professional medical tone for quick clinical reference. Use sections: **Patient Context**, **Chief Complaint**, **Clinical Findings**, **Treatment Plan**, **Follow-up Actions**. " + lengthInstruction + " " + baseFormatting
             
         case .dentist:
-            return "Summarize this dental visit. Use sections: **Dental Findings**, **Procedure Performed**, **Advice**, **Follow-up**. Keep it short and concrete. Use bullets for advice. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this dental consultation in a clear and structured way. Start with patient context and dental concerns. Identify the dentist and patient interaction. Highlight dental findings, procedures performed, and treatment recommendations. Extract key dental themes, treatment decisions, patient questions, and next steps. Use dental headings and bullet points to keep it organized. Keep it factual and concise; do not add clinical interpretations not stated in the recording. Maintain a professional dental tone for quick reference. Use sections: **Patient Context**, **Dental Assessment**, **Procedures Performed**, **Treatment Recommendations**, **Follow-up Care**. " + lengthInstruction + " " + baseFormatting
             
         case .techTeam:
-            return "Summarize this team meeting. Use sections: **Title** (short), **Summary**, **Key Points** (bullets), **Decisions**, **Action Items** (only if explicitly mentioned, with assignee if present). Business-neutral tone. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this technical team meeting in a clear and structured way. Start with team context and meeting purpose. Identify the participants and technical topics discussed. Highlight the main technical points, architecture decisions, and development priorities. Extract key technical themes, engineering decisions, outstanding questions, and next steps. Use technical headings and bullet points to keep it organized. Keep it factual and concise; do not add technical assumptions not stated in the meeting. Maintain a professional technical tone for quick team reference. Use sections: **Meeting Context**, **Technical Discussion**, **Key Decisions**, **Action Items**, **Next Steps**. " + lengthInstruction + " " + baseFormatting
             
         case .planning:
-            return "Summarize this planning discussion. Use sections: **Title**, **Summary**, **Key Dates & Commitments**, **Decisions**, **Action Items**. Include dates/times exactly as mentioned. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this planning session in a clear and structured way. Start with project context and planning objectives. Identify the participants and project scope being discussed. Highlight the main planning points, resource allocations, and timeline decisions. Extract key planning themes, strategic decisions, scheduling questions, and next steps. Use planning headings and bullet points to keep it organized. Keep it factual and concise; do not add project assumptions not stated in the session. Maintain a professional project tone for quick planning reference. Use sections: **Project Context**, **Planning Discussion**, **Key Milestones**, **Resource Decisions**, **Action Items**. " + lengthInstruction + " " + baseFormatting
             
         case .alignment:
-            return "Summarize this alignment conversation. Use sections: **Title**, **Summary**, **Main Topics**, **Decisions / Next Steps**. Informal but clear tone. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this alignment meeting in a clear and structured way. Start with participants and alignment objectives. Identify the team members and strategic topics being aligned on. Highlight the main alignment points, priority decisions, and coordination agreements. Extract key strategic themes, alignment decisions, clarification questions, and next steps. Use alignment headings and bullet points to keep it organized. Keep it factual and concise; do not add strategic assumptions not stated in the meeting. Maintain a professional collaborative tone for quick reference. Use sections: **Alignment Context**, **Strategic Discussion**, **Key Agreements**, **Priority Decisions**, **Follow-up Actions**. " + lengthInstruction + " " + baseFormatting
             
         case .brainstorm:
-            return "Summarize this brainstorming session. Use sections: **Session Title**, **Challenge / Goal**, **Ideas Generated**, **Best Ideas**, **Next Steps**. Capture creative energy and group thinking patterns. Organize ideas by theme or priority. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this brainstorming session in a clear and structured way. Start with participants and creative challenge being addressed. Identify the facilitator and team members contributing ideas. Highlight the main creative concepts, innovative solutions, and promising directions. Extract key creative themes, concept decisions, exploration questions, and next steps. Use creative headings and bullet points to keep it organized. Keep it factual and concise; do not add ideas not actually proposed in the session. Maintain an energetic yet professional tone for quick creative reference. Use sections: **Session Context**, **Creative Challenge**, **Ideas Generated**, **Promising Concepts**, **Next Steps**. " + lengthInstruction + " " + baseFormatting
             
         case .lecture:
-            return "Summarize this lecture or learning session. Use sections: **Topic**, **Key Concepts**, **Main Points**, **Examples / Case Studies**, **Takeaways**. Focus on educational content and learning objectives. Structure for study reference. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this educational session in a clear and structured way. Start with instructor and learning context. Identify the educator and educational objectives being covered. Highlight the main educational points, key concepts taught, and learning outcomes. Extract key educational themes, concept explanations, student questions, and next steps. Use educational headings and bullet points to keep it organized. Keep it factual and concise; do not add educational content not actually presented. Maintain a professional educational tone for quick learning reference. Use sections: **Learning Context**, **Key Concepts**, **Main Teaching Points**, **Examples Provided**, **Learning Outcomes**. " + lengthInstruction + " " + baseFormatting
+            
+        case .interview:
+            return "Summarize this interview in a clear and structured way. Start with interviewer and interviewee context. Identify the participants and interview purpose or topic. Highlight the main discussion points, key responses, and important revelations. Extract key interview themes, significant answers, follow-up questions, and next steps. Use interview headings and bullet points to keep it organized. Keep it factual and concise; do not add interpretations not stated in the interview. Maintain a professional interview tone for quick reference. Use sections: **Interview Context**, **Key Questions**, **Main Responses**, **Important Insights**, **Follow-up Items**. " + lengthInstruction + " " + baseFormatting
             
         case .personal:
-            return "Summarize this conversation in simple language. Use sections: **Title**, **Summary**, **Key Points**. Keep it light and personal. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this transcript in a clear and structured way. Start with a brief context: who the speakers are and what the topic is. Highlight the main points discussed. Extract themes, decisions, questions, and next steps. Use headings and bullet points to keep it organized. Keep it factual and concise; do not add information that isn't in the transcript. Maintain a neutral, professional tone so the summary is quick to read. " + lengthInstruction + " " + baseFormatting
         }
     }
 }
@@ -134,9 +139,10 @@ actor SummaryService {
         - Alignment / 1:1: Strategic alignment and coordination sessions
         - Brainstorm Session: Creative brainstorming and ideation discussions
         - Lecture / Learning: Educational content, presentations, or learning sessions
-        - Personal / Other: General conversations that don't fit other categories
+        - Interview: Interviews, Q&A sessions, or structured conversations between interviewer and interviewee
+        - General Summary: General conversations that don't fit other categories
         
-        Respond with ONLY the mode name: Primary Care (GP), Dentist, Tech Team, Planning, Alignment / 1:1, Brainstorm Session, Lecture / Learning, or Personal / Other
+        Respond with ONLY the mode name: Primary Care (GP), Dentist, Tech Team, Planning, Alignment / 1:1, Brainstorm Session, Lecture / Learning, Interview, or General Summary
         """
 
         let userPrompt = """

@@ -18,8 +18,10 @@ extension SummaryMode {
             return "For creative brainstorming and ideation sessions"
         case .lecture:
             return "For lectures, talks, and learning content"
+        case .interview:
+            return "For interviews, Q&A sessions, and structured conversations"
         case .personal:
-            return "For personal conversations and general topics"
+            return "For general conversations and topics"
         }
     }
 }
@@ -259,6 +261,34 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                 }
                 
+                Section(header: Text("Feedback & Support")) {
+                    Button(action: { sendFeedback() }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "message.fill")
+                                .font(.poppins.regular(size: 20))
+                                .foregroundColor(.green)
+                                .frame(width: 28, height: 28)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Send Feedback via WhatsApp")
+                                    .font(.poppins.body)
+                                    .foregroundColor(.primary)
+                                
+                                Text("Report issues or request features")
+                                    .font(.poppins.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "arrow.up.right.square")
+                                .font(.poppins.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                
                 Section(header: Text("Info")) {
                     VStack(alignment: .leading, spacing: 12) {
                         SettingsInfoRow(
@@ -306,6 +336,60 @@ struct SettingsView: View {
         }
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        }
+    }
+    
+    // MARK: - Feedback Function
+    
+    private func sendFeedback() {
+        // Create feedback message with app info
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+        let systemVersion = UIDevice.current.systemVersion
+        let deviceModel = UIDevice.current.model
+        
+        let message = """
+        Hi! I'd like to share feedback about the Echo app:
+        
+        [Please write your feedback, feature requests, or bug reports here]
+        
+        ---
+        App Version: \(appVersion) (\(buildNumber))
+        iOS Version: \(systemVersion)
+        Device: \(deviceModel)
+        """
+        
+        let encodedMessage = message.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let phoneNumber = "31611220008" // +31611220008 without the + for WhatsApp URL
+        
+        // Try to open WhatsApp first
+        if let whatsAppUrl = URL(string: "whatsapp://send?phone=\(phoneNumber)&text=\(encodedMessage)"),
+           UIApplication.shared.canOpenURL(whatsAppUrl) {
+            UIApplication.shared.open(whatsAppUrl)
+        } else {
+            // Fallback to showing contact info
+            let alert = UIAlertController(
+                title: "WhatsApp Not Available",
+                message: "To send feedback:\n\n📱 WhatsApp: +31 6 1122 0008\n\nPlease include:\n• Feature requests\n• Bug reports\n• General feedback\n\nApp info: \(appVersion) (\(buildNumber)) - iOS \(systemVersion)",
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "Copy Phone Number", style: .default) { _ in
+                UIPasteboard.general.string = "+31611220008"
+            })
+            
+            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
+            
+            // Present alert from the current window
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first,
+               let rootViewController = window.rootViewController {
+                var topController = rootViewController
+                while let presentedViewController = topController.presentedViewController {
+                    topController = presentedViewController
+                }
+                topController.present(alert, animated: true)
+            }
         }
     }
 }
