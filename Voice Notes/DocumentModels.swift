@@ -37,8 +37,7 @@ enum DocumentType: String, CaseIterable, Codable {
     
     var usesChecklist: Bool {
         switch self {
-        case .todo, .shopping: return true
-        case .ideas, .meeting: return false
+        case .todo, .shopping, .ideas, .meeting: return true
         }
     }
 }
