@@ -38,7 +38,21 @@ struct ProviderAuthorizationView: View {
                 ManualAPIKeyView(provider: provider, onComplete: onComplete)
             }
         }
+        .onAppear {
+            // Ensure clean state when view appears
+            isLoading = true
+            isConnecting = false
+            showingManualEntry = false
+            connectionStatus = .notConnected
+        }
         .task(id: provider) {
+            // Immediately show loading and reset state to prevent showing cached data from other providers
+            await MainActor.run {
+                isLoading = true
+                isConnecting = false
+                showingManualEntry = false
+                connectionStatus = .notConnected
+            }
             initializeForProvider()
         }
     }
@@ -256,10 +270,14 @@ struct ProviderAuthorizationView: View {
     private func connectWithProvider() {
         isConnecting = true
         
-        print("🔗 Connecting with provider: \(provider.displayName)")
+        print("🔗 Connecting with provider: \(provider) - \(provider.displayName)")
+        
+        // Get provider-specific URL and ensure it's correct
+        let setupURL = getProviderSetupURL()
+        print("🔗 Setup URL for \(provider): \(setupURL?.absoluteString ?? "nil")")
         
         // Open the provider's API key setup page in Safari
-        if let url = getProviderSetupURL() {
+        if let url = setupURL {
             print("🔗 Opening setup URL: \(url.absoluteString)")
             UIApplication.shared.open(url)
             
@@ -267,6 +285,7 @@ struct ProviderAuthorizationView: View {
             Task { @MainActor in
                 connectionStatus = .connecting
                 isConnecting = false
+                print("🔗 Updated connection status to connecting for \(provider)")
             }
         } else {
             print("❌ No setup URL available for provider: \(provider.displayName)")
@@ -298,25 +317,21 @@ struct ProviderAuthorizationView: View {
     }
     
     private func initializeForProvider() {
-        // Reset state for new provider
-        isConnecting = false
-        showingManualEntry = false
-        
-        // Show loading state briefly to prevent white screen
+        // Quick initialization with minimal delay for smooth UX
         Task {
-            // Small delay to ensure UI renders
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            // Brief pause to ensure UI has updated with loading state
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds (reduced from 0.5s)
             
             await MainActor.run {
-                // Check connection status
+                // Check connection status for the current provider
                 if aiSettings.hasApiKey(for: provider) {
                     connectionStatus = .connected
                 } else {
                     connectionStatus = .notConnected
                 }
                 
-                // Hide loading with animation
-                withAnimation(.easeInOut(duration: 0.3)) {
+                // Hide loading with smooth animation
+                withAnimation(.easeInOut(duration: 0.2)) {
                     isLoading = false
                 }
             }
