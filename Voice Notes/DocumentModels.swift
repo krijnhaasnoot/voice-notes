@@ -117,10 +117,6 @@ class DocumentStore: ObservableObject {
         self.documentsURL = documentsPath.appendingPathComponent("voice_notes_documents.json")
         
         loadDocuments()
-        
-        #if DEBUG
-        seedSampleDataIfNeeded()
-        #endif
     }
     
     // MARK: - Persistence
@@ -422,73 +418,4 @@ class DocumentStore: ObservableObject {
             return "Meeting Notes — \(dateString)"
         }
     }
-    
-    // MARK: - Sample Data
-    #if DEBUG
-    private func seedSampleDataIfNeeded() {
-        guard documents.isEmpty else { return }
-        
-        // Sample To-Do document (Today)
-        let todoDoc = Document(
-            title: "Personal Tasks — Today",
-            type: .todo,
-            createdAt: Date().addingTimeInterval(-3600), // 1 hour ago
-            updatedAt: Date().addingTimeInterval(-1800), // 30 min ago
-            items: [
-                DocItem(text: "Review project proposals", isDone: true),
-                DocItem(text: "Call dentist for appointment"),
-                DocItem(text: "Update resume", isDone: false),
-                DocItem(text: "Plan weekend trip"),
-                DocItem(text: "Respond to client emails", isDone: true),
-                DocItem(text: "Book flight tickets for conference")
-            ]
-        )
-        
-        // Sample Shopping document (Today)
-        let shoppingDoc = Document(
-            title: "Weekly Groceries",
-            type: .shopping,
-            createdAt: Date().addingTimeInterval(-7200), // 2 hours ago
-            updatedAt: Date().addingTimeInterval(-900), // 15 min ago
-            items: [
-                DocItem(text: "Organic milk", isDone: true),
-                DocItem(text: "Whole grain bread"),
-                DocItem(text: "Fresh apples"),
-                DocItem(text: "Chicken breast"),
-                DocItem(text: "Pasta sauce"),
-                DocItem(text: "Greek yogurt", isDone: true),
-                DocItem(text: "Spinach leaves"),
-                DocItem(text: "Olive oil", isDone: true)
-            ]
-        )
-        
-        // Sample Ideas document
-        let ideasDoc = Document(
-            title: "App Feature Ideas",
-            type: .ideas,
-            createdAt: Date().addingTimeInterval(-86400), // Yesterday
-            updatedAt: Date().addingTimeInterval(-82800), // Yesterday evening
-            notes: "Ideas for improving the voice notes app:\n\n• Voice-to-text accuracy improvements\n• Better organization with tags and categories\n• Export options for different formats (PDF, Markdown)\n• Integration with calendar apps for meeting notes\n• Collaboration features for team documents\n• Dark mode optimization\n• Widget for quick note capture\n• Backup to cloud services\n• Custom templates for different document types"
-        )
-        
-        // Sample Meeting document
-        let meetingDoc = Document(
-            title: "Team Standup — Sep 15",
-            type: .meeting,
-            createdAt: Date().addingTimeInterval(-90000), // Yesterday morning
-            updatedAt: Date().addingTimeInterval(-88000), // Yesterday noon
-            items: [
-                DocItem(text: "Finalize Q4 roadmap presentation", isDone: true),
-                DocItem(text: "Review code coverage metrics"),
-                DocItem(text: "Schedule user testing sessions"),
-                DocItem(text: "Update project documentation", isDone: false),
-                DocItem(text: "Follow up with design team on mockups")
-            ],
-            notes: "Key Discussion Points:\n\n**Sprint Progress:**\n• All stories completed ahead of schedule\n• Code review process working well\n• Need to address technical debt in auth module\n\n**Blockers:**\n• Waiting for API specification from backend team\n• Design assets delayed by 2 days\n\n**Next Steps:**\n• Begin integration testing tomorrow\n• Prepare demo for stakeholder review"
-        )
-        
-        documents = [todoDoc, shoppingDoc, meetingDoc, ideasDoc]
-        saveDocuments()
-    }
-    #endif
 }
