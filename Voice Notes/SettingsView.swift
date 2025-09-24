@@ -289,6 +289,30 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
                 }
                 
+                Section(header: Text("Privacy & Data Usage")) {
+                    NavigationLink(destination: PrivacyInfoView()) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "lock.shield")
+                                .font(.poppins.regular(size: 20))
+                                .foregroundColor(.blue)
+                                .frame(width: 28, height: 28)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Privacy & Data Usage")
+                                    .font(.poppins.body)
+                                    .foregroundColor(.primary)
+                                
+                                Text(PrivacyStrings.shortDescription)
+                                    .font(.poppins.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                
                 Section(header: Text("Info")) {
                     VStack(alignment: .leading, spacing: 12) {
                         SettingsInfoRow(

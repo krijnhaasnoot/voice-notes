@@ -4,7 +4,7 @@ import SwiftUI
 struct AppTourView: View {
     let onComplete: () -> Void
     @State private var currentPage = 0
-    private let totalPages = 4
+    private let totalPages = 5
     
     var body: some View {
         ZStack {
@@ -58,14 +58,18 @@ struct AppTourView: View {
                     )
                     .tag(2)
                     
-                    // Page 4: Search
+                    // Page 4: Privacy & AI
+                    PrivacyTourPage()
+                    .tag(3)
+                    
+                    // Page 5: Search
                     TourPage(
                         systemImage: "magnifyingglass",
                         title: "Find Anything Fast",
                         description: "Search through all your recordings and documents instantly. Never lose an important thought again.",
                         gradient: LinearGradient(colors: [.purple.opacity(0.8), .purple], startPoint: .top, endPoint: .bottom)
                     )
-                    .tag(3)
+                    .tag(4)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.3), value: currentPage)
@@ -125,6 +129,95 @@ struct AppTourView: View {
             }
         }
         .interactiveDismissDisabled()
+    }
+}
+
+// MARK: - Privacy Tour Page
+private struct PrivacyTourPage: View {
+    var body: some View {
+        VStack(spacing: 40) {
+            Spacer()
+            
+            // Icon with gradient background
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(colors: [.teal.opacity(0.8), .teal], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 120, height: 120)
+                    .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
+                
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 48, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+            }
+            
+            // Text content
+            VStack(spacing: 16) {
+                Text(PrivacyStrings.tourTitle)
+                    .font(.poppins.bold(size: 28))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.primary)
+                
+                Text(PrivacyStrings.tourDescription)
+                    .font(.poppins.regular(size: 18))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 32)
+            
+            // Key privacy points
+            VStack(spacing: 12) {
+                PrivacyTourPoint(
+                    icon: "checkmark.shield.fill",
+                    text: "Secure transmission to your chosen AI provider",
+                    color: .green
+                )
+                
+                PrivacyTourPoint(
+                    icon: "hand.raised.fill",
+                    text: "Your data is never used for AI training",
+                    color: .orange
+                )
+                
+                PrivacyTourPoint(
+                    icon: "person.fill.checkmark",
+                    text: "You control which provider to use",
+                    color: .blue
+                )
+            }
+            .padding(.horizontal, 40)
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct PrivacyTourPoint: View {
+    let icon: String
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(color)
+                .frame(width: 24, height: 24)
+            
+            Text(text)
+                .font(.poppins.medium(size: 14))
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.leading)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(color.opacity(0.1))
+        .cornerRadius(12)
     }
 }
 
