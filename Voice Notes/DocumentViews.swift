@@ -155,75 +155,87 @@ struct QuickCreateButton: View {
 // MARK: - Document List Overview View
 struct DocumentListOverviewView: View {
     @EnvironmentObject var documentStore: DocumentStore
+    @Environment(\.dismiss) private var dismiss
     @State private var showingCreateSheet = false
     
     var body: some View {
-        Group {
-            if documentStore.documents.isEmpty {
-                // Empty state
-                VStack(spacing: 16) {
-                    Image(systemName: "list.bullet")
-                        .font(.poppins.regular(size: 44))
-                        .foregroundStyle(.tertiary)
-                    Text("No lists yet")
-                        .font(.poppins.title3)
-                    Text("Create a To‑Do, Shopping, Ideas or Meeting list.")
-                        .font(.poppins.callout)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    // Order: To‑Do, Shopping, Ideas, Meeting
-                    Section(header: sectionHeader(.todo)) {
-                        ForEach(documentStore.documents.filter { $0.type == .todo }) { document in
-                            NavigationLink(destination: DocumentDetailView(document: document)) {
-                                DocumentRowView(document: document)
+        NavigationStack {
+            Group {
+                if documentStore.documents.isEmpty {
+                    // Empty state
+                    VStack(spacing: 16) {
+                        Image(systemName: "list.bullet")
+                            .font(.poppins.regular(size: 44))
+                            .foregroundStyle(.tertiary)
+                        Text("No lists yet")
+                            .font(.poppins.title3)
+                        Text("Create a To‑Do, Shopping, Ideas or Meeting list.")
+                            .font(.poppins.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List {
+                        // Order: To‑Do, Shopping, Ideas, Meeting
+                        Section(header: sectionHeader(.todo)) {
+                            ForEach(documentStore.documents.filter { $0.type == .todo }) { document in
+                                NavigationLink(destination: DocumentDetailView(document: document)) {
+                                    DocumentRowView(document: document)
+                                }
                             }
                         }
-                    }
 
-                    Section(header: sectionHeader(.shopping)) {
-                        ForEach(documentStore.documents.filter { $0.type == .shopping }) { document in
-                            NavigationLink(destination: DocumentDetailView(document: document)) {
-                                DocumentRowView(document: document)
+                        Section(header: sectionHeader(.shopping)) {
+                            ForEach(documentStore.documents.filter { $0.type == .shopping }) { document in
+                                NavigationLink(destination: DocumentDetailView(document: document)) {
+                                    DocumentRowView(document: document)
+                                }
                             }
                         }
-                    }
 
-                    Section(header: sectionHeader(.ideas)) {
-                        ForEach(documentStore.documents.filter { $0.type == .ideas }) { document in
-                            NavigationLink(destination: DocumentDetailView(document: document)) {
-                                DocumentRowView(document: document)
+                        Section(header: sectionHeader(.ideas)) {
+                            ForEach(documentStore.documents.filter { $0.type == .ideas }) { document in
+                                NavigationLink(destination: DocumentDetailView(document: document)) {
+                                    DocumentRowView(document: document)
+                                }
                             }
                         }
-                    }
 
-                    Section(header: sectionHeader(.meeting)) {
-                        ForEach(documentStore.documents.filter { $0.type == .meeting }) { document in
-                            NavigationLink(destination: DocumentDetailView(document: document)) {
-                                DocumentRowView(document: document)
+                        Section(header: sectionHeader(.meeting)) {
+                            ForEach(documentStore.documents.filter { $0.type == .meeting }) { document in
+                                NavigationLink(destination: DocumentDetailView(document: document)) {
+                                    DocumentRowView(document: document)
+                                }
                             }
                         }
                     }
-                }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-            }
-        }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Lists")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: { showingCreateSheet = true }) {
-                    Image(systemName: "plus")
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
                 }
             }
-        }
-        .sheet(isPresented: $showingCreateSheet) {
-            CreateDocumentSheet()
-                .environmentObject(documentStore)
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Lists")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: { showingCreateSheet = true }) {
+                        Image(systemName: "plus")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                }
+            }
+            .sheet(isPresented: $showingCreateSheet) {
+                CreateDocumentSheet()
+                    .environmentObject(documentStore)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .interactiveDismissDisabled(false)
         }
     }
 
@@ -270,7 +282,7 @@ struct CreateDocumentSheet: View {
                 }
             }
             .navigationTitle("New List")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
@@ -358,40 +370,21 @@ struct DocumentDetailView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Title editing header
-            if editingTitle {
-                titleEditingHeader
-            }
+            // Custom Large Header
+            customHeaderView
             
+            // Content
             if document.type.usesChecklist {
-                checklistView
+                checklistContentView
             } else {
                 notesView
             }
         }
-        .navigationTitle(editingTitle ? "Edit Title" : getCurrentDocument().title)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                if editingTitle {
-                    Button("Cancel") {
-                        editingTitle = false
-                    }
-                } else {
-                    Button("Done") {
-                        saveNotesIfNeeded()
-                        dismiss()
-                    }
-                }
-            }
-            
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                if editingTitle {
-                    Button("Save") {
-                        saveTitleAndExit()
-                    }
-                    .disabled(newTitleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                } else {
+                if !editingTitle {
                     Button(action: { 
                         newTitleText = document.title
                         editingTitle = true
@@ -421,19 +414,6 @@ struct DocumentDetailView: View {
         }
     }
     
-    private var titleEditingHeader: some View {
-        VStack(spacing: 12) {
-            TextField("List title", text: $newTitleText)
-                .textFieldStyle(.roundedBorder)
-                .font(.title2)
-                .focused($titleFocus)
-                .onSubmit {
-                    saveTitleAndExit()
-                }
-        }
-        .padding()
-        .background(.regularMaterial)
-    }
     
     private func saveTitleAndExit() {
         let trimmedTitle = newTitleText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -485,39 +465,96 @@ struct DocumentDetailView: View {
         }
     }
     
+    // MARK: - Custom Header View
     
-    private var checklistView: some View {
+    private var customHeaderView: some View {
         VStack(spacing: 0) {
-            // Filter and Progress Section
-            VStack(spacing: 16) {
-                // Filter Picker - moved to top for cleaner hierarchy
-                Picker("Filter", selection: $selectedFilter) {
-                    ForEach(ItemFilter.allCases, id: \.self) { filter in
-                        Label(filter.rawValue, systemImage: filter.systemImage)
-                            .tag(filter)
+            // Main header with title and Done button
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if editingTitle {
+                        TextField("List title", text: $newTitleText)
+                            .focused($titleFocus)
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .onSubmit {
+                                saveTitleAndExit()
+                            }
+                    } else {
+                        Text(getCurrentDocument().title)
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
                     }
                 }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
                 
-                // Progress Indicator - simplified
-                HStack {
-                    Image(systemName: document.type.systemImage)
-                        .foregroundColor(document.type.color)
-                        .font(.headline)
-                    
-                    Text("\(getCurrentDocument().completedCount)/\(getCurrentDocument().itemCount) completed")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    
-                    Spacer()
+                Spacer()
+                
+                // Action buttons
+                HStack(spacing: 12) {
+                    if editingTitle {
+                        Button("Cancel") {
+                            editingTitle = false
+                        }
+                        .foregroundColor(.secondary)
+                        
+                        Button("Save") {
+                            saveTitleAndExit()
+                        }
+                        .fontWeight(.semibold)
+                        .disabled(newTitleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    } else {
+                        Button("Done") {
+                            saveNotesIfNeeded()
+                            dismiss()
+                        }
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                    }
                 }
-                .padding(.horizontal)
             }
-            .padding(.vertical, 12)
-            .background(Color(.secondarySystemGroupedBackground))
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
             
-            // Items List
+            // Filter and Progress Section (only for checklists)
+            if document.type.usesChecklist && !editingTitle {
+                VStack(spacing: 12) {
+                    // Custom Segmented Filter Control
+                    SegmentedFilterControl(selection: $selectedFilter)
+                        .padding(.horizontal, 20)
+                    
+                    // Progress Indicator
+                    HStack(spacing: 8) {
+                        Image(systemName: document.type.systemImage)
+                            .foregroundColor(document.type.color)
+                            .font(.footnote)
+                        
+                        Text("\(getCurrentDocument().completedCount)/\(getCurrentDocument().itemCount) completed")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                }
+                .padding(.top, 16)
+            }
+        }
+        .padding(.bottom, 16)
+        .background(.regularMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(.quaternary.opacity(0.3))
+                .frame(height: 1)
+        }
+        .ignoresSafeArea(edges: .top)
+    }
+    
+    
+    private var checklistContentView: some View {
+        VStack(spacing: 0) {
+            // Items List - no more redundant header
             List {
                 if filteredItems.isEmpty {
                     VStack(spacing: 16) {
@@ -890,6 +927,58 @@ struct DocumentTypeButton: View {
     private var strokeOverlay: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
             .stroke(isSelected ? AnyShapeStyle(.clear) : AnyShapeStyle(.quaternary), lineWidth: 1)
+    }
+}
+
+// MARK: - Segmented Filter Control (All / Open / Done)
+struct SegmentedFilterControl: View {
+    @Binding var selection: ItemFilter
+    private let items: [ItemFilter] = ItemFilter.allCases
+    @Namespace private var ns
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(items, id: \.self) { item in
+                Button(action: { withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) { selection = item } }) {
+                    ZStack {
+                        if selection == item {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color(.systemBackground))
+                                .matchedGeometryEffect(id: "seg-fill", in: ns)
+                                .shadow(color: Color.black.opacity(0.06), radius: 2, y: 1)
+                        }
+
+                        HStack(spacing: 6) {
+                            Image(systemName: icon(for: item))
+                                .font(.footnote)
+                            Text(item.rawValue)
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(selection == item ? .primary : .secondary)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(.secondarySystemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color(.quaternaryLabel), lineWidth: 0.5)
+        )
+    }
+
+    private func icon(for filter: ItemFilter) -> String {
+        switch filter {
+        case .all: return "line.3.horizontal"
+        case .open: return "circle"
+        case .done: return "checkmark.circle.fill"
+        }
     }
 }
 
