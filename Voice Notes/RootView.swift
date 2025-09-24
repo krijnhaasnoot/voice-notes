@@ -164,17 +164,6 @@ struct DocumentsView: View {
                 }
             }
             
-            VStack(spacing: 12) {
-                HStack(spacing: 16) {
-                    QuickCreateButton(type: .todo, documentStore: documentStore)
-                    QuickCreateButton(type: .shopping, documentStore: documentStore)
-                }
-                
-                HStack(spacing: 16) {
-                    QuickCreateButton(type: .ideas, documentStore: documentStore)
-                    QuickCreateButton(type: .meeting, documentStore: documentStore)
-                }
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
