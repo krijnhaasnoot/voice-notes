@@ -515,7 +515,8 @@ struct DocumentDetailView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 16)
+            .padding(.top, 32)
+            .padding(.bottom, 16)
             
             // Filter and Progress Section (only for checklists)
             if document.type.usesChecklist && !editingTitle {
