@@ -676,7 +676,7 @@ struct DocumentDetailView: View {
                 .font(.poppins.regular(size: 20))
                 .foregroundColor(.blue)
             
-            TextField("Add item…", text: $newItemText)
+            TextField("", text: $newItemText)
                 .textFieldStyle(.plain)
                 .focused($isNewItemFocused)
                 .onSubmit {
