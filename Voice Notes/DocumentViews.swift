@@ -72,6 +72,67 @@ struct DocumentRowView: View {
     }
 }
 
+// MARK: - Quick Create Button
+struct QuickCreateButton: View {
+    let type: DocumentType
+    let documentStore: DocumentStore
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: createDocument) {
+            VStack(spacing: 8) {
+                Image(systemName: type.systemImage)
+                    .font(.title2)
+                    .foregroundColor(type.color)
+                
+                Text(type.displayName)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+            }
+            .frame(height: 80)
+            .frame(maxWidth: .infinity)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(.quaternary, lineWidth: 0.5)
+            )
+            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: isPressed)
+        }
+        .buttonStyle(.plain)
+        .onPressGesture(
+            onPress: { isPressed = true },
+            onRelease: { isPressed = false }
+        )
+    }
+    
+    private func createDocument() {
+        let title = generateDefaultTitle(for: type)
+        documentStore.createDocument(title: title, type: type)
+        
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+    }
+    
+    private func generateDefaultTitle(for type: DocumentType) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        let dateString = formatter.string(from: Date())
+        
+        switch type {
+        case .todo:
+            return "Tasks — \(dateString)"
+        case .shopping:
+            return "Shopping — \(dateString)"
+        case .ideas:
+            return "Ideas — \(dateString)"
+        case .meeting:
+            return "Meeting — \(dateString)"
+        }
+    }
+}
 
 // MARK: - Document List Overview View
 struct DocumentListOverviewView: View {
