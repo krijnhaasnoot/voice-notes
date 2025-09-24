@@ -938,41 +938,61 @@ struct SegmentedFilterControl: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
-        HStack(spacing: 0) {
+        let cornerRadius = isCompact ? 10.0 : 14.0
+        let containerCornerRadius = isCompact ? 12.0 : 18.0
+        let spacing = isCompact ? 4.0 : 6.0
+        let padding = isCompact ? 4.0 : 6.0
+        let verticalPadding = isCompact ? 6.0 : 10.0
+        let iconFont = isCompact ? Font.caption : Font.footnote
+        let textFont = isCompact ? Font.caption.bold : Font.subheadline.weight(.semibold)
+        
+        return HStack(spacing: 0) {
             ForEach(items, id: \.self) { item in
-                Button(action: { withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) { selection = item } }) {
-                    ZStack {
-                        if selection == item {
-                            RoundedRectangle(cornerRadius: isCompact ? 10 : 14, style: .continuous)
-                                .fill(Color(.systemBackground))
-                                .matchedGeometryEffect(id: "seg-fill", in: ns)
-                                .shadow(color: Color.black.opacity(0.03), radius: 1, y: 0.5)
-                        }
-
-                        HStack(spacing: isCompact ? 4 : 6) {
-                            Image(systemName: icon(for: item))
-                                .font(isCompact ? .caption : .footnote)
-                            Text(item.rawValue)
-                                .font(isCompact ? .caption.bold : .subheadline.weight(.semibold))
-                        }
-                        .foregroundStyle(selection == item ? .primary : .secondary)
-                        .padding(.vertical, isCompact ? 6 : 10)
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-                .buttonStyle(.plain)
+                segmentButton(for: item, cornerRadius: cornerRadius, spacing: spacing, verticalPadding: verticalPadding, iconFont: iconFont, textFont: textFont)
             }
         }
-        .padding(isCompact ? 4 : 6)
+        .padding(padding)
         .frame(height: isCompact ? 36 : nil)
-        .background(
-            RoundedRectangle(cornerRadius: isCompact ? 12 : 18, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: isCompact ? 12 : 18, style: .continuous)
-                .stroke(Color(.quaternaryLabel), lineWidth: 0.5)
-        )
+        .background(containerBackground(cornerRadius: containerCornerRadius))
+        .overlay(containerOverlay(cornerRadius: containerCornerRadius))
+    }
+    
+    private func segmentButton(for item: ItemFilter, cornerRadius: CGFloat, spacing: CGFloat, verticalPadding: CGFloat, iconFont: Font, textFont: Font) -> some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                selection = item
+            }
+        }) {
+            ZStack {
+                if selection == item {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color(.systemBackground))
+                        .matchedGeometryEffect(id: "seg-fill", in: ns)
+                        .shadow(color: Color.black.opacity(0.03), radius: 1, y: 0.5)
+                }
+
+                HStack(spacing: spacing) {
+                    Image(systemName: icon(for: item))
+                        .font(iconFont)
+                    Text(item.rawValue)
+                        .font(textFont)
+                }
+                .foregroundStyle(selection == item ? .primary : .secondary)
+                .padding(.vertical, verticalPadding)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func containerBackground(cornerRadius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(Color(.secondarySystemBackground))
+    }
+    
+    private func containerOverlay(cornerRadius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .stroke(Color(.quaternaryLabel), lineWidth: 0.5)
     }
     
     private var isCompact: Bool {
