@@ -944,7 +944,7 @@ struct SegmentedFilterControl: View {
         let padding = isCompact ? 4.0 : 6.0
         let verticalPadding = isCompact ? 6.0 : 10.0
         let iconFont = isCompact ? Font.caption : Font.footnote
-        let textFont = isCompact ? Font.caption.bold : Font.subheadline.weight(.semibold)
+        let textFont = isCompact ? Font.caption.bold() : Font.subheadline.weight(.semibold)
         
         return HStack(spacing: 0) {
             ForEach(items, id: \.self) { item in
