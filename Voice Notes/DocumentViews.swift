@@ -157,6 +157,8 @@ struct DocumentListOverviewView: View {
     @EnvironmentObject var documentStore: DocumentStore
     @Environment(\.dismiss) private var dismiss
     @State private var showingCreateSheet = false
+    @AppStorage("hasSeenListsIntroduction") private var hasSeenListsIntroduction = false
+    @State private var showingIntroduction = false
     
     var body: some View {
         NavigationStack {
@@ -229,9 +231,22 @@ struct DocumentListOverviewView: View {
                         .fontWeight(.semibold)
                 }
             }
+            .onAppear {
+                if !hasSeenListsIntroduction {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        showingIntroduction = true
+                    }
+                }
+            }
             .sheet(isPresented: $showingCreateSheet) {
                 CreateDocumentSheet()
                     .environmentObject(documentStore)
+            }
+            .sheet(isPresented: $showingIntroduction) {
+                ListsIntroductionView(onComplete: {
+                    hasSeenListsIntroduction = true
+                    showingIntroduction = false
+                })
             }
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
@@ -1109,6 +1124,157 @@ extension View {
                     onRelease()
                 }
             }, perform: {})
+    }
+}
+
+// MARK: - Lists Introduction View
+struct ListsIntroductionView: View {
+    let onComplete: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 32) {
+                    // Header
+                    VStack(spacing: 16) {
+                        Image(systemName: "list.bullet.clipboard")
+                            .font(.system(size: 64))
+                            .foregroundColor(.blue)
+                        
+                        Text("Welcome to Lists")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        
+                        Text("Turn your voice notes into organized, actionable lists")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 20)
+                    
+                    // Features
+                    VStack(spacing: 24) {
+                        IntroFeatureRow(
+                            icon: "checkmark.circle",
+                            color: .blue,
+                            title: "To-Do Lists",
+                            description: "Track tasks and mark them complete as you go"
+                        )
+                        
+                        IntroFeatureRow(
+                            icon: "cart",
+                            color: .green,
+                            title: "Shopping Lists",
+                            description: "Keep track of items you need to buy"
+                        )
+                        
+                        IntroFeatureRow(
+                            icon: "lightbulb",
+                            color: .orange,
+                            title: "Ideas Lists",
+                            description: "Capture and organize your creative thoughts"
+                        )
+                        
+                        IntroFeatureRow(
+                            icon: "person.2",
+                            color: .purple,
+                            title: "Meeting Lists",
+                            description: "Document action items and follow-ups from meetings"
+                        )
+                    }
+                    
+                    // How it works
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("How it works")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            HowItWorksStep(
+                                number: "1",
+                                text: "Create a list by tapping the + button"
+                            )
+                            
+                            HowItWorksStep(
+                                number: "2", 
+                                text: "Add items by typing or using voice recording"
+                            )
+                            
+                            HowItWorksStep(
+                                number: "3",
+                                text: "Check off completed items and track your progress"
+                            )
+                        }
+                    }
+                    
+                    Spacer(minLength: 40)
+                }
+                .padding(.horizontal, 24)
+            }
+            .navigationTitle("")
+            .navigationBarHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Get Started") {
+                        onComplete()
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.blue)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Introduction Components
+struct IntroFeatureRow: View {
+    let icon: String
+    let color: Color
+    let title: String
+    let description: String
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundColor(color)
+                .frame(width: 32, height: 32)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                Text(description)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
+            Spacer()
+        }
+    }
+}
+
+struct HowItWorksStep: View {
+    let number: String
+    let text: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(number)
+                .font(.footnote)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(.blue))
+            
+            Text(text)
+                .font(.body)
+                .foregroundColor(.secondary)
+            
+            Spacer()
+        }
     }
 }
 
