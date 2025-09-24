@@ -538,10 +538,10 @@ struct DocumentDetailView: View {
                     }
                     .padding(.horizontal, 20)
                 }
-                .padding(.top, 16)
+                .padding(.top, 8)
             }
         }
-        .padding(.bottom, 16)
+        .padding(.bottom, 8)
         .background(.regularMaterial)
         .overlay(alignment: .bottom) {
             Rectangle()
@@ -935,6 +935,7 @@ struct SegmentedFilterControl: View {
     @Binding var selection: ItemFilter
     private let items: [ItemFilter] = ItemFilter.allCases
     @Namespace private var ns
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         HStack(spacing: 0) {
@@ -942,35 +943,40 @@ struct SegmentedFilterControl: View {
                 Button(action: { withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) { selection = item } }) {
                     ZStack {
                         if selection == item {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: isCompact ? 10 : 14, style: .continuous)
                                 .fill(Color(.systemBackground))
                                 .matchedGeometryEffect(id: "seg-fill", in: ns)
-                                .shadow(color: Color.black.opacity(0.06), radius: 2, y: 1)
+                                .shadow(color: Color.black.opacity(0.03), radius: 1, y: 0.5)
                         }
 
-                        HStack(spacing: 6) {
+                        HStack(spacing: isCompact ? 4 : 6) {
                             Image(systemName: icon(for: item))
-                                .font(.footnote)
+                                .font(isCompact ? .caption : .footnote)
                             Text(item.rawValue)
-                                .font(.subheadline.weight(.semibold))
+                                .font(isCompact ? .caption.bold : .subheadline.weight(.semibold))
                         }
                         .foregroundStyle(selection == item ? .primary : .secondary)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, isCompact ? 6 : 10)
                         .frame(maxWidth: .infinity)
                     }
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(6)
+        .padding(isCompact ? 4 : 6)
+        .frame(height: isCompact ? 36 : nil)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: isCompact ? 12 : 18, style: .continuous)
                 .fill(Color(.secondarySystemBackground))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: isCompact ? 12 : 18, style: .continuous)
                 .stroke(Color(.quaternaryLabel), lineWidth: 0.5)
         )
+    }
+    
+    private var isCompact: Bool {
+        horizontalSizeClass == .compact
     }
 
     private func icon(for filter: ItemFilter) -> String {
