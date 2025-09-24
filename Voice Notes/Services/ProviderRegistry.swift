@@ -12,7 +12,8 @@ class ProviderRegistry {
             .appDefault: AppDefaultSummaryProvider(),
             .openai: OpenAISummaryProvider(),
             .anthropic: AnthropicSummaryProvider(),
-            .gemini: GeminiSummaryProvider()
+            .gemini: GeminiSummaryProvider(),
+            .mistral: MistralSummaryProvider()
         ]
     }
     

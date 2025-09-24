@@ -46,22 +46,64 @@ struct ProviderAuthorizationView: View {
     // MARK: - Loading View
     
     private var loadingView: some View {
-        VStack(spacing: 20) {
-            // Show provider icon and name immediately
-            provider.iconView(size: 64)
-                .padding(.top, 40)
+        VStack(spacing: 24) {
+            // Match the exact spacing and structure of providerHeaderView
+            VStack(spacing: 16) {
+                provider.iconView(size: 64)
+                    .padding(.top, 20)
+                    .overlay(
+                        // Subtle shimmer effect during loading
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.clear, Color.white.opacity(0.3), Color.clear],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .opacity(0.6)
+                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: true)
+                    )
+                
+                Text(provider.displayName)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                
+                Text("Loading connection details...")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
             
-            Text(provider.displayName)
-                .font(.largeTitle)
-                .fontWeight(.bold)
+            // Elegant loading indicator
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(provider.accentColor)
+                
+                Text("Preparing secure connection...")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
             
-            Text("Loading connection details...")
-                .font(.body)
-                .foregroundColor(.secondary)
-                .padding(.bottom, 20)
+            Spacer()
             
-            ProgressView()
-                .controlSize(.large)
+            // Placeholder for buttons area to maintain layout consistency
+            VStack(spacing: 16) {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(height: 50)
+                    .overlay(
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.gray)
+                    )
+                
+                Text("Setting up provider options...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .opacity(0.6)
             
             Spacer()
         }
@@ -214,8 +256,11 @@ struct ProviderAuthorizationView: View {
     private func connectWithProvider() {
         isConnecting = true
         
+        print("🔗 Connecting with provider: \(provider.displayName)")
+        
         // Open the provider's API key setup page in Safari
         if let url = getProviderSetupURL() {
+            print("🔗 Opening setup URL: \(url.absoluteString)")
             UIApplication.shared.open(url)
             
             // Show instructions to user
@@ -224,6 +269,7 @@ struct ProviderAuthorizationView: View {
                 isConnecting = false
             }
         } else {
+            print("❌ No setup URL available for provider: \(provider.displayName)")
             Task { @MainActor in
                 connectionStatus = .error("Unable to open setup page")
                 isConnecting = false
@@ -241,6 +287,8 @@ struct ProviderAuthorizationView: View {
             return URL(string: "https://console.anthropic.com/settings/keys")
         case .gemini:
             return URL(string: "https://aistudio.google.com/app/apikey")
+        case .mistral:
+            return URL(string: "https://console.mistral.ai/api-keys/")
         }
     }
     
@@ -294,6 +342,8 @@ struct ProviderAuthorizationView: View {
             return "sk-ant-mock-" + String((0..<90).map { _ in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_".randomElement()! })
         case .gemini:
             return String((0..<39).map { _ in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_".randomElement()! })
+        case .mistral:
+            return String((0..<32).map { _ in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".randomElement()! })
         }
     }
 }
@@ -456,8 +506,12 @@ struct ManualAPIKeyView: View {
                     .foregroundColor(.secondary)
 
                 Button("Open \(provider.developerPortalURL)") {
-                    if let url = URL(string: "https://\(provider.developerPortalURL)") {
+                    let urlString = "https://\(provider.developerPortalURL)"
+                    print("🔗 Opening URL for \(provider.displayName): \(urlString)")
+                    if let url = URL(string: urlString) {
                         UIApplication.shared.open(url)
+                    } else {
+                        print("❌ Failed to create URL from: \(urlString)")
                     }
                 }
                 .font(.caption)
@@ -520,9 +574,11 @@ extension AIProviderType {
             return "Claude_AI_symbol.svg"
         case .gemini:
             return "gemini-color"
+        case .mistral:
+            return "Mistral_AI_logo_(2025–).svg"
         }
     }
-    
+
     var accentColor: Color {
         switch self {
         case .appDefault:
@@ -533,9 +589,11 @@ extension AIProviderType {
             return Color(red: 0.90, green: 0.49, blue: 0.13) // Claude/Anthropic orange
         case .gemini:
             return Color(red: 0.26, green: 0.52, blue: 0.96) // Google Blue
+        case .mistral:
+            return Color(red: 0.11, green: 0.60, blue: 0.80) // Mistral brand teal
         }
     }
-    
+
     var fallbackSystemIcon: String {
         switch self {
         case .appDefault:
@@ -546,32 +604,46 @@ extension AIProviderType {
             return "brain"
         case .gemini:
             return "star"
+        case .mistral:
+            return "wind"
         }
     }
-    
+
     @ViewBuilder
     func iconView(size: CGFloat = 64) -> some View {
-        Group {
-            if self == .appDefault {
-                Image(systemName: self.iconName)
-                    .font(.system(size: size))
-            } else {
-                // Try to load brand icon, fallback to system icon if not found
-                if UIImage(named: self.iconName) != nil {
-                    Image(self.iconName)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: size, height: size)
+        // Consistent container with fixed dimensions to prevent layout shifts
+        ZStack {
+            // Invisible background to maintain consistent bounds
+            RoundedRectangle(cornerRadius: size * 0.1)
+                .fill(Color.clear)
+                .frame(width: size, height: size)
+
+            Group {
+                if self == .appDefault {
+                    Image(systemName: self.iconName)
+                        .font(.system(size: size * 0.6, weight: .medium))
+                        .frame(width: size * 0.8, height: size * 0.8)
                 } else {
-                    // Fallback system icons
-                    Image(systemName: self.fallbackSystemIcon)
-                        .font(.system(size: size))
+                    // Try to load brand icon, fallback to system icon if not found
+                    if UIImage(named: self.iconName) != nil {
+                        Image(self.iconName)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: size * 0.75, height: size * 0.75)
+                            .clipped()
+                    } else {
+                        // Fallback system icons with consistent sizing
+                        Image(systemName: self.fallbackSystemIcon)
+                            .font(.system(size: size * 0.6, weight: .medium))
+                            .frame(width: size * 0.8, height: size * 0.8)
+                    }
                 }
             }
         }
         .foregroundColor(self.accentColor)
+        .animation(.easeInOut(duration: 0.2), value: UIImage(named: self.iconName) != nil)
     }
-    
+
     var shortDescription: String {
         switch self {
         case .appDefault:
@@ -582,9 +654,11 @@ extension AIProviderType {
             return "Connect your Anthropic account for Claude-powered summaries"
         case .gemini:
             return "Connect your Google account for Gemini-powered summaries"
+        case .mistral:
+            return "Connect your Mistral account for fast, affordable summaries"
         }
     }
-    
+
     var authInstructions: String {
         switch self {
         case .appDefault:
@@ -595,9 +669,11 @@ extension AIProviderType {
             return "Opens Anthropic Console where you can create an API key. New accounts get $5 free credits."
         case .gemini:
             return "Opens Google AI Studio where you can create a free API key with generous usage limits."
+        case .mistral:
+            return "Opens Mistral Console where you can create an API key. Affordable, fast models."
         }
     }
-    
+
     var developerPortalURL: String {
         switch self {
         case .appDefault:
@@ -607,10 +683,12 @@ extension AIProviderType {
         case .anthropic:
             return "console.anthropic.com"
         case .gemini:
-            return "makersuite.google.com"
+            return "aistudio.google.com"
+        case .mistral:
+            return "console.mistral.ai"
         }
     }
-    
+
     var keyFormatHint: String {
         switch self {
         case .appDefault:
@@ -621,6 +699,8 @@ extension AIProviderType {
             return "Should start with 'sk-ant-' and be about 95 characters long"
         case .gemini:
             return "Should be about 39 characters long (starts with letters/numbers)"
+        case .mistral:
+            return "Should start with 'sk-' and be roughly 40–64 characters"
         }
     }
 }

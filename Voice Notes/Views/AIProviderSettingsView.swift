@@ -253,16 +253,7 @@ struct APIKeyEntryView: View {
     }
     
     private var keyInstructionsText: String {
-        switch provider {
-        case .appDefault:
-            return ""
-        case .openai:
-            return "Get your API key from platform.openai.com. It should start with 'sk-'."
-        case .anthropic:
-            return "Get your API key from console.anthropic.com. It should start with 'sk-ant-'."
-        case .gemini:
-            return "Get your API key from makersuite.google.com. It's a 39-character string."
-        }
+        provider.keyFormatHint
     }
     
     private func validateAndSaveKey() {

@@ -32,11 +32,11 @@ struct RecordingDetailView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {
                             headerSection(recording)
-                            recordingInfoSection(recording)
-                            playbackSection(recording)
                             summarySection(recording)
                             transcriptSection(recording)
                             actionItemsSection(recording)
+                            recordingInfoSection(recording)
+                            playbackSection(recording)
                             
                             // Share/Copy buttons at bottom
                             if hasContent(recording) {

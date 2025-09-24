@@ -50,6 +50,12 @@ struct PrivacyInfoView: View {
                                 name: "Google (Gemini)",
                                 description: "Advanced multimodal AI with enterprise-grade security"
                             )
+                            
+                            PrivacyProviderRow(
+                                provider: .mistral,
+                                name: "Mistral AI",
+                                description: "European AI leader delivering fast, efficient models with strong privacy focus"
+                            )
                         }
                     }
                     .padding(.top, 8)

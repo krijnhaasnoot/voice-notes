@@ -21,6 +21,8 @@ final class AudioRecorder: NSObject, ObservableObject {
     
     private var recordingTimer: Timer?
     private var recordingStartTime: Date?
+    private var pausedDuration: TimeInterval = 0
+    private var lastPauseTime: Date?
     private var currentRecordingURL: URL?
     
 #if canImport(WatchConnectivity)
@@ -271,6 +273,8 @@ final class AudioRecorder: NSObject, ObservableObject {
             isRecording = true
             recordingStartTime = Date()
             recordingDuration = 0
+            pausedDuration = 0
+            lastPauseTime = nil
             lastError = nil
             
             // Start background task for potential background recording
@@ -279,11 +283,12 @@ final class AudioRecorder: NSObject, ObservableObject {
             // Start timer for duration updates
             recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
                 if let startTime = self.recordingStartTime {
-                    let currentDuration = Date().timeIntervalSince(startTime)
-                    self.recordingDuration = currentDuration
+                    let totalElapsed = Date().timeIntervalSince(startTime)
+                    let activeDuration = totalElapsed - self.pausedDuration
+                    self.recordingDuration = activeDuration
                     
                     // Stop recording if max duration reached (1 hour)
-                    if currentDuration >= self.maxRecordingDuration {
+                    if activeDuration >= self.maxRecordingDuration {
                         print("🎵 Maximum recording duration reached, stopping recording")
                         Task { @MainActor in
                             let _ = self.stopRecording()
@@ -320,6 +325,8 @@ final class AudioRecorder: NSObject, ObservableObject {
         let finalDuration = recordingDuration
         recordingDuration = 0
         recordingStartTime = nil
+        pausedDuration = 0
+        lastPauseTime = nil
         
         // Check file was created and has content
         guard let fileURL = currentRecordingURL else {
@@ -358,6 +365,10 @@ final class AudioRecorder: NSObject, ObservableObject {
         recorder.pause()
         recordingTimer?.invalidate()
         recordingTimer = nil
+        lastPauseTime = Date()
+        
+        print("🎵 Recording paused at duration: \(String(format: "%.1f", recordingDuration))s")
+        print("🎵 File: \(currentRecordingURL?.lastPathComponent ?? "unknown")")
         
         notifyWatch()
     }
@@ -366,6 +377,15 @@ final class AudioRecorder: NSObject, ObservableObject {
         guard isRecording, let recorder = audioRecorder else { return }
         
         print("🎵 Resuming recording...")
+        
+        // Add the pause duration to our total paused time
+        if let pauseTime = lastPauseTime {
+            let pauseDuration = Date().timeIntervalSince(pauseTime)
+            pausedDuration += pauseDuration
+            print("🎵 Pause duration: \(String(format: "%.1f", pauseDuration))s, total paused: \(String(format: "%.1f", pausedDuration))s")
+        }
+        lastPauseTime = nil
+        
         guard recorder.record() else {
             print("🎵 ❌ Failed to resume recording")
             lastError = "Failed to resume recording"
@@ -375,11 +395,12 @@ final class AudioRecorder: NSObject, ObservableObject {
         // Restart timer for duration updates
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             if let startTime = self.recordingStartTime {
-                let currentDuration = Date().timeIntervalSince(startTime)
-                self.recordingDuration = currentDuration
+                let totalElapsed = Date().timeIntervalSince(startTime)
+                let activeDuration = totalElapsed - self.pausedDuration
+                self.recordingDuration = activeDuration
                 
                 // Stop recording if max duration reached (1 hour)
-                if currentDuration >= self.maxRecordingDuration {
+                if activeDuration >= self.maxRecordingDuration {
                     print("🎵 Maximum recording duration reached, stopping recording")
                     Task { @MainActor in
                         let _ = self.stopRecording()
@@ -387,6 +408,9 @@ final class AudioRecorder: NSObject, ObservableObject {
                 }
             }
         }
+        
+        print("🎵 Recording resumed at duration: \(String(format: "%.1f", recordingDuration))s")
+        print("🎵 File: \(currentRecordingURL?.lastPathComponent ?? "unknown")")
         
         notifyWatch()
     }

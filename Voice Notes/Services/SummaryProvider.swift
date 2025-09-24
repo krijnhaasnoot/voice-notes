@@ -30,11 +30,13 @@ protocol SummaryProvider {
 
 // MARK: - Provider Types
 
+/// AI provider options for summarization services
 enum AIProviderType: String, CaseIterable {
     case appDefault = "app_default"
     case openai = "openai"
-    case anthropic = "anthropic"
+    case anthropic = "anthropic" 
     case gemini = "gemini"
+    case mistral = "mistral"
     
     var displayName: String {
         switch self {
@@ -46,6 +48,8 @@ enum AIProviderType: String, CaseIterable {
             return "Anthropic/Claude"
         case .gemini:
             return "Google Gemini"
+        case .mistral:
+            return "Mistral AI"
         }
     }
     
@@ -53,7 +57,7 @@ enum AIProviderType: String, CaseIterable {
         switch self {
         case .appDefault:
             return false
-        case .openai, .anthropic, .gemini:
+        case .openai, .anthropic, .gemini, .mistral:
             return true
         }
     }
@@ -68,6 +72,8 @@ enum AIProviderType: String, CaseIterable {
             return "^sk-ant-[A-Za-z0-9\\-_]{95,}$"
         case .gemini:
             return "^[A-Za-z0-9\\-_]{39}$"
+        case .mistral:
+            return "^[A-Za-z0-9]{32}$"
         }
     }
 }

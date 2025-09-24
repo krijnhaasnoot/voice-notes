@@ -4,7 +4,7 @@ struct PrivacyStrings {
     static let title = "Privacy & Data Usage"
     
     static let bodyText = """
-When you enable AI summaries, your transcripts are sent securely to the AI provider you choose (OpenAI, Claude, or Gemini).
+When you enable AI summaries, your transcripts are sent securely to the AI provider you choose (OpenAI, Claude, Gemini, or Mistral).
 
 These providers use your data only to generate summaries.
 

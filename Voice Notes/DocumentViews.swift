@@ -250,20 +250,13 @@ struct CreateDocumentSheet: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("List Title")
-                        .font(.poppins.headline)
-                    
+        NavigationStack {
+            Form {
+                Section(header: Text("List Title")) {
                     TextField("Enter title...", text: $title)
-                        .textFieldStyle(.roundedBorder)
                 }
                 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("List Type")
-                        .font(.poppins.headline)
-                    
+                Section(header: Text("List Type")) {
                     LazyVGrid(columns: gridColumns, spacing: 16) {
                         ForEach(DocumentType.allCases, id: \.self) { type in
                             DocumentTypeButton(
@@ -273,13 +266,13 @@ struct CreateDocumentSheet: View {
                             )
                         }
                     }
+                    .padding(.vertical, 8)
                 }
-                
-                Spacer()
             }
-            .padding()
             .navigationTitle("New List")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
@@ -377,64 +370,8 @@ struct DocumentDetailView: View {
             }
         }
         .navigationTitle(editingTitle ? "Edit Title" : getCurrentDocument().title)
-        .navigationBarTitleDisplayMode((document.type.usesChecklist || editingTitle) ? .inline : .large)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                if editingTitle {
-                    Button("Save") {
-                        saveTitleAndExit()
-                    }
-                    .disabled(newTitleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                } else {
-                    Button(action: { 
-                        newTitleText = document.title
-                        editingTitle = true
-                        // Focus the text field after a brief delay to ensure the view has updated
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            titleFocus = true
-                        }
-                    }) {
-                        Image(systemName: "pencil")
-                            .font(.poppins.medium(size: 16))
-                            .foregroundStyle(.blue)
-                            .frame(width: 32, height: 32)
-                            .background {
-                                Circle()
-                                    .fill(.regularMaterial)
-                                    .overlay {
-                                        Circle()
-                                            .stroke(.quaternary.opacity(0.6), lineWidth: 1)
-                                    }
-                                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .if(isLiquidGlassAvailable) { view in
-                        view.glassEffect(.regular)
-                    }
-                    
-                    Button(action: shareDocument) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.poppins.medium(size: 16))
-                            .foregroundStyle(.blue)
-                            .frame(width: 32, height: 32)
-                            .background {
-                                Circle()
-                                    .fill(.regularMaterial)
-                                    .overlay {
-                                        Circle()
-                                            .stroke(.quaternary.opacity(0.6), lineWidth: 1)
-                                    }
-                                    .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .if(isLiquidGlassAvailable) { view in
-                        view.glassEffect(.regular)
-                    }
-                }
-            }
-            
             ToolbarItem(placement: .navigationBarLeading) {
                 if editingTitle {
                     Button("Cancel") {
@@ -447,7 +384,32 @@ struct DocumentDetailView: View {
                     }
                 }
             }
+            
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                if editingTitle {
+                    Button("Save") {
+                        saveTitleAndExit()
+                    }
+                    .disabled(newTitleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                } else {
+                    Button(action: { 
+                        newTitleText = document.title
+                        editingTitle = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            titleFocus = true
+                        }
+                    }) {
+                        Image(systemName: "pencil")
+                    }
+                    
+                    Button(action: shareDocument) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+            }
         }
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .onAppear {
             notesText = document.notes
         }
@@ -526,22 +488,9 @@ struct DocumentDetailView: View {
     
     private var checklistView: some View {
         VStack(spacing: 0) {
-            // Progress and Filter Header
-            VStack(spacing: 12) {
-                // Progress Indicator
-                HStack {
-                    Image(systemName: document.type.systemImage)
-                        .foregroundColor(document.type.color)
-                    
-                    Text("\(getCurrentDocument().completedCount)/\(getCurrentDocument().itemCount) completed")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    
-                    Spacer()
-                }
-                .padding(.horizontal)
-                
-                // Filter Picker
+            // Filter and Progress Section
+            VStack(spacing: 16) {
+                // Filter Picker - moved to top for cleaner hierarchy
                 Picker("Filter", selection: $selectedFilter) {
                     ForEach(ItemFilter.allCases, id: \.self) { filter in
                         Label(filter.rawValue, systemImage: filter.systemImage)
@@ -550,28 +499,47 @@ struct DocumentDetailView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
+                
+                // Progress Indicator - simplified
+                HStack {
+                    Image(systemName: document.type.systemImage)
+                        .foregroundColor(document.type.color)
+                        .font(.headline)
+                    
+                    Text("\(getCurrentDocument().completedCount)/\(getCurrentDocument().itemCount) completed")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal)
             }
-            .padding(.vertical, 8)
-            .background(.regularMaterial)
+            .padding(.vertical, 12)
+            .background(Color(.secondarySystemGroupedBackground))
             
-            // Items List (always shown so header is visible even when empty)
+            // Items List
             List {
                 if filteredItems.isEmpty {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 16) {
                         Image(systemName: document.type.systemImage)
-                            .font(.poppins.light(size: 40))
+                            .font(.system(size: 48))
                             .foregroundStyle(.tertiary)
-                        Text("No \(selectedFilter.rawValue.lowercased()) items")
-                            .font(.poppins.body)
-                            .fontWeight(.medium)
-                        Text("Add items or save action items from a recording.")
-                            .font(.poppins.callout)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
+                        
+                        VStack(spacing: 8) {
+                            Text("No \(selectedFilter.rawValue.lowercased()) items")
+                                .font(.headline)
+                                .fontWeight(.medium)
+                            
+                            Text("Add items or save action items from a recording.")
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-                    .listRowBackground(Color(.systemGroupedBackground))
+                    .padding(.vertical, 40)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 } else {
                     ForEach(filteredItems) { item in
                         ChecklistItemView(
@@ -587,7 +555,6 @@ struct DocumentDetailView: View {
                             itemDraft: $itemDraft,
                             itemFocus: $itemFocus
                         )
-                        .listRowBackground(Color(.systemBackground))
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button("Edit") {
                                 editingItemId = item.id
@@ -618,24 +585,7 @@ struct DocumentDetailView: View {
                     .onMove(perform: selectedFilter == .all ? moveItems : nil)
                 }
             }
-            .safeAreaInset(edge: .top) {
-                HStack(spacing: 12) {
-                    Image(systemName: document.type.systemImage)
-                        .font(.poppins.semiBold(size: 22))
-                        .foregroundColor(document.type.color)
-                    Text(getCurrentDocument().title)
-                        .font(.poppins.largeTitle)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
-                .background(Color(.systemGroupedBackground))
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
+            .listStyle(.insetGrouped)
             
             // Add New Item Bar
             addItemBar
@@ -710,28 +660,13 @@ struct DocumentDetailView: View {
     }
     
     private var notesView: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack {
-                Image(systemName: document.type.systemImage)
-                    .font(.poppins.medium(size: 20))
-                    .foregroundColor(document.type.color)
-                
-                Text("Notes")
-                    .font(.poppins.title3)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-            }
-            .padding()
-            .background(.regularMaterial)
-            
-            // Notes Editor
+        VStack(spacing: 0) {
+            // Notes Editor - full screen like Settings
             TextEditor(text: $notesText)
                 .focused($isNotesEditing)
-                .font(.poppins.body)
-                .scrollContentBackground(.hidden)
-                .background(Color(.systemGroupedBackground))
+                .font(.body)
+                .padding(16)
+                .background(Color(.systemBackground))
                 .onChange(of: notesText) { _, newValue in
                     // Debounce saves to avoid excessive writes
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -740,7 +675,10 @@ struct DocumentDetailView: View {
                         }
                     }
                 }
+            
+            Spacer()
         }
+        .background(Color(.systemGroupedBackground))
     }
     
     private func getCurrentDocument() -> Document {

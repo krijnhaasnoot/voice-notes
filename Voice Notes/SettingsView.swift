@@ -63,7 +63,7 @@ struct SettingsView: View {
                             Text("AI Provider Settings")
                                 .font(.poppins.body)
                             
-                            Text("Configure OpenAI, Claude, or Gemini")
+                            Text("Configure OpenAI, Claude, Gemini, or Mistral")
                                 .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                         }
