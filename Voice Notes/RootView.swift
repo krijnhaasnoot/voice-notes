@@ -176,6 +176,7 @@ struct DocumentsView: View {
                     QuickCreateButton(type: .meeting, documentStore: documentStore)
                 }
             }
+            .padding(.horizontal, 20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
