@@ -110,11 +110,9 @@ class BackgroundTaskManager: ObservableObject {
         // Process up to 3 recordings to avoid taking too much background time
         for recording in pendingRecordings.prefix(3) {
             if recording.transcript == nil || recording.transcript?.isEmpty == true {
-                // Start transcription - need audio URL
-                if let audioURL = recording.fileURL {
-                    let _ = processingManager.startTranscription(for: recording.id, audioURL: audioURL)
-                    print("📱 BackgroundTaskManager: Started transcription for recording \(recording.id)")
-                }
+                // Start transcription using resolved file URL
+                let _ = processingManager.startTranscription(for: recording.id, audioURL: recording.resolvedFileURL)
+                print("📱 BackgroundTaskManager: Started transcription for recording \(recording.id)")
             } else if recording.summary == nil || recording.summary?.isEmpty == true,
                       let transcript = recording.transcript, !transcript.isEmpty {
                 // Start summarization
