@@ -826,35 +826,51 @@ struct HomeView: View {
             // Sticky header
             stickyHeader
             
-            // Simple content area with welcome message
+            // Content area 
             ScrollView {
-                VStack(spacing: 24) {
-                    // Welcome/info section
+                VStack(spacing: 32) {
+                    // AI Summary Mode Selector (moved up for better prominence)
                     VStack(spacing: 16) {
-                        Image(systemName: "waveform.circle.fill")
-                            .font(.system(size: 64, weight: .light))
-                            .foregroundStyle(.blue.opacity(0.6))
+                        Text("Recording Settings")
+                            .font(.poppins.title3)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         
-                        VStack(spacing: 8) {
-                            Text("Ready to Record")
-                                .font(.poppins.title2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.primary)
-                            
-                            Text("Tap the record button above to create a new voice note. Your recordings will appear in the Recordings tab.")
-                                .font(.poppins.body)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
-                        }
+                        summaryModeSelector
                     }
-                    .padding(.top, 40)
+                    .padding(.top, 32)
                     
-                    // AI Summary Mode Selector
-                    summaryModeSelector
+                    // Recent recordings section with transition
+                    if !recordingsManager.recordings.isEmpty {
+                        recentRecordingsSection
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity.combined(with: .scale(scale: 0.9))),
+                                removal: .move(edge: .top).combined(with: .opacity)
+                            ))
+                    } else {
+                        // Quick guidance (simplified)
+                        VStack(spacing: 12) {
+                            Image(systemName: "mic.badge.plus")
+                                .font(.system(size: 48, weight: .ultraLight))
+                                .foregroundStyle(.blue.opacity(0.4))
+                            
+                            Text("Your voice notes will appear in the Recordings tab after recording.")
+                                .font(.poppins.body)
+                                .foregroundStyle(.tertiary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.horizontal)
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.95)),
+                            removal: .move(edge: .top).combined(with: .opacity)
+                        ))
+                    }
                     
-                    Spacer(minLength: 100)
+                    Spacer(minLength: 120)
                 }
+                .padding(.horizontal)
+                .animation(.spring(response: 0.7, dampingFraction: 0.75, blendDuration: 0.25), value: recordingsManager.recordings.isEmpty)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -1031,8 +1047,153 @@ struct HomeView: View {
         SummaryMode(rawValue: defaultMode) ?? .personal
     }
     
+    private var recentRecordingsSection: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("Recent Recordings")
+                    .font(.poppins.title3)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                
+                Spacer()
+                
+                Button("View All") {
+                    appRouter.selectedTab = .recordings
+                }
+                .font(.poppins.body)
+                .foregroundColor(.blue)
+            }
+            
+            VStack(spacing: 8) {
+                ForEach(Array(recordingsManager.recordings.prefix(3)), id: \.id) { recording in
+                    RecentRecordingRow(recording: recording) {
+                        selectedRecording = recording
+                    }
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity.combined(with: .scale(scale: 0.95))),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
+                }
+            }
+            .animation(.spring(response: 0.6, dampingFraction: 0.8, blendDuration: 0.25), value: recordingsManager.recordings.count)
+        }
+    }
+    
 }
 
+// MARK: - Recent Recording Row Component
+struct RecentRecordingRow: View {
+    let recording: Recording
+    let onTap: () -> Void
+    
+    @State private var hasAppeared = false
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                // Status indicator
+                ZStack {
+                    Circle()
+                        .fill(statusColor.opacity(0.2))
+                        .frame(width: 32, height: 32)
+                    
+                    Image(systemName: statusIcon)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(statusColor)
+                }
+                
+                // Recording info
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(displayTitle)
+                        .font(.poppins.body)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    
+                    Text(formattedDate)
+                        .font(.poppins.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // Duration
+                Text(recording.formattedDuration)
+                    .font(.poppins.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.secondary.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .scaleEffect(hasAppeared ? 1.0 : 0.95)
+            .opacity(hasAppeared ? 1.0 : 0.0)
+            .animation(.spring(response: 0.5, dampingFraction: 0.75, blendDuration: 0.1).delay(0.1), value: hasAppeared)
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            hasAppeared = true
+        }
+    }
+    
+    private var displayTitle: String {
+        if !recording.title.isEmpty {
+            return recording.title
+        }
+        // Fallback to a generic title if no title was generated yet
+        return "New Recording"
+    }
+    
+    private var formattedDate: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: recording.date, relativeTo: Date())
+    }
+    
+    private var statusIcon: String {
+        switch recording.status {
+        case .idle:
+            if recording.summary != nil {
+                return "checkmark.circle.fill"
+            } else if recording.transcript != nil {
+                return "doc.text.fill"
+            } else {
+                return "waveform.circle.fill"
+            }
+        case .transcribing:
+            return "waveform.circle"
+        case .summarizing:
+            return "brain.head.profile"
+        case .failed:
+            return "exclamationmark.circle.fill"
+        case .done:
+            return "checkmark.circle.fill"
+        }
+    }
+    
+    private var statusColor: Color {
+        switch recording.status {
+        case .idle:
+            if recording.summary != nil {
+                return .green
+            } else if recording.transcript != nil {
+                return .blue
+            } else {
+                return .orange
+            }
+        case .transcribing, .summarizing:
+            return .blue
+        case .failed:
+            return .red
+        case .done:
+            return .green
+        }
+    }
+}
 
 extension HomeView {
     private var recordingControls: some View {
@@ -1112,14 +1273,27 @@ extension HomeView {
             if let error = audioRecorder.lastError {
                 Text(error)
                     .font(.caption)
-                    .foregroundColor(.blue)
+                    .foregroundColor(.red)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             } else {
-                Text(recordingStatusText)
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
+                HStack(spacing: 8) {
+                    if audioRecorder.isRecording {
+                        // Recording indicator
+                        Circle()
+                            .fill(.red)
+                            .frame(width: 8, height: 8)
+                            .scaleEffect(isPaused ? 1.0 : 1.2)
+                            .opacity(isPaused ? 0.5 : 1.0)
+                            .animation(.easeInOut(duration: 0.8).repeatForever(), value: audioRecorder.isRecording && !isPaused)
+                    }
+                    
+                    Text(recordingStatusText)
+                        .font(.poppins.title3)
+                        .fontWeight(audioRecorder.isRecording ? .medium : .regular)
+                        .foregroundColor(audioRecorder.isRecording ? .primary : .secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
             
             // Debug: Show recent transcription status
@@ -1213,9 +1387,13 @@ extension HomeView {
     
     private var recordingStatusText: String {
         if isPaused {
-            return "Recording paused"
+            let minutes = Int(audioRecorder.recordingDuration) / 60
+            let seconds = Int(audioRecorder.recordingDuration) % 60
+            return "Recording paused - \(String(format: "%02d:%02d", minutes, seconds))"
         } else if audioRecorder.isRecording {
-            return "Recording… \(Int(audioRecorder.recordingDuration))s"
+            let minutes = Int(audioRecorder.recordingDuration) / 60
+            let seconds = Int(audioRecorder.recordingDuration) % 60
+            return "Recording - \(String(format: "%02d:%02d", minutes, seconds))"
         } else {
             return "Tap to start recording"
         }

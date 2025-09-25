@@ -48,6 +48,9 @@ struct Voice_NotesApp: App {
         // Initialize analytics with session management
         initializeAnalytics()
         
+        // Register background tasks for processing
+        BackgroundTaskManager.shared.registerBackgroundTasks()
+        
         print("📱 APP: App initialization complete")
     }
     

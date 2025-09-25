@@ -110,66 +110,15 @@ struct RecordingRow: View {
     // MARK: - Helper Properties & Functions
     
     private var displayTitle: String {
-        // 1. Use explicit title if set
+        // Use the auto-generated title if available
         if !recording.title.isEmpty {
             return recording.title
         }
         
-        // 2. Extract title from AI summary if available
-        if let summary = recording.summary, !summary.isEmpty {
-            if let aiTitle = extractTitleFromSummary(summary) {
-                return aiTitle
-            }
-        }
-        
-        // 3. Fall back to formatted filename
-        let base = recording.fileName
-            .replacingOccurrences(of: ".m4a", with: "")
-            .replacingOccurrences(of: "_", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return base.isEmpty ? "Untitled" : base
+        // Fallback while title is being generated
+        return "New Recording"
     }
     
-    private func extractTitleFromSummary(_ summary: String) -> String? {
-        let lines = summary.components(separatedBy: .newlines)
-        
-        // Look for common title patterns from AI summaries
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            // Match patterns like "**Title**", "**Session Title**", "**Topic**"
-            if trimmed.hasPrefix("**") && trimmed.contains("**") {
-                // Extract text after the first title-like pattern
-                if trimmed.contains("Title") || trimmed.contains("Topic") || trimmed.contains("Session") {
-                    // Look for the next non-empty line as the actual title content
-                    if let titleIndex = lines.firstIndex(of: line) {
-                        let nextIndex = titleIndex + 1
-                        if nextIndex < lines.count {
-                            let titleContent = lines[nextIndex].trimmingCharacters(in: .whitespacesAndNewlines)
-                            if !titleContent.isEmpty && !titleContent.hasPrefix("**") {
-                                return titleContent.count > 40 ? String(titleContent.prefix(40)) + "..." : titleContent
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Alternative: Look for first non-header line if it starts after a title marker
-            if trimmed.hasPrefix("**Title**") || trimmed.hasPrefix("**Session Title**") || trimmed.hasPrefix("**Topic**") {
-                // Skip this header line and get the next meaningful content
-                if let titleIndex = lines.firstIndex(of: line) {
-                    for i in (titleIndex + 1)..<lines.count {
-                        let content = lines[i].trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !content.isEmpty && !content.hasPrefix("**") {
-                            return content.count > 40 ? String(content.prefix(40)) + "..." : content
-                        }
-                    }
-                }
-            }
-        }
-        
-        return nil
-    }
     
     private var previewText: String {
         // Prioritize AI summary content over raw transcript

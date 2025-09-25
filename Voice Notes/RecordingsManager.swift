@@ -206,13 +206,44 @@ final class RecordingsManager: ObservableObject {
         recordings.insert(recording, at: 0)
         saveRecordings()
         print("🎵 RecordingsManager: Recording added successfully. Total recordings: \(recordings.count)")
+        
+        // Start background task for processing
+        let taskId = BackgroundTaskManager.shared.beginBackgroundTask(name: "RecordingProcessing")
+        
+        // Schedule background processing
+        BackgroundTaskManager.shared.scheduleBackgroundProcessing()
+        
+        // Start transcription immediately
+        Task {
+            let _ = processingManager.startTranscription(for: recording.id)
+            
+            // End background task after a delay to ensure processing started
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                BackgroundTaskManager.shared.endBackgroundTask()
+            }
+        }
     }
     
     func updateRecording(_ recordingId: UUID, status: Recording.Status? = nil, transcript: String? = nil, summary: String? = nil, rawSummary: String? = nil, languageHint: String? = nil, title: String? = nil) {
         if let index = recordings.firstIndex(where: { $0.id == recordingId }) {
             let currentRecording = recordings[index]
             
-            let finalTitle = title ?? currentRecording.title
+            // Generate title automatically if not provided and we have content
+            let finalTitle: String
+            if let providedTitle = title {
+                finalTitle = providedTitle
+            } else if currentRecording.title.isEmpty && (transcript != nil || summary != nil) {
+                // Auto-generate title using transcript or summary
+                let mode = SummaryMode(rawValue: currentRecording.detectedMode ?? "") ?? .personal
+                finalTitle = TitleGenerator.shared.generateTitle(
+                    from: transcript ?? currentRecording.transcript,
+                    summary: summary ?? currentRecording.summary,
+                    mode: mode,
+                    date: currentRecording.date
+                )
+            } else {
+                finalTitle = currentRecording.title
+            }
             
             let updatedRecording = Recording(
                 fileName: currentRecording.fileName,
@@ -547,6 +578,20 @@ final class RecordingsManager: ObservableObject {
         guard let index = recordings.firstIndex(where: { $0.id == recordingId }) else { return }
         let currentRecording = recordings[index]
         
+        // Generate title if not already set
+        let finalTitle: String
+        if currentRecording.title.isEmpty {
+            let mode = SummaryMode(rawValue: currentRecording.detectedMode ?? "") ?? .personal
+            finalTitle = TitleGenerator.shared.generateTitle(
+                from: currentRecording.transcript,
+                summary: cleanSummary,
+                mode: mode,
+                date: currentRecording.date
+            )
+        } else {
+            finalTitle = currentRecording.title
+        }
+        
         let updatedRecording = Recording(
             fileName: currentRecording.fileName,
             date: currentRecording.date,
@@ -558,7 +603,7 @@ final class RecordingsManager: ObservableObject {
             languageHint: currentRecording.languageHint,
             transcriptLastUpdated: currentRecording.transcriptLastUpdated,
             summaryLastUpdated: Date(),
-            title: currentRecording.title,
+            title: finalTitle,
             detectedMode: currentRecording.detectedMode,
             preferredSummaryProvider: currentRecording.preferredSummaryProvider,
             tags: currentRecording.tags,

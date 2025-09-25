@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 @MainActor
 class ProcessingManager: ObservableObject {
@@ -32,7 +33,13 @@ class ProcessingManager: ObservableObject {
         activeOperations[operation.id] = operation
         print("🎯 ProcessingManager: Created operation \(operation.id), active operations: \(activeOperations.count)")
         
+        // Begin background task for transcription
+        let backgroundTaskId = BackgroundTaskManager.shared.beginBackgroundTask(name: "Transcription-\(recordingId)")
+        
         Task {
+            defer {
+                BackgroundTaskManager.shared.endBackgroundTask()
+            }
             await performTranscription(operation: operation, audioURL: audioURL, languageHint: languageHint)
         }
         
@@ -65,7 +72,13 @@ class ProcessingManager: ObservableObject {
         activeOperations[operation.id] = operation
         print("🔄 ProcessingManager: Starting new summarization for recording \(recordingId)")
         
+        // Begin background task for summarization
+        let backgroundTaskId = BackgroundTaskManager.shared.beginBackgroundTask(name: "Summarization-\(recordingId)")
+        
         Task {
+            defer {
+                BackgroundTaskManager.shared.endBackgroundTask()
+            }
             await performSummarization(operation: operation, transcript: transcript)
         }
         
