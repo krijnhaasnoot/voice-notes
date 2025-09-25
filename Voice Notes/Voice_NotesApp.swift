@@ -40,6 +40,14 @@ struct Voice_NotesApp: App {
         
         configureLiquidNavigationBar()
         
+        // Initialize telemetry session
+        Task { @MainActor in
+            EnhancedTelemetryService.shared.startSession(reason: "cold")
+        }
+        
+        // Initialize analytics with session management
+        initializeAnalytics()
+        
         print("📱 APP: App initialization complete")
     }
     
@@ -49,7 +57,39 @@ struct Voice_NotesApp: App {
                 .environmentObject(documentStore)
                 .environmentObject(AudioRecorder.shared)
                 .environmentObject(RecordingsManager.shared)
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                    handleAppDidBecomeActive()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                    handleAppDidEnterBackground()
+                }
         }
+    }
+    
+    // MARK: - Analytics Session Management
+    
+    private func initializeAnalytics() {
+        // Start analytics with static session provider
+        Analytics.start {
+            return SessionManager.shared.getCurrentSessionId()
+        }
+        
+        // Track app launch
+        Analytics.track("app_open")
+    }
+    
+    private func handleAppDidBecomeActive() {
+        // Refresh session and track app open
+        let currentSessionId = SessionManager.shared.getCurrentSessionId()
+        Analytics.track("app_open")
+        print("📊 Analytics: App became active, session: \(currentSessionId)")
+    }
+    
+    private func handleAppDidEnterBackground() {
+        // Track app background and flush events
+        Analytics.track("app_background")
+        Analytics.flush()
+        print("📊 Analytics: App entered background, flushed events")
     }
     
     private func configureLiquidNavigationBar() {

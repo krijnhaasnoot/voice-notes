@@ -1,20 +1,25 @@
 import SwiftUI
 
 struct TelemetryView: View {
-    private let telemetryService = TelemetryService.shared
-    @State private var selectedDays = 30
+    private let telemetryService = EnhancedTelemetryService.shared
+    private let aggregator = TelemetryAggregator()
+    
+    @State private var selectedRange: AnalysisRange = AnalysisRange(days: 30)
     @State private var showingExportSheet = false
     @State private var exportData: Data?
     
-    private let dayOptions = [7, 30, 90]
+    private let rangeOptions = [1, 7, 30]
     
     var body: some View {
         List {
-                periodSelectionSection
-                overallStatsSection
-                providerBreakdownSection
-                dataManagementSection
-            }
+            periodSelectionSection
+            sessionMetricsSection
+            recordingMetricsSection
+            settingsDistributionSection
+            actionMetricsSection
+            listsMetricsSection
+            dataManagementSection
+        }
         .navigationTitle("Usage Analytics")
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.visible, for: .navigationBar)
@@ -30,51 +35,174 @@ struct TelemetryView: View {
     
     private var periodSelectionSection: some View {
         Section(header: Text("Analysis Period")) {
-            Picker("Days", selection: $selectedDays) {
-                ForEach(dayOptions, id: \.self) { days in
-                    Text("\(days) days")
-                        .tag(days)
+            Picker("Period", selection: $selectedRange) {
+                ForEach(rangeOptions, id: \.self) { days in
+                    Text(AnalysisRange(days: days).displayName)
+                        .tag(AnalysisRange(days: days))
                 }
             }
             .pickerStyle(.segmented)
         }
     }
     
-    // MARK: - Overall Statistics
+    // MARK: - Session Metrics
     
-    private var overallStatsSection: some View {
-        Section(header: Text("Overall Statistics")) {
-            let stats = telemetryService.getUsageStats(days: selectedDays)
+    private var sessionMetricsSection: some View {
+        Section(header: Text("Sessions & Activity")) {
+            let analytics = aggregator.generateAnalytics(for: selectedRange)
             
             VStack(spacing: 12) {
-                StatRow(title: "Total Requests", value: "\(stats.totalRequests)")
-                StatRow(title: "Success Rate", value: stats.formattedSuccessRate)
-                StatRow(title: "Fallback Rate", value: stats.formattedFallbackRate)
-                StatRow(title: "Avg Processing Time", value: stats.formattedProcessingTime)
-                StatRow(title: "Avg Transcript Length", value: "\(stats.averageTranscriptLength) chars")
-                StatRow(title: "Avg Summary Length", value: "\(stats.averageSummaryLength) chars")
+                StatRow(title: "Total Sessions", value: "\(analytics.totalSessions)")
+                StatRow(title: "Active Days", value: "\(analytics.activeDays)")
+                StatRow(title: "Sessions per Day", value: analytics.sessionsPerDay.formattedOneDecimal)
+                StatRow(title: "App Opens per Day", value: analytics.appOpensPerDay.formattedOneDecimal)
+                StatRow(title: "Total Time in App", value: analytics.totalTimeInApp.formattedDuration)
+                StatRow(title: "Avg Session Duration", value: analytics.averageSessionDuration.formattedSessionTime)
             }
             .padding(.vertical, 8)
         }
     }
     
-    // MARK: - Provider Breakdown
+    // MARK: - Recording Metrics
     
-    private var providerBreakdownSection: some View {
-        Section(header: Text("Provider Breakdown")) {
-            let breakdown = telemetryService.getProviderBreakdown(days: selectedDays)
+    private var recordingMetricsSection: some View {
+        Section(header: Text("Recording Analytics")) {
+            let analytics = aggregator.generateAnalytics(for: selectedRange)
             
-            ForEach(Array(breakdown.sorted(by: { $0.value.totalRequests > $1.value.totalRequests })), id: \.key) { provider, stats in
-                if stats.totalRequests > 0 {
-                    ProviderStatsRow(providerName: provider, stats: stats)
+            VStack(spacing: 12) {
+                StatRow(title: "Total Recordings", value: "\(analytics.totalRecordings)")
+                StatRow(title: "Total Recording Time", value: analytics.totalRecordingTime.formattedDuration)
+                StatRow(title: "Avg Recording Length", value: analytics.averageRecordingLength.formattedSessionTime)
+            }
+            .padding(.vertical, 8)
+            
+            // Recording length distribution
+            if analytics.totalRecordings > 0 {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Recording Length Distribution")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .padding(.top, 8)
+                    
+                    ForEach(RecordingBucket.allCases, id: \.self) { bucket in
+                        let count = analytics.recordingBuckets[bucket] ?? 0
+                        if count > 0 {
+                            let percentage = analytics.totalRecordings > 0 ? 
+                                Double(count) / Double(analytics.totalRecordings) * 100 : 0
+                            
+                            HStack {
+                                Text(bucket.displayName)
+                                    .font(.caption)
+                                Spacer()
+                                Text("\(count) (\(String(format: "%.1f%%", percentage)))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
                 }
+                .padding(.vertical, 8)
+            }
+        }
+    }
+    
+    // MARK: - Settings Distribution
+    
+    private var settingsDistributionSection: some View {
+        Section(header: Text("Settings Usage")) {
+            let analytics = aggregator.generateAnalytics(for: selectedRange)
+            
+            VStack(spacing: 12) {
+                StatRow(title: "Auto Detect Enabled", value: analytics.settingsToggles.autoDetectEnabled.formattedPercentage)
+                StatRow(title: "Auto Save Enabled", value: analytics.settingsToggles.autoSaveEnabled.formattedPercentage)
+                StatRow(title: "Compact View Enabled", value: analytics.settingsToggles.compactViewEnabled.formattedPercentage)
+            }
+            .padding(.vertical, 8)
+            
+            // Provider distribution
+            if !analytics.providerDistribution.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Provider Distribution")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .padding(.top, 8)
+                    
+                    ForEach(Array(analytics.providerDistribution.sorted(by: { $0.value > $1.value })), id: \.key) { provider, count in
+                        let percentage = analytics.totalRecordings > 0 ? 
+                            Double(count) / Double(analytics.totalRecordings) * 100 : 0
+                        
+                        HStack {
+                            Text(provider.capitalized)
+                                .font(.caption)
+                            Spacer()
+                            Text("\(count) (\(String(format: "%.1f%%", percentage)))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
             }
             
-            if breakdown.values.allSatisfy({ $0.totalRequests == 0 }) {
-                Text("No usage data available for selected period")
-                    .foregroundColor(.secondary)
-                    .italic()
+            // Mode distribution
+            if !analytics.modeDistribution.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Mode Distribution")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .padding(.top, 8)
+                    
+                    ForEach(Array(analytics.modeDistribution.sorted(by: { $0.value > $1.value })), id: \.key) { mode, count in
+                        let percentage = analytics.totalRecordings > 0 ? 
+                            Double(count) / Double(analytics.totalRecordings) * 100 : 0
+                        
+                        HStack {
+                            Text(mode.capitalized)
+                                .font(.caption)
+                            Spacer()
+                            Text("\(count) (\(String(format: "%.1f%%", percentage)))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
             }
+        }
+    }
+    
+    // MARK: - Action Metrics
+    
+    private var actionMetricsSection: some View {
+        Section(header: Text("User Actions")) {
+            let analytics = aggregator.generateAnalytics(for: selectedRange)
+            
+            VStack(spacing: 12) {
+                StatRow(title: "Total Retry Taps", value: "\(analytics.retryTaps.total)")
+                StatRow(title: "Transcription Retries", value: "\(analytics.retryTaps.transcriptionRetries)")
+                StatRow(title: "Summary Retries", value: "\(analytics.retryTaps.summaryRetries)")
+                StatRow(title: "Retry Rate", value: "\(analytics.retryTaps.ratePerHundredRecordings.formattedOneDecimal) per 100")
+                StatRow(title: "Summary Edits", value: "\(analytics.summaryEdits)")
+                StatRow(title: "Summary Edit Rate", value: analytics.summaryEditRate.formattedPercentage)
+            }
+            .padding(.vertical, 8)
+        }
+    }
+    
+    // MARK: - Lists Metrics
+    
+    private var listsMetricsSection: some View {
+        Section(header: Text("Lists Usage")) {
+            let analytics = aggregator.generateAnalytics(for: selectedRange)
+            
+            VStack(spacing: 12) {
+                StatRow(title: "Lists Users", value: "\(analytics.listsUsers)")
+                StatRow(title: "Lists Created", value: "\(analytics.listsCreated)")
+                StatRow(title: "List Items Created", value: "\(analytics.listItemsCreated)")
+                StatRow(title: "List Items Checked", value: "\(analytics.listItemsChecked)")
+                StatRow(title: "Recording to Lists Conversion", value: analytics.recordingToListsConversion.formattedPercentage)
+            }
+            .padding(.vertical, 8)
         }
     }
     
@@ -83,21 +211,23 @@ struct TelemetryView: View {
     private var dataManagementSection: some View {
         Section(
             header: Text("Data Management"),
-            footer: Text("Telemetry data is stored locally and contains no personal information. Only anonymized usage statistics are tracked.")
+            footer: Text("All data is stored locally with privacy-first design. Only anonymous usage patterns are tracked using a device-specific anonymous ID.")
         ) {
-            Button("Export Data") {
-                exportData = telemetryService.exportTelemetryData()
+            Button("Export Analytics Data") {
+                exportData = telemetryService.exportData()
                 showingExportSheet = true
             }
-            .disabled(telemetryService.getUsageStats(days: selectedDays).totalRequests == 0)
+            .disabled(aggregator.generateAnalytics(for: selectedRange).totalSessions == 0)
             
+            #if DEBUG
             Button("Add Test Data") {
                 telemetryService.addTestData()
             }
-            .disabled(telemetryService.getUsageStats(days: selectedDays).totalRequests > 50)
+            .disabled(aggregator.generateAnalytics(for: selectedRange).totalSessions > 50)
+            #endif
             
-            Button("Clear Data", role: .destructive) {
-                telemetryService.clearTelemetryData()
+            Button("Clear All Analytics Data", role: .destructive) {
+                telemetryService.clearAllData()
             }
         }
     }
@@ -121,65 +251,10 @@ struct StatRow: View {
     }
 }
 
-// MARK: - Provider Stats Row
-
-struct ProviderStatsRow: View {
-    let providerName: String
-    let stats: UsageStats
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(providerName)
-                    .fontWeight(.medium)
-                Spacer()
-                Text("\(stats.totalRequests) requests")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Success")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Text(stats.formattedSuccessRate)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(stats.successRate > 0.9 ? .green : stats.successRate > 0.7 ? .orange : .red)
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Avg Time")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Text(stats.formattedProcessingTime)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                }
-                
-                if stats.fallbacksUsed > 0 {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Fallbacks")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text(stats.formattedFallbackRate)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.orange)
-                    }
-                }
-                
-                Spacer()
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-
 // MARK: - Preview
 
 #Preview {
-    TelemetryView()
+    NavigationView {
+        TelemetryView()
+    }
 }

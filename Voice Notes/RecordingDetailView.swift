@@ -23,6 +23,7 @@ struct RecordingDetailView: View {
     @State private var showingSummarySettings = false
     @State private var selectedSummaryMode: SummaryMode = .personal
     @State private var selectedSummaryLength: SummaryLength = .standard
+    @State private var showingAddTagSheet = false
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
@@ -32,6 +33,7 @@ struct RecordingDetailView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {
                             headerSection(recording)
+                            tagsSection(recording)
                             summarySection(recording)
                             transcriptSection(recording)
                             actionItemsSection(recording)
@@ -111,6 +113,11 @@ struct RecordingDetailView: View {
                 )
             }
         }
+        .sheet(isPresented: $showingAddTagSheet) {
+            AddTagSheet(isPresented: $showingAddTagSheet) { tag in
+                recordingsManager.addTagToRecording(recordingId: recordingId, tag: tag)
+            }
+        }
         .overlay(alignment: .bottom) {
             if showingToast {
                 toastView
@@ -148,6 +155,29 @@ struct RecordingDetailView: View {
 
             Spacer()
         }
+    }
+    
+    private func tagsSection(_ recording: Recording) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Tags")
+                .font(.poppins.headline)
+                .fontWeight(.semibold)
+            
+            TagRowView(
+                tags: recording.tags,
+                maxVisible: 10,
+                isRemovable: true,
+                onRemove: { tag in
+                    recordingsManager.removeTagFromRecording(recordingId: recordingId, tag: tag)
+                },
+                onAddTag: {
+                    showingAddTagSheet = true
+                }
+            )
+        }
+        .padding()
+        .background(Color.secondary.opacity(0.1))
+        .cornerRadius(12)
     }
     
     private func recordingInfoSection(_ recording: Recording) -> some View {
@@ -746,6 +776,7 @@ struct RecordingDetailView: View {
     private func shareRecording(_ recording: Recording) {
         shareItems = ["Transcript wordt nog gemaakt…"]
         isSharePresented = true
+        Analytics.track("share_summary")
         
         Task {
             let transcript = recording.transcript
@@ -759,6 +790,7 @@ struct RecordingDetailView: View {
     
     private func copyRecording(_ recording: Recording) {
         UIPasteboard.general.string = makeShareText(recording)
+        Analytics.track("copy_summary")
     }
     
     private func makeShareText(_ recording: Recording) -> String {
@@ -768,6 +800,8 @@ struct RecordingDetailView: View {
     private func startEditingTranscript(_ transcript: String) {
         editedTranscript = transcript
         isEditingTranscript = true
+        EnhancedTelemetryService.shared.logSummaryEditTap(source: "transcript")
+        Analytics.track("edit_tapped", props: ["type": "transcript"])
     }
     
     private func saveTranscriptEdits(for recording: Recording) {

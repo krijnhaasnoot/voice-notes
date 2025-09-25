@@ -15,8 +15,9 @@ struct Recording: Identifiable, Codable {
     let title: String
     let detectedMode: String?
     let preferredSummaryProvider: String? // AIProviderType.rawValue
+    var tags: [String]
     
-    init(fileName: String, date: Date = Date(), duration: TimeInterval = 0, transcript: String? = nil, summary: String? = nil, rawSummary: String? = nil, status: Status = .idle, languageHint: String? = nil, transcriptLastUpdated: Date? = nil, summaryLastUpdated: Date? = nil, title: String = "", detectedMode: String? = nil, preferredSummaryProvider: String? = nil, id: UUID = UUID()) {
+    init(fileName: String, date: Date = Date(), duration: TimeInterval = 0, transcript: String? = nil, summary: String? = nil, rawSummary: String? = nil, status: Status = .idle, languageHint: String? = nil, transcriptLastUpdated: Date? = nil, summaryLastUpdated: Date? = nil, title: String = "", detectedMode: String? = nil, preferredSummaryProvider: String? = nil, tags: [String] = [], id: UUID = UUID()) {
         self.id = id
         self.fileName = fileName
         self.date = date
@@ -31,6 +32,7 @@ struct Recording: Identifiable, Codable {
         self.title = title
         self.detectedMode = detectedMode
         self.preferredSummaryProvider = preferredSummaryProvider
+        self.tags = tags.normalized()
     }
     
     // Convenience computed property for AI provider
@@ -57,6 +59,28 @@ struct Recording: Identifiable, Codable {
             title: title,
             detectedMode: detectedMode,
             preferredSummaryProvider: provider?.rawValue,
+            tags: tags,
+            id: id
+        )
+    }
+    
+    // Method to create a copy with updated tags
+    func withTags(_ newTags: [String]) -> Recording {
+        return Recording(
+            fileName: fileName,
+            date: date,
+            duration: duration,
+            transcript: transcript,
+            summary: summary,
+            rawSummary: rawSummary,
+            status: status,
+            languageHint: languageHint,
+            transcriptLastUpdated: transcriptLastUpdated,
+            summaryLastUpdated: summaryLastUpdated,
+            title: title,
+            detectedMode: detectedMode,
+            preferredSummaryProvider: preferredSummaryProvider,
+            tags: newTags,
             id: id
         )
     }

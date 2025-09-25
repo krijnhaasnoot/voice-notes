@@ -81,6 +81,9 @@ struct RootView: View {
         }
         .applyLiquidGlassTabBar()
         .environmentObject(appRouter)
+        .onChange(of: appRouter.selectedTab) { _, newTab in
+            EnhancedTelemetryService.shared.logScreenView(screen: newTab.rawValue)
+        }
         .onAppear {
             // Show tour on first app launch
             if !hasCompletedTour {
@@ -141,6 +144,10 @@ struct DocumentsView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: documentStore.recentlyDeletedDocument != nil)
             }
+        }
+        .onAppear {
+            EnhancedTelemetryService.shared.logListsOpen(from: "tab")
+            Analytics.track("lists_opened")
         }
     }
     
@@ -253,6 +260,8 @@ struct SearchView: View {
     @State private var selectedRecording: Recording?
     @State private var selectedDocument: Document?
     @State private var selectedTab: SearchTab = .recordings
+    @State private var selectedTagFilters: Set<String> = []
+    @State private var showingTagFilterSheet = false
     @Environment(\.dismiss) private var dismiss
     
     enum SearchTab: String, CaseIterable {
@@ -325,11 +334,56 @@ struct SearchView: View {
             
             // Search content
             VStack {
-                LiquidGlassSearchBar(
-                    text: $searchText,
-                    placeholder: selectedTab == .recordings ? "Search recordings..." : "Search lists..."
-                )
-                .padding(.horizontal, 20)
+                VStack(spacing: 12) {
+                    LiquidGlassSearchBar(
+                        text: $searchText,
+                        placeholder: selectedTab == .recordings ? "Search recordings..." : "Search lists..."
+                    )
+                    
+                    // Tag filters section
+                    HStack {
+                        // Selected tag filters
+                        if !selectedTagFilters.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(Array(selectedTagFilters).sorted(), id: \.self) { tag in
+                                        TagChipView(
+                                            tag: tag,
+                                            isRemovable: true,
+                                            onRemove: { selectedTagFilters.remove(tag) }
+                                        )
+                                    }
+                                }
+                                .padding(.horizontal, 20)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        // Tag filter button
+                        Button(action: { showingTagFilterSheet = true }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "tag")
+                                    .font(.system(size: 14, weight: .medium))
+                                Text("Filter")
+                                    .font(.poppins.medium(size: 14))
+                            }
+                            .foregroundColor(selectedTagFilters.isEmpty ? .secondary : .blue)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(.regularMaterial)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(selectedTagFilters.isEmpty ? .clear : .blue.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 20)
+                }
                 .padding(.top, 16)
                 
                 if searchText.isEmpty {
@@ -349,6 +403,9 @@ struct SearchView: View {
                 .onAppear {
                     documentStore.markOpened(document.id)
                 }
+        }
+        .sheet(isPresented: $showingTagFilterSheet) {
+            TagFilterSheet(isPresented: $showingTagFilterSheet, selectedTags: $selectedTagFilters)
         }
     }
     
@@ -408,17 +465,70 @@ struct SearchView: View {
     }
     
     private var filteredRecordings: [Recording] {
-        guard !searchText.isEmpty else { return [] }
+        guard !searchText.isEmpty || !selectedTagFilters.isEmpty else { return [] }
         
-        return recordingsManager.recordings.filter { recording in
-            displayTitle(for: recording).localizedCaseInsensitiveContains(searchText) ||
-            recording.fileName.localizedCaseInsensitiveContains(searchText) ||
-            (recording.transcript?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-            (recording.summary?.localizedCaseInsensitiveContains(searchText) ?? false)
+        var recordings = recordingsManager.recordings
+        
+        // First apply tag filters if any
+        if !selectedTagFilters.isEmpty {
+            recordings = recordings.filter { recording in
+                // Recording must have ALL selected tags (AND logic)
+                selectedTagFilters.allSatisfy { selectedTag in
+                    recording.tags.contains { recordingTag in
+                        recordingTag.lowercased() == selectedTag.lowercased()
+                    }
+                }
+            }
         }
+        
+        // Then apply text search if present
+        if !searchText.isEmpty {
+            let (tagSearches, textSearch) = parseSearchText(searchText)
+            
+            recordings = recordings.filter { recording in
+                // Tag searches (#tag) - must match ALL
+                let tagMatches = tagSearches.isEmpty || tagSearches.allSatisfy { tagSearch in
+                    recording.tags.contains { recordingTag in
+                        recordingTag.lowercased().contains(tagSearch.lowercased())
+                    }
+                }
+                
+                // Text search (if present)
+                let textMatches = textSearch.isEmpty || (
+                    displayTitle(for: recording).localizedCaseInsensitiveContains(textSearch) ||
+                    recording.fileName.localizedCaseInsensitiveContains(textSearch) ||
+                    (recording.transcript?.localizedCaseInsensitiveContains(textSearch) ?? false) ||
+                    (recording.summary?.localizedCaseInsensitiveContains(textSearch) ?? false)
+                )
+                
+                return tagMatches && textMatches
+            }
+        }
+        
+        return recordings
     }
     
     // MARK: - Helper Functions for Search
+    
+    private func parseSearchText(_ text: String) -> ([String], String) {
+        var tagSearches: [String] = []
+        var remainingText: [String] = []
+        
+        let words = text.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        
+        for word in words {
+            if word.hasPrefix("#") {
+                let tag = String(word.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !tag.isEmpty {
+                    tagSearches.append(tag)
+                }
+            } else {
+                remainingText.append(word)
+            }
+        }
+        
+        return (tagSearches, remainingText.joined(separator: " "))
+    }
     
     private func displayTitle(for recording: Recording) -> String {
         // 1. Use explicit title if set
@@ -483,15 +593,48 @@ struct SearchView: View {
     }
     
     private var filteredDocuments: [Document] {
-        guard !searchText.isEmpty else { return [] }
+        guard !searchText.isEmpty || !selectedTagFilters.isEmpty else { return [] }
         
-        return documentStore.documents.filter { document in
-            document.title.localizedCaseInsensitiveContains(searchText) ||
-            document.notes.localizedCaseInsensitiveContains(searchText) ||
-            document.items.contains { item in
-                item.text.localizedCaseInsensitiveContains(searchText)
+        var documents = documentStore.documents
+        
+        // First apply tag filters if any
+        if !selectedTagFilters.isEmpty {
+            documents = documents.filter { document in
+                // Document must have ALL selected tags (AND logic)
+                selectedTagFilters.allSatisfy { selectedTag in
+                    document.tags.contains { documentTag in
+                        documentTag.lowercased() == selectedTag.lowercased()
+                    }
+                }
             }
         }
+        
+        // Then apply text search if present
+        if !searchText.isEmpty {
+            let (tagSearches, textSearch) = parseSearchText(searchText)
+            
+            documents = documents.filter { document in
+                // Tag searches (#tag) - must match ALL
+                let tagMatches = tagSearches.isEmpty || tagSearches.allSatisfy { tagSearch in
+                    document.tags.contains { documentTag in
+                        documentTag.lowercased().contains(tagSearch.lowercased())
+                    }
+                }
+                
+                // Text search (if present)
+                let textMatches = textSearch.isEmpty || (
+                    document.title.localizedCaseInsensitiveContains(textSearch) ||
+                    document.notes.localizedCaseInsensitiveContains(textSearch) ||
+                    document.items.contains { item in
+                        item.text.localizedCaseInsensitiveContains(textSearch)
+                    }
+                )
+                
+                return tagMatches && textMatches
+            }
+        }
+        
+        return documents
     }
 }
 

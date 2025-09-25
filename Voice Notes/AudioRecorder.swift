@@ -13,6 +13,7 @@ final class AudioRecorder: NSObject, ObservableObject {
     private let audioSession = AVAudioSession.sharedInstance()
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     private let maxRecordingDuration: TimeInterval = 3600
+    private let telemetryService = EnhancedTelemetryService.shared
 
     @Published var isRecording = false
     @Published var recordingDuration: TimeInterval = 0
@@ -277,6 +278,16 @@ final class AudioRecorder: NSObject, ObservableObject {
             lastPauseTime = nil
             lastError = nil
             
+            // Track recording start
+            telemetryService.logRecordingStart()
+            
+            // Analytics: recording started
+            let selectedMode = UserDefaults.standard.string(forKey: "defaultMode") ?? "personal"
+            Analytics.track("recording_started", props: [
+                "source": "ios",
+                "mode": selectedMode
+            ])
+            
             // Start background task for potential background recording
             startBackgroundTask()
             
@@ -348,6 +359,21 @@ final class AudioRecorder: NSObject, ObservableObject {
                 lastError = "Recording file is empty - please try again"
                 return (finalDuration, fileURL, 0)
             }
+            
+            // Track successful recording stop
+            telemetryService.logRecordingStop(
+                duration: finalDuration,
+                hasTranscript: false, // Will be updated later when processing completes
+                hasSummary: false,
+                provider: UserDefaults.standard.string(forKey: "selectedProvider"),
+                mode: UserDefaults.standard.string(forKey: "defaultMode"),
+                length: UserDefaults.standard.string(forKey: "defaultSummaryLength")
+            )
+            
+            // Analytics: recording stopped
+            Analytics.track("recording_stopped", props: [
+                "duration_s": Int(finalDuration)
+            ])
             
             return (finalDuration, fileURL, fileSize)
             

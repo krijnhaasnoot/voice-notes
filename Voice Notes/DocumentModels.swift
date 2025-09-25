@@ -70,8 +70,9 @@ struct Document: Identifiable, Codable, Equatable {
     var updatedAt: Date
     var items: [DocItem]
     var notes: String
+    var tags: [String]
     
-    init(id: UUID = UUID(), title: String, type: DocumentType, createdAt: Date = Date(), updatedAt: Date = Date(), items: [DocItem] = [], notes: String = "") {
+    init(id: UUID = UUID(), title: String, type: DocumentType, createdAt: Date = Date(), updatedAt: Date = Date(), items: [DocItem] = [], notes: String = "", tags: [String] = []) {
         self.id = id
         self.title = title
         self.type = type
@@ -79,6 +80,7 @@ struct Document: Identifiable, Codable, Equatable {
         self.updatedAt = updatedAt
         self.items = items
         self.notes = notes
+        self.tags = tags.normalized()
     }
     
     var itemCount: Int {
@@ -110,6 +112,7 @@ class DocumentStore: ObservableObject {
     
     private let documentsURL: URL
     private var recentDocumentIds: [UUID] = [] // Track recency
+    private let telemetryService = EnhancedTelemetryService.shared
     
     init() {
         // Get documents directory
@@ -117,6 +120,7 @@ class DocumentStore: ObservableObject {
         self.documentsURL = documentsPath.appendingPathComponent("voice_notes_documents.json")
         
         loadDocuments()
+        setupTagNotifications()
     }
     
     // MARK: - Persistence
@@ -132,11 +136,94 @@ class DocumentStore: ObservableObject {
     private func loadDocuments() {
         do {
             let data = try Data(contentsOf: documentsURL)
-            documents = try JSONDecoder().decode([Document].self, from: data)
+            let loadedDocuments = try JSONDecoder().decode([Document].self, from: data)
+            
+            // Migration: ensure all documents have tags property
+            documents = loadedDocuments.map { doc in
+                // If Document doesn't have tags property, it will have empty tags from init
+                return doc
+            }
+            
+            // Add all existing tags to TagStore on main actor
+            Task { @MainActor in
+                for document in documents {
+                    for tag in document.tags {
+                        TagStore.shared.add(tag)
+                    }
+                }
+            }
         } catch {
             print("Failed to load documents (this is normal on first launch): \(error)")
             documents = []
         }
+    }
+    
+    private func setupTagNotifications() {
+        NotificationCenter.default.addObserver(
+            forName: .tagRenamed,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let oldTag = userInfo["old"] as? String,
+                  let newTag = userInfo["new"] as? String else { return }
+            self?.renameTagInAllDocuments(from: oldTag, to: newTag)
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .tagRemoved,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let tag = userInfo["tag"] as? String else { return }
+            self?.removeTagFromAllDocuments(tag: tag)
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .tagMerged,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let fromTag = userInfo["from"] as? String,
+                  let intoTag = userInfo["into"] as? String else { return }
+            self?.mergeTagInAllDocuments(from: fromTag, into: intoTag)
+        }
+    }
+    
+    private func renameTagInAllDocuments(from oldTag: String, to newTag: String) {
+        for i in documents.indices {
+            if let index = documents[i].tags.firstIndex(where: { $0.lowercased() == oldTag.lowercased() }) {
+                documents[i].tags[index] = newTag
+                documents[i].updatedAt = Date()
+            }
+        }
+        saveDocuments()
+    }
+    
+    private func removeTagFromAllDocuments(tag: String) {
+        for i in documents.indices {
+            documents[i].tags.removeAll { $0.lowercased() == tag.lowercased() }
+            documents[i].updatedAt = Date()
+        }
+        saveDocuments()
+    }
+    
+    private func mergeTagInAllDocuments(from fromTag: String, into intoTag: String) {
+        for i in documents.indices {
+            var tags = documents[i].tags
+            
+            // Remove the old tag and add the new one if not already present
+            tags.removeAll { $0.lowercased() == fromTag.lowercased() }
+            if !tags.contains(where: { $0.lowercased() == intoTag.lowercased() }) {
+                tags.append(intoTag)
+            }
+            
+            documents[i].tags = tags.normalized()
+            documents[i].updatedAt = Date()
+        }
+        saveDocuments()
     }
     
     // MARK: - CRUD Operations
@@ -144,6 +231,13 @@ class DocumentStore: ObservableObject {
         let document = Document(title: title, type: type)
         documents.append(document)
         saveDocuments()
+        
+        // Track list creation
+        Task { @MainActor in
+            telemetryService.logListCreated(type: type.rawValue)
+        }
+        Analytics.track("list_created", props: ["type": type.rawValue])
+        
         return document.id
     }
     
@@ -157,6 +251,14 @@ class DocumentStore: ObservableObject {
         documents[index].items.append(contentsOf: newItems)
         documents[index].updatedAt = Date()
         saveDocuments()
+        
+        // Track list item creation
+        let documentType = documents[index].type.rawValue
+        Task { @MainActor in
+            for _ in newItems {
+                telemetryService.logListItemCreated(listType: documentType)
+            }
+        }
     }
     
     func addItems(to documentId: UUID, items: [DocItem]) {
@@ -165,15 +267,32 @@ class DocumentStore: ObservableObject {
         documents[index].items.append(contentsOf: items)
         documents[index].updatedAt = Date()
         saveDocuments()
+        
+        // Track list item creation
+        let documentType = documents[index].type.rawValue
+        Task { @MainActor in
+            for _ in items {
+                telemetryService.logListItemCreated(listType: documentType)
+            }
+        }
     }
     
     func toggleItem(documentId: UUID, itemId: UUID) {
         guard let docIndex = documents.firstIndex(where: { $0.id == documentId }),
               let itemIndex = documents[docIndex].items.firstIndex(where: { $0.id == itemId }) else { return }
         
+        let wasNotDone = !documents[docIndex].items[itemIndex].isDone
         documents[docIndex].items[itemIndex].isDone.toggle()
         documents[docIndex].updatedAt = Date()
         saveDocuments()
+        
+        // Track item checking (only when checking, not unchecking)
+        if wasNotDone {
+            let documentType = documents[docIndex].type.rawValue
+            Task { @MainActor in
+                telemetryService.logListItemChecked(listType: documentType)
+            }
+        }
     }
     
     func deleteItem(documentId: UUID, itemId: UUID) {
@@ -221,6 +340,45 @@ class DocumentStore: ObservableObject {
     func updateDocumentNotes(documentId: UUID, notes: String) {
         guard let index = documents.firstIndex(where: { $0.id == documentId }) else { return }
         documents[index].notes = notes
+        documents[index].updatedAt = Date()
+        saveDocuments()
+    }
+    
+    @MainActor func updateDocumentTags(documentId: UUID, tags: [String]) {
+        guard let index = documents.firstIndex(where: { $0.id == documentId }) else { return }
+        let normalizedTags = tags.normalized()
+        
+        // Add new tags to global store
+        for tag in normalizedTags {
+            TagStore.shared.add(tag)
+        }
+        
+        documents[index].tags = normalizedTags
+        documents[index].updatedAt = Date()
+        saveDocuments()
+    }
+    
+    @MainActor func addTagToDocument(documentId: UUID, tag: String) {
+        guard let index = documents.firstIndex(where: { $0.id == documentId }) else { return }
+        var currentTags = documents[index].tags
+        let cleanTag = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !cleanTag.isEmpty && currentTags.count < 50 else { return }
+        
+        // Check if tag already exists (case insensitive)
+        if !currentTags.contains(where: { $0.lowercased() == cleanTag.lowercased() }) {
+            currentTags.append(cleanTag)
+            TagStore.shared.add(cleanTag)
+            
+            documents[index].tags = currentTags.normalized()
+            documents[index].updatedAt = Date()
+            saveDocuments()
+        }
+    }
+    
+    func removeTagFromDocument(documentId: UUID, tag: String) {
+        guard let index = documents.firstIndex(where: { $0.id == documentId }) else { return }
+        documents[index].tags.removeAll { $0.lowercased() == tag.lowercased() }
         documents[index].updatedAt = Date()
         saveDocuments()
     }

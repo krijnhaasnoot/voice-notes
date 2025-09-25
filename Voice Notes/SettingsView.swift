@@ -38,6 +38,16 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingTour = false
     
+    // MARK: - Analytics PIN & Sheet State
+    @AppStorage("analyticsPIN") private var analyticsPIN: String = ""
+    @State private var showAnalytics = false
+    @State private var showPinSheet = false
+    @State private var pinEntry: String = ""
+    @State private var newPin: String = ""
+    @State private var confirmPin: String = ""
+    @State private var pinError: String?
+    @State private var showResetPinConfirm = false
+    
     private var selectedMode: SummaryMode {
         SummaryMode(rawValue: defaultMode) ?? .personal
     }
@@ -81,6 +91,25 @@ struct SettingsView: View {
                                 .font(.poppins.body)
                             
                             Text("View AI provider performance stats")
+                                .font(.poppins.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            
+            Section(header: Text("Organization")) {
+                NavigationLink(destination: TagManagementView()) {
+                    HStack {
+                        Image(systemName: "tag.fill")
+                            .foregroundColor(.green)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Manage Tags")
+                                .font(.poppins.body)
+                            
+                            Text("Organize, rename, merge, and delete tags")
                                 .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -311,6 +340,26 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.vertical, 4)
+                    Button(role: .destructive) {
+                        showResetPinConfirm = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "key.fill")
+                                .font(.poppins.regular(size: 20))
+                                .foregroundColor(.red)
+                                .frame(width: 28, height: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Reset Analytics PIN")
+                                    .font(.poppins.body)
+                                    .foregroundColor(.primary)
+                                Text("Remove the PIN required to open Analytics")
+                                    .font(.poppins.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
                 
                 Section(header: Text("Info")) {
@@ -340,6 +389,15 @@ struct SettingsView: View {
                         )
                     }
                     .padding(.vertical, 4)
+                    .contentShape(Rectangle())
+                    .onLongPressGesture(minimumDuration: 1.0) {
+                        // Present PIN gate first
+                        pinEntry = ""
+                        newPin = ""
+                        confirmPin = ""
+                        pinError = nil
+                        showPinSheet = true
+                    }
                 }
         }
         .navigationTitle("Settings")
@@ -358,8 +416,139 @@ struct SettingsView: View {
                 showingTour = false
             })
         }
+        .sheet(isPresented: $showPinSheet) {
+            NavigationStack {
+                VStack(spacing: 16) {
+                    if analyticsPIN.isEmpty {
+                        // Set a new PIN flow
+                        Text("Set Analytics PIN")
+                            .font(.poppins.headline)
+                        Text("Create a 4–8 digit code to protect the analytics dashboard.")
+                            .font(.poppins.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                        SecureField("New PIN", text: $newPin)
+                            .textContentType(.oneTimeCode)
+                            .keyboardType(.numberPad)
+                            .padding(12)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        SecureField("Confirm PIN", text: $confirmPin)
+                            .textContentType(.oneTimeCode)
+                            .keyboardType(.numberPad)
+                            .padding(12)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        if let pinError {
+                            Text(pinError)
+                                .font(.poppins.caption)
+                                .foregroundColor(.red)
+                        }
+                        Button {
+                            pinError = nil
+                            let trimmed = newPin.trimmingCharacters(in: .whitespaces)
+                            guard trimmed.count >= 4, trimmed.count <= 8, trimmed.allSatisfy({ $0.isNumber }) else {
+                                pinError = "PIN must be 4–8 digits"
+                                return
+                            }
+                            guard trimmed == confirmPin.trimmingCharacters(in: .whitespaces) else {
+                                pinError = "PINs do not match"
+                                return
+                            }
+                            analyticsPIN = trimmed
+                            showPinSheet = false
+                            showAnalytics = true
+                        } label: {
+                            Text("Save PIN & Open Analytics")
+                                .font(.poppins.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.top, 8)
+                    } else {
+                        // Enter existing PIN flow
+                        Text("Enter Analytics PIN")
+                            .font(.poppins.headline)
+                        SecureField("PIN", text: $pinEntry)
+                            .textContentType(.oneTimeCode)
+                            .keyboardType(.numberPad)
+                            .padding(12)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        if let pinError {
+                            Text(pinError)
+                                .font(.poppins.caption)
+                                .foregroundColor(.red)
+                        }
+                        HStack(spacing: 12) {
+                            Button("Cancel") {
+                                showPinSheet = false
+                            }
+                            .buttonStyle(.bordered)
+                            Button("Unlock") {
+                                pinError = nil
+                                if pinEntry == analyticsPIN {
+                                    showPinSheet = false
+                                    showAnalytics = true
+                                } else {
+                                    pinError = "Incorrect PIN"
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding()
+                .navigationTitle("Protected")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { showPinSheet = false }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showAnalytics) {
+            TelemetryView()
+        }
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .alert("Reset Analytics PIN?", isPresented: $showResetPinConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reset", role: .destructive) {
+                analyticsPIN = ""
+                // light haptic feedback to confirm
+                let impact = UIImpactFeedbackGenerator(style: .light)
+                impact.impactOccurred()
+            }
+        } message: {
+            Text("This will remove the current PIN. You'll be asked to set a new PIN the next time you long-press the Info section.")
+        }
+        .onChange(of: defaultMode) { oldValue, newValue in
+            EnhancedTelemetryService.shared.logSettingsChanged(key: "defaultMode", value: newValue)
+            Analytics.track("mode_changed", props: ["from": oldValue, "to": newValue])
+        }
+        .onChange(of: defaultSummaryLength) { oldValue, newValue in
+            EnhancedTelemetryService.shared.logSettingsChanged(key: "defaultSummaryLength", value: newValue)
+            Analytics.track("length_changed", props: ["from": oldValue, "to": newValue])
+        }
+        .onChange(of: autoDetectMode) { _, newValue in
+            EnhancedTelemetryService.shared.logSettingsChanged(key: "autoDetectMode", value: newValue)
+            Analytics.track("auto_detect_toggled", props: ["on": newValue])
+        }
+        .onChange(of: defaultDocumentType) { _, newValue in
+            EnhancedTelemetryService.shared.logSettingsChanged(key: "defaultDocumentType", value: newValue)
+            Analytics.track("default_document_type_changed", props: ["type": newValue])
+        }
+        .onChange(of: autoSaveToDocuments) { _, newValue in
+            EnhancedTelemetryService.shared.logSettingsChanged(key: "autoSaveToDocuments", value: newValue)
+            Analytics.track("auto_save_toggled", props: ["on": newValue])
+        }
+        .onChange(of: useCompactView) { _, newValue in
+            EnhancedTelemetryService.shared.logSettingsChanged(key: "useCompactView", value: newValue)
+            Analytics.track("compact_view_toggled", props: ["on": newValue])
+        }
         }
     }
     
