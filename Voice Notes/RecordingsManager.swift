@@ -215,7 +215,7 @@ final class RecordingsManager: ObservableObject {
         
         // Start transcription immediately
         Task {
-            let _ = processingManager.startTranscription(for: recording.id)
+            let _ = processingManager.startTranscription(for: recording.id, audioURL: recording.fileURL)
             
             // End background task after a delay to ensure processing started
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
