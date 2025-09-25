@@ -10,7 +10,7 @@ struct RecordingsView: View {
     @State private var selectedCalendarDate: Date?
     @State private var showingCalendar = false
     @State private var isSharePresented = false
-    @State private var shareItems: [Any] = ["Transcript wordt nog gemaakt…"]
+    @State private var shareItems: [Any] = []
     
     private var filteredRecordings: [Recording] {
         var recordings = recordingsManager.recordings
@@ -416,17 +416,10 @@ struct RecordingsView: View {
     
     
     private func shareRecordingImmediately(_ recording: Recording) {
-        shareItems = ["Transcript wordt nog gemaakt…"]
+        // Generate share text immediately since transcript and summary are already available
+        let shareText = Voice_Notes.makeShareText(for: recording)
+        shareItems = [shareText]
         isSharePresented = true
-        
-        Task {
-            let transcript = recording.transcript
-            let summary = recording.summary
-            
-            await MainActor.run {
-                shareItems = [Voice_Notes.makeShareText(for: recording, overrideTranscript: transcript, overrideSummary: summary)]
-            }
-        }
     }
 }
 

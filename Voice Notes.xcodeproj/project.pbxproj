@@ -6,7 +6,32 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		EF572D212E8044160019C264 /* Echo Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = EF572D202E8044160019C264 /* Echo Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		EF572D222E8044160019C264 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EF60827E2E6C82B50057421A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EF572D1F2E8044160019C264;
+			remoteInfo = "Echo Watch App";
+		};
+		EF572D302E8044190019C264 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EF60827E2E6C82B50057421A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EF572D1F2E8044160019C264;
+			remoteInfo = "Echo Watch App";
+		};
+		EF572D3A2E8044190019C264 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EF60827E2E6C82B50057421A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EF572D1F2E8044160019C264;
+			remoteInfo = "Echo Watch App";
+		};
 		EF6082942E6C82B80057421A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = EF60827E2E6C82B50057421A /* Project object */;
@@ -23,14 +48,47 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		EF572D442E8044190019C264 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				EF572D212E8044160019C264 /* Echo Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		EF16DA592E78E67C00F0A126 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		EF572D1B2E8044160019C264 /* Echo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Echo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EF572D202E8044160019C264 /* Echo Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Echo Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EF572D2F2E8044190019C264 /* Echo Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Echo Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EF572D392E8044190019C264 /* Echo Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Echo Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF6082862E6C82B50057421A /* Voice Notes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Voice Notes.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF6082932E6C82B80057421A /* Voice NotesTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Voice NotesTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF60829D2E6C82B80057421A /* Voice NotesUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Voice NotesUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		EF572D242E8044160019C264 /* Echo Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Echo Watch App";
+			sourceTree = "<group>";
+		};
+		EF572D322E8044190019C264 /* Echo Watch AppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Echo Watch AppTests";
+			sourceTree = "<group>";
+		};
+		EF572D3C2E8044190019C264 /* Echo Watch AppUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Echo Watch AppUITests";
+			sourceTree = "<group>";
+		};
 		EF6082882E6C82B50057421A /* Voice Notes */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "Voice Notes";
@@ -49,6 +107,27 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		EF572D1D2E8044160019C264 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF572D2C2E8044190019C264 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF572D362E8044190019C264 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EF6082832E6C82B50057421A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -80,6 +159,9 @@
 				EF6082882E6C82B50057421A /* Voice Notes */,
 				EF6082962E6C82B80057421A /* Voice NotesTests */,
 				EF6082A02E6C82B80057421A /* Voice NotesUITests */,
+				EF572D242E8044160019C264 /* Echo Watch App */,
+				EF572D322E8044190019C264 /* Echo Watch AppTests */,
+				EF572D3C2E8044190019C264 /* Echo Watch AppUITests */,
 				EF6082872E6C82B50057421A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +172,10 @@
 				EF6082862E6C82B50057421A /* Voice Notes.app */,
 				EF6082932E6C82B80057421A /* Voice NotesTests.xctest */,
 				EF60829D2E6C82B80057421A /* Voice NotesUITests.xctest */,
+				EF572D1B2E8044160019C264 /* Echo.app */,
+				EF572D202E8044160019C264 /* Echo Watch App.app */,
+				EF572D2F2E8044190019C264 /* Echo Watch AppTests.xctest */,
+				EF572D392E8044190019C264 /* Echo Watch AppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -97,6 +183,93 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		EF572D1A2E8044160019C264 /* Echo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EF572D452E8044190019C264 /* Build configuration list for PBXNativeTarget "Echo" */;
+			buildPhases = (
+				EF572D192E8044160019C264 /* Resources */,
+				EF572D442E8044190019C264 /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EF572D232E8044160019C264 /* PBXTargetDependency */,
+			);
+			name = Echo;
+			packageProductDependencies = (
+			);
+			productName = Echo;
+			productReference = EF572D1B2E8044160019C264 /* Echo.app */;
+			productType = "com.apple.product-type.application.watchapp2-container";
+		};
+		EF572D1F2E8044160019C264 /* Echo Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EF572D412E8044190019C264 /* Build configuration list for PBXNativeTarget "Echo Watch App" */;
+			buildPhases = (
+				EF572D1C2E8044160019C264 /* Sources */,
+				EF572D1D2E8044160019C264 /* Frameworks */,
+				EF572D1E2E8044160019C264 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				EF572D242E8044160019C264 /* Echo Watch App */,
+			);
+			name = "Echo Watch App";
+			packageProductDependencies = (
+			);
+			productName = "Echo Watch App";
+			productReference = EF572D202E8044160019C264 /* Echo Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		EF572D2E2E8044190019C264 /* Echo Watch AppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EF572D482E8044190019C264 /* Build configuration list for PBXNativeTarget "Echo Watch AppTests" */;
+			buildPhases = (
+				EF572D2B2E8044190019C264 /* Sources */,
+				EF572D2C2E8044190019C264 /* Frameworks */,
+				EF572D2D2E8044190019C264 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EF572D312E8044190019C264 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				EF572D322E8044190019C264 /* Echo Watch AppTests */,
+			);
+			name = "Echo Watch AppTests";
+			packageProductDependencies = (
+			);
+			productName = "Echo Watch AppTests";
+			productReference = EF572D2F2E8044190019C264 /* Echo Watch AppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		EF572D382E8044190019C264 /* Echo Watch AppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EF572D4B2E8044190019C264 /* Build configuration list for PBXNativeTarget "Echo Watch AppUITests" */;
+			buildPhases = (
+				EF572D352E8044190019C264 /* Sources */,
+				EF572D362E8044190019C264 /* Frameworks */,
+				EF572D372E8044190019C264 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EF572D3B2E8044190019C264 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				EF572D3C2E8044190019C264 /* Echo Watch AppUITests */,
+			);
+			name = "Echo Watch AppUITests";
+			packageProductDependencies = (
+			);
+			productName = "Echo Watch AppUITests";
+			productReference = EF572D392E8044190019C264 /* Echo Watch AppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		EF6082852E6C82B50057421A /* Voice Notes */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = EF6082A72E6C82B80057421A /* Build configuration list for PBXNativeTarget "Voice Notes" */;
@@ -172,9 +345,23 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1640;
+				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					EF572D1A2E8044160019C264 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					EF572D1F2E8044160019C264 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					EF572D2E2E8044190019C264 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = EF572D1F2E8044160019C264;
+					};
+					EF572D382E8044190019C264 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = EF572D1F2E8044160019C264;
+					};
 					EF6082852E6C82B50057421A = {
 						CreatedOnToolsVersion = 16.4;
 					};
@@ -205,11 +392,43 @@
 				EF6082852E6C82B50057421A /* Voice Notes */,
 				EF6082922E6C82B80057421A /* Voice NotesTests */,
 				EF60829C2E6C82B80057421A /* Voice NotesUITests */,
+				EF572D1A2E8044160019C264 /* Echo */,
+				EF572D1F2E8044160019C264 /* Echo Watch App */,
+				EF572D2E2E8044190019C264 /* Echo Watch AppTests */,
+				EF572D382E8044190019C264 /* Echo Watch AppUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		EF572D192E8044160019C264 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF572D1E2E8044160019C264 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF572D2D2E8044190019C264 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF572D372E8044190019C264 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EF6082842E6C82B50057421A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -234,6 +453,27 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		EF572D1C2E8044160019C264 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF572D2B2E8044190019C264 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EF572D352E8044190019C264 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EF6082822E6C82B50057421A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -258,6 +498,21 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		EF572D232E8044160019C264 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EF572D1F2E8044160019C264 /* Echo Watch App */;
+			targetProxy = EF572D222E8044160019C264 /* PBXContainerItemProxy */;
+		};
+		EF572D312E8044190019C264 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EF572D1F2E8044160019C264 /* Echo Watch App */;
+			targetProxy = EF572D302E8044190019C264 /* PBXContainerItemProxy */;
+		};
+		EF572D3B2E8044190019C264 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EF572D1F2E8044160019C264 /* Echo Watch App */;
+			targetProxy = EF572D3A2E8044190019C264 /* PBXContainerItemProxy */;
+		};
 		EF6082952E6C82B80057421A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = EF6082852E6C82B50057421A /* Voice Notes */;
@@ -271,6 +526,194 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		EF572D422E8044190019C264 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 9V592235FH;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Echo;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKWatchOnly = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-Notes.watchkitapp";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		EF572D432E8044190019C264 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 9V592235FH;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Echo;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKWatchOnly = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-Notes.watchkitapp";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		EF572D462E8044190019C264 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9V592235FH;
+				INFOPLIST_KEY_CFBundleDisplayName = Echo;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kinder.Echo;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		EF572D472E8044190019C264 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9V592235FH;
+				INFOPLIST_KEY_CFBundleDisplayName = Echo;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kinder.Echo;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		EF572D492E8044190019C264 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9V592235FH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Echo-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Echo Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Echo Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		EF572D4A2E8044190019C264 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9V592235FH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Echo-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Echo Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Echo Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		EF572D4C2E8044190019C264 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9V592235FH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-Notes.watchkitapp.uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "Echo Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		EF572D4D2E8044190019C264 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9V592235FH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-Notes.watchkitapp.uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "Echo Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 		EF6082A52E6C82B80057421A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -401,7 +844,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 9V592235FH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -415,12 +858,12 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.1.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-Notes";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -436,7 +879,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 9V592235FH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -450,12 +893,12 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.1.5;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-Notes";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -473,7 +916,7 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 9V592235FH;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-NotesTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -492,7 +935,7 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 9V592235FH;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-NotesTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -510,7 +953,7 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 9V592235FH;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-NotesUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -528,7 +971,7 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 9V592235FH;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-NotesUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -542,6 +985,42 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		EF572D412E8044190019C264 /* Build configuration list for PBXNativeTarget "Echo Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EF572D422E8044190019C264 /* Debug */,
+				EF572D432E8044190019C264 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EF572D452E8044190019C264 /* Build configuration list for PBXNativeTarget "Echo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EF572D462E8044190019C264 /* Debug */,
+				EF572D472E8044190019C264 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EF572D482E8044190019C264 /* Build configuration list for PBXNativeTarget "Echo Watch AppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EF572D492E8044190019C264 /* Debug */,
+				EF572D4A2E8044190019C264 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EF572D4B2E8044190019C264 /* Build configuration list for PBXNativeTarget "Echo Watch AppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EF572D4C2E8044190019C264 /* Debug */,
+				EF572D4D2E8044190019C264 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		EF6082812E6C82B50057421A /* Build configuration list for PBXProject "Voice Notes" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

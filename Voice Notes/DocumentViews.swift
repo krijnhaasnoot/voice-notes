@@ -52,6 +52,16 @@ struct DocumentRowView: View {
                 Text(RelativeDateTimeFormatter().localizedString(for: document.updatedAt, relativeTo: Date()))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
+                
+                // Tags
+                if !document.tags.isEmpty {
+                    TagRowView(
+                        tags: document.tags,
+                        maxVisible: 2,
+                        isRemovable: false
+                    )
+                    .padding(.top, 2)
+                }
             }
             
             Spacer()
@@ -352,6 +362,7 @@ struct DocumentDetailView: View {
     @FocusState private var titleFocus: Bool
     @State private var isRecordingNewItem = false
     @StateObject private var voiceRecorder = VoiceRecorder()
+    @State private var showingAddTagSheet = false
     
     private var filteredItems: [DocItem] {
         let items = getCurrentDocument().items
@@ -408,6 +419,11 @@ struct DocumentDetailView: View {
         }
         .sheet(isPresented: $showingDatePicker) {
             datePickerSheet
+        }
+        .sheet(isPresented: $showingAddTagSheet) {
+            AddTagSheet(isPresented: $showingAddTagSheet) { tag in
+                documentStore.addTagToDocument(documentId: document.id, tag: tag)
+            }
         }
     }
     
@@ -514,6 +530,25 @@ struct DocumentDetailView: View {
             .padding(.horizontal, 20)
             .padding(.top, 32)
             .padding(.bottom, 16)
+            
+            // Tags Section
+            if !editingTitle {
+                VStack(alignment: .leading, spacing: 8) {
+                    TagRowView(
+                        tags: getCurrentDocument().tags,
+                        maxVisible: 10,
+                        isRemovable: true,
+                        onRemove: { tag in
+                            documentStore.removeTagFromDocument(documentId: document.id, tag: tag)
+                        },
+                        onAddTag: {
+                            showingAddTagSheet = true
+                        }
+                    )
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+            }
             
             // Filter and Progress Section (only for checklists)
             if document.type.usesChecklist && !editingTitle {

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // Summary detail/length options
 enum SummaryLength: String, CaseIterable, Identifiable {
@@ -64,6 +65,20 @@ enum SummaryMode: String, CaseIterable, Identifiable {
         }
     }
     
+    var shortDescription: String {
+        switch self {
+        case .primaryCare: return "Medical consultations and healthcare discussions"
+        case .dentist:     return "Dental treatments and oral health consultations"
+        case .techTeam:    return "Technical meetings and development discussions"
+        case .planning:    return "Project planning and strategic sessions"
+        case .alignment:   return "Team coordination and 1:1 meetings"
+        case .brainstorm:  return "Creative ideation and brainstorming sessions"
+        case .lecture:     return "Educational content and learning sessions"
+        case .interview:   return "Interviews and structured Q&A conversations"
+        case .personal:    return "General conversations and personal notes"
+        }
+    }
+    
     func template(length: SummaryLength = .standard) -> String {
         let baseFormatting = "Output must be plain text. No markdown headings (#). Put bold labels with double asterisks on their own line, then one blank line. One blank line between sections. Use bullets '• '. Omit empty sections. Keep the transcript's language. Do not invent facts, owners, or deadlines."
         let lengthInstruction = length.lengthModifier
@@ -95,6 +110,34 @@ enum SummaryMode: String, CaseIterable, Identifiable {
             
         case .personal:
             return "Summarize this transcript in a clear and structured way. Start with a brief context: who the speakers are and what the topic is. Highlight the main points discussed. Extract themes, decisions, questions, and next steps. Use headings and bullet points to keep it organized. Keep it factual and concise; do not add information that isn't in the transcript. Maintain a neutral, professional tone so the summary is quick to read. " + lengthInstruction + " " + baseFormatting
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .primaryCare: return .red
+        case .dentist: return .blue
+        case .techTeam: return .purple
+        case .planning: return .orange
+        case .alignment: return .green
+        case .brainstorm: return .yellow
+        case .lecture: return .indigo
+        case .interview: return .pink
+        case .personal: return .gray
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .primaryCare: return "cross.fill"
+        case .dentist: return "mouth.fill"
+        case .techTeam: return "laptopcomputer"
+        case .planning: return "calendar"
+        case .alignment: return "arrow.triangle.2.circlepath"
+        case .brainstorm: return "lightbulb.fill"
+        case .lecture: return "graduationcap.fill"
+        case .interview: return "person.2.fill"
+        case .personal: return "doc.text"
         }
     }
 }

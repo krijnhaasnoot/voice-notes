@@ -6,12 +6,14 @@ enum Tab: String, CaseIterable {
     case home = "home"
     case recordings = "recordings"
     case documents = "documents"
+    case settings = "settings"
     
     var title: String {
         switch self {
         case .home: return "Home"
         case .recordings: return "Recordings"
         case .documents: return "Lists"
+        case .settings: return "Settings"
         }
     }
     
@@ -20,6 +22,7 @@ enum Tab: String, CaseIterable {
         case .home: return "house"
         case .recordings: return "waveform"
         case .documents: return "doc.text"
+        case .settings: return "gearshape"
         }
     }
 }
@@ -78,6 +81,15 @@ struct RootView: View {
                 Label(Tab.documents.title, systemImage: Tab.documents.systemImage)
             }
             .tag(Tab.documents)
+            
+            // Settings Tab
+            NavigationStack {
+                SettingsView(showingAlternativeView: $useCompactView, recordingsManager: recordingsManager)
+            }
+            .tabItem {
+                Label(Tab.settings.title, systemImage: Tab.settings.systemImage)
+            }
+            .tag(Tab.settings)
         }
         .applyLiquidGlassTabBar()
         .environmentObject(appRouter)
@@ -766,6 +778,11 @@ struct HomeView: View {
     @State private var showingAlternativeView = false
     @State private var isPaused = false
     @AppStorage("useCompactView") private var useCompactView = true
+    
+    // AI Summary mode settings
+    @AppStorage("defaultMode") private var defaultMode: String = SummaryMode.personal.rawValue
+    @AppStorage("autoDetectMode") private var autoDetectMode: Bool = false
+    @State private var showingModeSheet = false
 
     var body: some View {
         if showingAlternativeView || useCompactView {
@@ -833,29 +850,8 @@ struct HomeView: View {
                     }
                     .padding(.top, 40)
                     
-                    // Quick stats (if there are recordings)
-                    if !recordingsManager.recordings.isEmpty {
-                        VStack(spacing: 12) {
-                            Text("Your Voice Notes")
-                                .font(.poppins.headline)
-                                .foregroundStyle(.primary)
-                            
-                            HStack(spacing: 24) {
-                                StatCard(
-                                    icon: "waveform",
-                                    value: "\(recordingsManager.recordings.count)",
-                                    label: "Recording\(recordingsManager.recordings.count == 1 ? "" : "s")"
-                                )
-                                
-                                StatCard(
-                                    icon: "clock",
-                                    value: totalDurationText,
-                                    label: "Total Time"
-                                )
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
+                    // AI Summary Mode Selector
+                    summaryModeSelector
                     
                     Spacer(minLength: 100)
                 }
@@ -877,54 +873,166 @@ struct HomeView: View {
             RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
         }
         .sheet(isPresented: $showingSettings) {
-            SettingsView(showingAlternativeView: $showingAlternativeView)
+            SettingsView(showingAlternativeView: $showingAlternativeView, recordingsManager: recordingsManager)
         }
         .dismissKeyboardOnTap()
+        .sheet(isPresented: $showingModeSheet) {
+            summaryModeSheetView
+        }
+    }
+    
+    // MARK: - AI Summary Mode Selector
+    
+    private var summaryModeSelector: some View {
+        VStack(spacing: 16) {
+            Text("AI Summary Mode")
+                .font(.poppins.headline)
+                .foregroundStyle(.primary)
+            
+            Button(action: {
+                showingModeSheet = true
+            }) {
+                HStack(spacing: 16) {
+                    // Mode icon with background
+                    ZStack {
+                        Circle()
+                            .fill(selectedMode.color.opacity(0.1))
+                            .frame(width: 44, height: 44)
+                        
+                        Image(systemName: selectedMode.icon)
+                            .foregroundStyle(selectedMode.color)
+                            .font(.system(size: 20, weight: .medium))
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(selectedMode.displayName)
+                            .font(.poppins.body)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                        
+                        Text(selectedMode.shortDescription)
+                            .font(.poppins.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(.quaternary.opacity(0.8), lineWidth: 0.5)
+                }
+            }
+            .buttonStyle(.plain)
+            
+            if autoDetectMode {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.orange)
+                    
+                    Text("Auto-detect mode is enabled - mode may change during recording")
+                        .font(.poppins.caption)
+                        .foregroundColor(.orange)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, -8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(.horizontal, 24)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: autoDetectMode)
+    }
+    
+    private var summaryModeSheetView: some View {
+        NavigationView {
+            List {
+                Section {
+                    ForEach(SummaryMode.allCases, id: \.self) { mode in
+                        Button(action: {
+                            let oldMode = defaultMode
+                            defaultMode = mode.rawValue
+                            showingModeSheet = false
+                            
+                            // Track mode change in analytics
+                            Analytics.track("mode_changed", props: [
+                                "from": oldMode,
+                                "to": mode.rawValue,
+                                "source": "home_mode_picker"
+                            ])
+                        }) {
+                            HStack(spacing: 16) {
+                                ZStack {
+                                    Circle()
+                                        .fill(mode.color.opacity(0.1))
+                                        .frame(width: 36, height: 36)
+                                    
+                                    Image(systemName: mode.icon)
+                                        .foregroundStyle(mode.color)
+                                        .font(.system(size: 16, weight: .medium))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(mode.displayName)
+                                        .font(.poppins.body)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.primary)
+                                    
+                                    Text(mode.shortDescription)
+                                        .font(.poppins.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                if mode.rawValue == defaultMode {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(.blue)
+                                        .font(.system(size: 16, weight: .semibold))
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("Choose the type of conversation you'll be recording")
+                        .font(.poppins.caption)
+                }
+            }
+            .navigationTitle("Recording Mode")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        showingModeSheet = false
+                    }
+                    .font(.poppins.body)
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
     }
     
     // MARK: - Helper Properties
     
-    private var totalDurationText: String {
-        let totalSeconds = recordingsManager.recordings.reduce(0) { $0 + $1.duration }
-        let hours = Int(totalSeconds) / 3600
-        let minutes = Int(totalSeconds) % 3600 / 60
-        
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        } else {
-            return "\(minutes)m"
-        }
+    private var selectedMode: SummaryMode {
+        SummaryMode(rawValue: defaultMode) ?? .personal
     }
+    
 }
 
-// MARK: - StatCard Component
-struct StatCard: View {
-    let icon: String
-    let value: String
-    let label: String
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(.blue)
-            
-            Text(value)
-                .font(.poppins.title3)
-                .fontWeight(.semibold)
-                .foregroundStyle(.primary)
-            
-            Text(label)
-                .font(.poppins.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(.regularMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-    }
-}
 
 extension HomeView {
     private var recordingControls: some View {

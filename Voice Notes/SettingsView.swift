@@ -35,6 +35,7 @@ struct SettingsView: View {
     @AppStorage("useCompactView") private var useCompactView: Bool = true
     
     @Binding var showingAlternativeView: Bool
+    @ObservedObject var recordingsManager: RecordingsManager
     @Environment(\.dismiss) private var dismiss
     @State private var showingTour = false
     
@@ -81,7 +82,7 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, 4)
                 
-                NavigationLink(destination: TelemetryView()) {
+                NavigationLink(destination: TelemetryView(recordingsManager: recordingsManager)) {
                     HStack {
                         Image(systemName: "chart.bar.xaxis")
                             .foregroundColor(.blue)
@@ -510,7 +511,7 @@ struct SettingsView: View {
             }
         }
         .sheet(isPresented: $showAnalytics) {
-            TelemetryView()
+            TelemetryView(recordingsManager: recordingsManager)
         }
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -635,5 +636,5 @@ struct SettingsInfoRow: View {
 }
 
 #Preview {
-    SettingsView(showingAlternativeView: .constant(false))
+    SettingsView(showingAlternativeView: .constant(false), recordingsManager: RecordingsManager.shared)
 }

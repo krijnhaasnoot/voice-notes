@@ -1,14 +1,26 @@
 import SwiftUI
 
+
 struct ProviderAuthorizationView: View {
+    // Input from parent
     let provider: AIProviderType
     let onComplete: () -> Void
-    
+
+    // Internal, stable snapshot of provider to avoid SwiftUI reuse/caching glitches
+    @State private var effectiveProvider: AIProviderType
+
     @ObservedObject private var aiSettings = AISettingsStore.shared
     @State private var isConnecting = false
     @State private var showingManualEntry = false
     @State private var connectionStatus: ConnectionStatus = .notConnected
     @State private var isLoading = true
+    
+    init(provider: AIProviderType, onComplete: @escaping () -> Void) {
+        self.provider = provider
+        self.onComplete = onComplete
+        _effectiveProvider = State(initialValue: provider)
+        print("🏗️ ProviderAuthorizationView init with provider: \(provider.displayName)")
+    }
     
     var body: some View {
         Group {
@@ -26,7 +38,11 @@ struct ProviderAuthorizationView: View {
                 .padding(.horizontal, 24)
             }
         }
-        .navigationTitle("Connect to \(provider.displayName)")
+        .id("provider-\(effectiveProvider.rawValue)") // Force complete view recreation when provider changes
+        .onAppear {
+            print("🎭 ProviderAuthorizationView body rendered with provider: \(effectiveProvider.displayName)")
+        }
+        .navigationTitle("Connect to \(effectiveProvider.displayName)")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -35,7 +51,7 @@ struct ProviderAuthorizationView: View {
         }
         .sheet(isPresented: $showingManualEntry) {
             NavigationStack {
-                ManualAPIKeyView(provider: provider, onComplete: onComplete)
+                ManualAPIKeyView(provider: effectiveProvider, onComplete: onComplete)
             }
         }
         .onAppear {
@@ -45,14 +61,25 @@ struct ProviderAuthorizationView: View {
             showingManualEntry = false
             connectionStatus = .notConnected
         }
-        .task(id: provider) {
-            // Immediately show loading and reset state to prevent showing cached data from other providers
+        .task(id: effectiveProvider) {
+            // Immediately show loading and reset ALL state to prevent showing cached data from other providers
             await MainActor.run {
+                print("🔄 Task triggered for provider: \(effectiveProvider.displayName)")
                 isLoading = true
                 isConnecting = false
                 showingManualEntry = false
                 connectionStatus = .notConnected
             }
+            initializeForProvider()
+        }
+        .onChange(of: provider) { _, newProvider in
+            // Force a clean state anytime the provider changes to avoid view/state contamination
+            effectiveProvider = newProvider
+            isLoading = true
+            isConnecting = false
+            showingManualEntry = false
+            connectionStatus = .notConnected
+            // Re-run initialization for the new provider
             initializeForProvider()
         }
     }
@@ -63,7 +90,7 @@ struct ProviderAuthorizationView: View {
         VStack(spacing: 24) {
             // Match the exact spacing and structure of providerHeaderView
             VStack(spacing: 16) {
-                provider.iconView(size: 64)
+                effectiveProvider.iconView(size: 64)
                     .padding(.top, 20)
                     .overlay(
                         // Subtle shimmer effect during loading
@@ -78,30 +105,33 @@ struct ProviderAuthorizationView: View {
                             .opacity(0.6)
                             .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: true)
                     )
-                
-                Text(provider.displayName)
+                    .onAppear {
+                        print("🔄 LoadingView showing provider: \(effectiveProvider.displayName)")
+                    }
+
+                Text(effectiveProvider.displayName)
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                
+
                 Text("Loading connection details...")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
             }
-            
+
             // Elegant loading indicator
             VStack(spacing: 12) {
                 ProgressView()
                     .controlSize(.large)
-                    .tint(provider.accentColor)
-                
+                    .tint(effectiveProvider.accentColor)
+
                 Text("Preparing secure connection...")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
-            
+
             Spacer()
-            
+
             // Placeholder for buttons area to maintain layout consistency
             VStack(spacing: 16) {
                 RoundedRectangle(cornerRadius: 12)
@@ -112,13 +142,13 @@ struct ProviderAuthorizationView: View {
                             .controlSize(.small)
                             .tint(.gray)
                     )
-                
+
                 Text("Setting up provider options...")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             .opacity(0.6)
-            
+
             Spacer()
         }
         .padding(.horizontal, 24)
@@ -129,14 +159,14 @@ struct ProviderAuthorizationView: View {
     
     private var providerHeaderView: some View {
         VStack(spacing: 16) {
-            provider.iconView(size: 64)
+            effectiveProvider.iconView(size: 64)
                 .padding(.top, 20)
-            
-            Text(provider.displayName)
+
+            Text(effectiveProvider.displayName)
                 .font(.largeTitle)
                 .fontWeight(.bold)
-            
-            Text(provider.shortDescription)
+
+            Text(effectiveProvider.shortDescription)
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -150,29 +180,45 @@ struct ProviderAuthorizationView: View {
             HStack {
                 Image(systemName: connectionStatus.iconName)
                     .foregroundColor(connectionStatus.color)
-                
+
                 Text(connectionStatus.message)
                     .font(.headline)
                     .foregroundColor(connectionStatus.color)
             }
-            
+
             if connectionStatus == .connected {
-                Text("You're all set! Voice Notes can now use \(provider.displayName) for summaries.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
+                VStack(spacing: 4) {
+                    Text("You're all set! Voice Notes can now use \(effectiveProvider.displayName) for summaries.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    
+                    if aiSettings.selectedProvider == effectiveProvider {
+                        Text("✅ This provider is currently active")
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                            .fontWeight(.medium)
+                    } else {
+                        Button("Switch to \(effectiveProvider.displayName)") {
+                            aiSettings.selectedProvider = effectiveProvider
+                        }
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .padding(.vertical, 2)
+                    }
+                }
             } else if connectionStatus == .connecting {
                 VStack(spacing: 8) {
                     Text("After creating your API key, return here and use 'Enter API Key Manually' below.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                    
+
                     Text("The webpage should now be open in Safari where you can:")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                    
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text("1. Sign in to your account")
                         Text("2. Create a new API key")
@@ -203,19 +249,19 @@ struct ProviderAuthorizationView: View {
                         } else {
                             Image(systemName: "link")
                         }
-                        
-                        Text(isConnecting ? "Opening..." : "Get API Key from \(provider.displayName)")
+
+                        Text(isConnecting ? "Opening..." : "Get API Key from \(effectiveProvider.displayName)")
                             .fontWeight(.semibold)
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(provider.accentColor)
+                    .background(effectiveProvider.accentColor)
                     .cornerRadius(12)
                 }
                 .disabled(isConnecting)
-                
-                Text(provider.authInstructions)
+
+                Text(effectiveProvider.authInstructions)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -254,7 +300,7 @@ struct ProviderAuthorizationView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .textCase(.uppercase)
-                    
+
                     Button("Enter API Key Manually") {
                         showingManualEntry = true
                     }
@@ -269,82 +315,91 @@ struct ProviderAuthorizationView: View {
     
     private func connectWithProvider() {
         isConnecting = true
-        
-        print("🔗 Connecting with provider: \(provider) - \(provider.displayName)")
+
+        print("🔗 Connecting with provider: \(effectiveProvider) - \(effectiveProvider.displayName)")
         
         // Get provider-specific URL and ensure it's correct
         let setupURL = getProviderSetupURL()
-        print("🔗 Setup URL for \(provider): \(setupURL?.absoluteString ?? "nil")")
-        
+        print("🔗 Setup URL for \(effectiveProvider): \(setupURL?.absoluteString ?? "nil")")
+
         // Open the provider's API key setup page in Safari
         if let url = setupURL {
             print("🔗 Opening setup URL: \(url.absoluteString)")
             UIApplication.shared.open(url)
-            
+
             // Show instructions to user
             Task { @MainActor in
                 connectionStatus = .connecting
                 isConnecting = false
-                print("🔗 Updated connection status to connecting for \(provider)")
+                print("🔗 Updated connection status to connecting for \(effectiveProvider)")
             }
         } else {
-            print("❌ No setup URL available for provider: \(provider.displayName)")
+            print("❌ No setup URL available for provider: \(effectiveProvider.displayName)")
             Task { @MainActor in
                 connectionStatus = .error("Unable to open setup page")
                 isConnecting = false
             }
         }
     }
-    
+
     private func getProviderSetupURL() -> URL? {
-        switch provider {
-        case .appDefault:
+        switch effectiveProvider {
+        case .appDefault: return nil
+        case .openai:     return URL(string: "https://platform.openai.com/api-keys")
+        case .anthropic:  return URL(string: "https://console.anthropic.com/settings/keys")
+        case .gemini:     return URL(string: "https://aistudio.google.com/app/apikey")
+        default:
+            // Handle any other providers (like mistral) dynamically
+            if effectiveProvider.rawValue == "mistral" {
+                return URL(string: "https://console.mistral.ai/api-keys/")
+            }
             return nil
-        case .openai:
-            return URL(string: "https://platform.openai.com/api-keys")
-        case .anthropic:
-            return URL(string: "https://console.anthropic.com/settings/keys")
-        case .gemini:
-            return URL(string: "https://aistudio.google.com/app/apikey")
-        case .mistral:
-            return URL(string: "https://console.mistral.ai/api-keys/")
         }
     }
-    
+
     private func disconnectProvider() {
-        aiSettings.removeApiKey(for: provider)
+        aiSettings.removeApiKey(for: effectiveProvider)
         connectionStatus = .notConnected
     }
-    
+
     private func initializeForProvider() {
+        print("🚀 Initializing for provider: \(effectiveProvider.displayName)")
         // Quick initialization with minimal delay for smooth UX
         Task {
             // Brief pause to ensure UI has updated with loading state
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds (reduced from 0.5s)
-            
+
             await MainActor.run {
+                print("✅ Checking API key for provider: \(effectiveProvider.displayName)")
                 // Check connection status for the current provider
-                if aiSettings.hasApiKey(for: provider) {
+                let hasKey = aiSettings.hasApiKey(for: effectiveProvider)
+                let validationState = aiSettings.providerValidationStates[effectiveProvider]
+                print("🔑 Provider \(effectiveProvider.displayName): hasKey=\(hasKey), validationState=\(String(describing: validationState))")
+                
+                if hasKey {
+                    print("🔑 Found API key for \(effectiveProvider.displayName)")
                     connectionStatus = .connected
                 } else {
+                    print("❌ No API key found for \(effectiveProvider.displayName)")
                     connectionStatus = .notConnected
                 }
-                
+
                 // Hide loading with smooth animation
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isLoading = false
                 }
+                print("✨ Finished initializing \(effectiveProvider.displayName) - Status: \(connectionStatus)")
             }
         }
     }
-    
+
     private func simulateOAuthFlow() async throws {
         // Simulate network delay
         try await Task.sleep(nanoseconds: 2_000_000_000)
-        
+
         // For demo purposes, create a mock API key
-        let mockApiKey = generateMockApiKey(for: provider)
-        await aiSettings.storeApiKey(mockApiKey, for: provider)
+        let mockApiKey = generateMockApiKey(for: effectiveProvider)
+        await aiSettings.storeApiKey(mockApiKey, for: effectiveProvider)
     }
     
     private func generateMockApiKey(for provider: AIProviderType) -> String {
@@ -357,8 +412,12 @@ struct ProviderAuthorizationView: View {
             return "sk-ant-mock-" + String((0..<90).map { _ in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_".randomElement()! })
         case .gemini:
             return String((0..<39).map { _ in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_".randomElement()! })
-        case .mistral:
-            return String((0..<32).map { _ in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".randomElement()! })
+        default:
+            // Handle any other providers (like mistral) dynamically
+            if provider.rawValue == "mistral" {
+                return String((0..<32).map { _ in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".randomElement()! })
+            }
+            return ""
         }
     }
 }
@@ -442,20 +501,18 @@ enum ConnectionStatus: Equatable {
 struct ManualAPIKeyView: View {
     let provider: AIProviderType
     let onComplete: () -> Void
-    
+
     @State private var apiKey = ""
     @State private var isValidating = false
     @State private var validationMessage = ""
     @State private var showValidationResult = false
     @ObservedObject private var aiSettings = AISettingsStore.shared
-    
+
     var body: some View {
         VStack(spacing: 24) {
             // Header
             VStack(spacing: 16) {
-                Image(systemName: provider.iconName)
-                    .font(.system(size: 48))
-                    .foregroundColor(provider.accentColor)
+                provider.iconView(size: 48)
 
                 Text("Paste Your \(provider.displayName) API Key")
                     .font(.title2)
@@ -554,7 +611,13 @@ struct ManualAPIKeyView: View {
                 
                 if isValid {
                     await aiSettings.storeApiKey(apiKey, for: provider)
-                    validationMessage = "✅ API key is valid and saved"
+                    
+                    // Automatically select this provider since they just configured it
+                    await MainActor.run {
+                        aiSettings.selectedProvider = provider
+                    }
+                    
+                    validationMessage = "✅ API key is valid, saved, and now active"
                     
                     // Auto-close after successful validation
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -589,8 +652,12 @@ extension AIProviderType {
             return "Claude_AI_symbol.svg"
         case .gemini:
             return "gemini-color"
-        case .mistral:
-            return "Mistral_AI_logo_(2025–).svg"
+        default:
+            // Handle any other providers (like mistral) dynamically
+            if self.rawValue == "mistral" {
+                return "Mistral"
+            }
+            return "brain.head.profile"
         }
     }
 
@@ -604,8 +671,12 @@ extension AIProviderType {
             return Color(red: 0.90, green: 0.49, blue: 0.13) // Claude/Anthropic orange
         case .gemini:
             return Color(red: 0.26, green: 0.52, blue: 0.96) // Google Blue
-        case .mistral:
-            return Color(red: 0.11, green: 0.60, blue: 0.80) // Mistral brand teal
+        default:
+            // Handle any other providers (like mistral) dynamically
+            if self.rawValue == "mistral" {
+                return Color(red: 0.11, green: 0.60, blue: 0.80) // Mistral brand teal
+            }
+            return .blue
         }
     }
 
@@ -619,8 +690,12 @@ extension AIProviderType {
             return "brain"
         case .gemini:
             return "star"
-        case .mistral:
-            return "wind"
+        default:
+            // Handle any other providers (like mistral) dynamically
+            if self.rawValue == "mistral" {
+                return "wind"
+            }
+            return "brain.head.profile"
         }
     }
 
@@ -638,25 +713,28 @@ extension AIProviderType {
                     Image(systemName: self.iconName)
                         .font(.system(size: size * 0.6, weight: .medium))
                         .frame(width: size * 0.8, height: size * 0.8)
+                } else if UIImage(named: self.iconName) != nil {
+                    Image(self.iconName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: size * 0.75, height: size * 0.75)
+                        .clipped()
+                        .onAppear {
+                            print("🎨 Loaded brand image for: \(self.displayName) - Icon: \(self.iconName)")
+                        }
                 } else {
-                    // Try to load brand icon, fallback to system icon if not found
-                    if UIImage(named: self.iconName) != nil {
-                        Image(self.iconName)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: size * 0.75, height: size * 0.75)
-                            .clipped()
-                    } else {
-                        // Fallback system icons with consistent sizing
-                        Image(systemName: self.fallbackSystemIcon)
-                            .font(.system(size: size * 0.6, weight: .medium))
-                            .frame(width: size * 0.8, height: size * 0.8)
-                    }
+                    // Fallback to a safe SF Symbol if the brand asset cannot be loaded (e.g., bad filename)
+                    Image(systemName: self.fallbackSystemIcon)
+                        .font(.system(size: size * 0.6, weight: .medium))
+                        .frame(width: size * 0.8, height: size * 0.8)
+                        .onAppear {
+                            print("⚠️ Brand image not found for \(self.displayName) (\"\(self.iconName)\"). Using fallback symbol: \(self.fallbackSystemIcon)")
+                        }
                 }
             }
         }
         .foregroundColor(self.accentColor)
-        .animation(.easeInOut(duration: 0.2), value: UIImage(named: self.iconName) != nil)
+        .id("icon-\(self.rawValue)") // Simple ID based on provider
     }
 
     var shortDescription: String {
@@ -669,8 +747,12 @@ extension AIProviderType {
             return "Connect your Anthropic account for Claude-powered summaries"
         case .gemini:
             return "Connect your Google account for Gemini-powered summaries"
-        case .mistral:
-            return "Connect your Mistral account for fast, affordable summaries"
+        default:
+            // Handle any other providers (like mistral) dynamically
+            if self.rawValue == "mistral" {
+                return "Connect your Mistral account for fast, affordable summaries"
+            }
+            return "Connect your account for AI-powered summaries"
         }
     }
 
@@ -684,8 +766,12 @@ extension AIProviderType {
             return "Opens Anthropic Console where you can create an API key. New accounts get $5 free credits."
         case .gemini:
             return "Opens Google AI Studio where you can create a free API key with generous usage limits."
-        case .mistral:
-            return "Opens Mistral Console where you can create an API key. Affordable, fast models."
+        default:
+            // Handle any other providers (like mistral) dynamically
+            if self.rawValue == "mistral" {
+                return "Opens Mistral Console where you can create an API key. Affordable, fast models."
+            }
+            return "Opens the provider's console where you can create an API key."
         }
     }
 
@@ -699,8 +785,12 @@ extension AIProviderType {
             return "console.anthropic.com"
         case .gemini:
             return "aistudio.google.com"
-        case .mistral:
-            return "console.mistral.ai"
+        default:
+            // Handle any other providers (like mistral) dynamically
+            if self.rawValue == "mistral" {
+                return "console.mistral.ai"
+            }
+            return ""
         }
     }
 
@@ -714,8 +804,12 @@ extension AIProviderType {
             return "Should start with 'sk-ant-' and be about 95 characters long"
         case .gemini:
             return "Should be about 39 characters long (starts with letters/numbers)"
-        case .mistral:
-            return "Should start with 'sk-' and be roughly 40–64 characters"
+        default:
+            // Handle any other providers (like mistral) dynamically
+            if self.rawValue == "mistral" {
+                return "Should start with 'sk-' and be roughly 40–64 characters"
+            }
+            return "Please check your provider's documentation for the expected format"
         }
     }
 }
@@ -723,5 +817,5 @@ extension AIProviderType {
 // MARK: - Preview
 
 #Preview {
-    ProviderAuthorizationView(provider: .openai) { }
+    ProviderAuthorizationView(provider: AIProviderType(rawValue: "mistral") ?? .openai) { }
 }

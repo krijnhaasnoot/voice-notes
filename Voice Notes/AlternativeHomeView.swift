@@ -18,6 +18,7 @@ struct AlternativeHomeView: View {
     @State private var sessionRecordingIds: Set<UUID> = []
     @State private var appDidBecomeActive = false
     
+    
     var body: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
@@ -216,7 +217,7 @@ struct AlternativeHomeView: View {
             RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
         }
         .sheet(isPresented: $showingSettings) {
-            SettingsView(showingAlternativeView: .constant(false))
+            SettingsView(showingAlternativeView: .constant(false), recordingsManager: recordingsManager)
         }
     }
     
@@ -423,6 +424,7 @@ private struct ExpandedRecordingSheet: View {
         
         return hasIndicators || (hasMultipleLineBreaks && hasQuestionMarks && hasBackAndForth) || hasDialogue
     }
+    
 }
 
 // MARK: - Compact Recording Card Component (Bottom of Screen)

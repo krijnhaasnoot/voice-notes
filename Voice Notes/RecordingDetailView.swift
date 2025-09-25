@@ -9,7 +9,7 @@ struct RecordingDetailView: View {
     @State private var isPlaying = false
     @State private var showingDeleteAlert = false
     @State private var isSharePresented = false
-    @State private var shareItems: [Any] = ["Transcript wordt nog gemaakt…"]
+    @State private var shareItems: [Any] = []
     @State private var isEditingTranscript = false
     @State private var editedTranscript = ""
     @State private var showingSaveToDocuments = false
@@ -242,22 +242,34 @@ struct RecordingDetailView: View {
                                 isEditingTranscript = false
                                 editedTranscript = ""
                             }
-                            .font(.poppins.caption)
+                            .font(.poppins.body)
                             .foregroundColor(.secondary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.secondary.opacity(0.1))
+                            .cornerRadius(8)
                             
                             Button("Save") {
                                 saveTranscriptEdits(for: recording)
                             }
-                            .font(.poppins.caption)
+                            .font(.poppins.body)
                             .foregroundColor(.blue)
                             .fontWeight(.medium)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(8)
                         }
                     } else {
                         Button("Edit") {
                             startEditingTranscript(transcript)
                         }
-                        .font(.poppins.caption)
+                        .font(.poppins.body)
                         .foregroundColor(.blue)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
                     }
                 } else if case .transcribing(let progress) = recording.status {
                     ProgressView(value: progress)
@@ -269,8 +281,12 @@ struct RecordingDetailView: View {
                     Button("Retry") {
                         recordingsManager.retryTranscription(for: recording)
                     }
-                    .font(.poppins.caption)
+                    .font(.poppins.body)
                     .foregroundColor(.blue)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(8)
                 }
             }
             
@@ -346,8 +362,11 @@ struct RecordingDetailView: View {
                     // Show settings button even when waiting for summary
                     Button(action: { showingSummarySettings = true }) {
                         Image(systemName: "gearshape")
-                            .font(.poppins.caption)
+                            .font(.system(size: 16))
                             .foregroundColor(.blue)
+                            .frame(width: 44, height: 32)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(8)
                     }
                 }
             }
@@ -473,11 +492,34 @@ struct RecordingDetailView: View {
                         .cornerRadius(8)
                 }
                 
+                // Share as PDF (recommended for long content)
+                Button(action: {
+                    sharePDFRecording(recording)
+                }) {
+                    HStack {
+                        Image(systemName: "doc.richtext")
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Share as PDF")
+                                .font(.poppins.body)
+                                .fontWeight(.medium)
+                            Text("Professional format, perfect for long content")
+                                .font(.poppins.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color.purple.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                
                 HStack(spacing: 8) {
                     Button(action: {
                         shareRecording(recording)
                     }) {
-                        Label("Share", systemImage: "square.and.arrow.up")
+                        Label("Share Text", systemImage: "square.and.arrow.up")
+                            .font(.poppins.body)
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.blue.opacity(0.1))
@@ -487,7 +529,8 @@ struct RecordingDetailView: View {
                     Button(action: {
                         copyRecording(recording)
                     }) {
-                        Label("Copy", systemImage: "doc.on.doc")
+                        Label("Copy Text", systemImage: "doc.on.doc")
+                            .font(.poppins.body)
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.green.opacity(0.1))
@@ -774,16 +817,41 @@ struct RecordingDetailView: View {
     }
     
     private func shareRecording(_ recording: Recording) {
-        shareItems = ["Transcript wordt nog gemaakt…"]
-        isSharePresented = true
         Analytics.track("share_summary")
         
+        // Generate share text immediately since transcript and summary are already available
+        let shareText = Voice_Notes.makeShareText(for: recording)
+        shareItems = [shareText]
+        isSharePresented = true
+    }
+    
+    private func sharePDFRecording(_ recording: Recording) {
+        shareItems = ["Generating PDF…"]
+        isSharePresented = true
+        Analytics.track("share_pdf")
+        
         Task {
-            let transcript = recording.transcript
-            let summary = recording.summary
-            
-            await MainActor.run {
-                shareItems = [Voice_Notes.makeShareText(for: recording, overrideTranscript: transcript, overrideSummary: summary)]
+            // Generate PDF in background
+            if let pdfData = PDFGenerator.generatePDF(for: recording, includeTranscript: true) {
+                // Create temporary file
+                let tempDir = FileManager.default.temporaryDirectory
+                let pdfURL = tempDir.appendingPathComponent("\(recording.title.isEmpty ? recording.fileName : recording.title).pdf")
+                
+                do {
+                    try pdfData.write(to: pdfURL)
+                    
+                    await MainActor.run {
+                        shareItems = [pdfURL]
+                    }
+                } catch {
+                    await MainActor.run {
+                        shareItems = ["Error generating PDF: \(error.localizedDescription)"]
+                    }
+                }
+            } else {
+                await MainActor.run {
+                    shareItems = ["Failed to generate PDF"]
+                }
             }
         }
     }
@@ -909,15 +977,22 @@ struct RecordingDetailView: View {
         HStack(spacing: 12) {
             Button(action: { showingSummarySettings.toggle() }) {
                 Image(systemName: "gearshape")
-                    .font(.poppins.caption)
+                    .font(.system(size: 16))
                     .foregroundColor(.blue)
+                    .frame(width: 44, height: 32)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(8)
             }
             
             Button("Retry") {
                 retryWithSettings(for: recording)
             }
-            .font(.poppins.caption)
+            .font(.poppins.body)
             .foregroundColor(.blue)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.blue.opacity(0.1))
+            .cornerRadius(8)
         }
     }
     
