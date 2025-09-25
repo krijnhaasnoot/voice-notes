@@ -1,48 +1,25 @@
 import Foundation
 import UIKit
-import BackgroundTasks
 
 @MainActor
 class BackgroundTaskManager: ObservableObject {
     static let shared = BackgroundTaskManager()
     
-    private let backgroundTaskIdentifier = "com.kinder.Voice-Notes.processing"
+    private let backgroundTaskIdentifier = "com.kinder.Voice-Notes.refresh"
     private var processingTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
     private var isRegistered = false
     
     private init() {}
     
     func registerBackgroundTasks() {
-        guard !isRegistered else { return }
-        
-        // Register background app refresh task
-        let success = BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: backgroundTaskIdentifier,
-            using: nil
-        ) { task in
-            self.handleBackgroundProcessing(task: task as! BGProcessingTask)
-        }
-        
-        if success {
-            print("📱 BackgroundTaskManager: Successfully registered background task")
-            isRegistered = true
-        } else {
-            print("❌ BackgroundTaskManager: Failed to register background task")
-        }
+        // No BGTaskScheduler registration needed for basic background tasks
+        isRegistered = true
+        print("📱 BackgroundTaskManager: Background task support enabled")
     }
     
     func scheduleBackgroundProcessing() {
-        let request = BGProcessingTaskRequest(identifier: backgroundTaskIdentifier)
-        request.requiresNetworkConnectivity = true
-        request.requiresExternalPower = false
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 2) // Start in 2 seconds
-        
-        do {
-            try BGTaskScheduler.shared.submit(request)
-            print("📱 BackgroundTaskManager: Background processing scheduled")
-        } catch {
-            print("❌ BackgroundTaskManager: Failed to schedule background task: \(error)")
-        }
+        // For audio apps, processing continues while audio is active
+        print("📱 BackgroundTaskManager: Background processing available during audio sessions")
     }
     
     func beginBackgroundTask(name: String = "Processing") -> UIBackgroundTaskIdentifier {
@@ -67,25 +44,7 @@ class BackgroundTaskManager: ObservableObject {
         }
     }
     
-    private func handleBackgroundProcessing(task: BGProcessingTask) {
-        print("📱 BackgroundTaskManager: Handling background processing task")
-        
-        // Schedule next background processing
-        scheduleBackgroundProcessing()
-        
-        task.expirationHandler = {
-            print("📱 BackgroundTaskManager: Background task expired")
-            task.setTaskCompleted(success: false)
-        }
-        
-        // Start processing any pending recordings
-        Task {
-            await processePendingRecordings()
-            task.setTaskCompleted(success: true)
-        }
-    }
-    
-    private func processePendingRecordings() async {
+    func processPendingRecordings() async {
         print("📱 BackgroundTaskManager: Processing pending recordings in background")
         
         let recordingsManager = RecordingsManager.shared
