@@ -60,13 +60,22 @@ struct SummaryFeedbackButtons: View {
             FeedbackDetailSheet(
                 recording: recording,
                 onSubmit: { feedback in
-                    submitFeedback(.thumbsDown, userFeedback: feedback)
-                    showingFeedbackSheet = false
+                    // Close sheet first, then submit feedback
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showingFeedbackSheet = false
+                    }
+                    
+                    // Submit feedback after a small delay to allow sheet to close
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        submitFeedback(.thumbsDown, userFeedback: feedback)
+                    }
                 },
                 onCancel: {
-                    showingFeedbackSheet = false
-                    // Reset selection if user cancels thumbs down
+                    // Close sheet with animation
                     withAnimation(.easeInOut(duration: 0.2)) {
+                        showingFeedbackSheet = false
+                        
+                        // Reset selection if user cancels thumbs down
                         if let existingFeedback = feedbackService.feedbackHistory.first(where: { $0.recordingId == recording.id }) {
                             selectedFeedback = existingFeedback.feedbackType
                         } else {
@@ -106,40 +115,28 @@ struct SummaryFeedbackButtons: View {
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
         
-        // Submit feedback on background thread
-        Task {
-            do {
-                // Remove any existing feedback for this recording (on background thread)
-                await MainActor.run {
-                    feedbackService.feedbackHistory.removeAll { $0.recordingId == recording.id }
-                }
-                
-                // Submit the new feedback
-                await MainActor.run {
-                    feedbackService.submitFeedback(
-                        recordingId: recording.id,
-                        summaryText: summary,
-                        feedbackType: type,
-                        userFeedback: userFeedback,
-                        recording: recording
-                    )
-                }
-                
-                // Update UI after a short delay
-                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                
-                await MainActor.run {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isSubmitting = false
-                    }
-                }
-                
-            } catch {
-                print("❌ SummaryFeedback: Error submitting feedback: \(error)")
-                await MainActor.run {
+        // Submit feedback asynchronously without blocking UI
+        Task { @MainActor in
+            defer {
+                // Always reset isSubmitting state
+                withAnimation(.easeInOut(duration: 0.2)) {
                     isSubmitting = false
                 }
             }
+            
+            // Remove any existing feedback for this recording
+            feedbackService.feedbackHistory.removeAll { $0.recordingId == recording.id }
+            
+            // Submit the new feedback - this will handle analytics in background
+            feedbackService.submitFeedback(
+                recordingId: recording.id,
+                summaryText: summary,
+                feedbackType: type,
+                userFeedback: userFeedback,
+                recording: recording
+            )
+            
+            print("✅ SummaryFeedback: Successfully submitted \(type.rawValue) feedback")
         }
     }
 }

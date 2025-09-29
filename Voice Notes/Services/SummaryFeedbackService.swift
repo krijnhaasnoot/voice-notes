@@ -82,9 +82,9 @@ class SummaryFeedbackService: ObservableObject {
         feedbackHistory.append(feedback)
         
         // Save and send analytics on background queue to avoid blocking UI
-        Task {
-            saveFeedbackHistory()
-            sendFeedbackToAnalytics(feedback)
+        Task.detached(priority: .background) {
+            await self.saveFeedbackHistory()
+            await self.sendFeedbackToAnalytics(feedback)
         }
         
         print("📝 SummaryFeedback: Collected \(feedbackType.rawValue) feedback for recording \(recordingId)")
@@ -95,7 +95,7 @@ class SummaryFeedbackService: ObservableObject {
     
     // MARK: - Analytics Integration
     
-    private func sendFeedbackToAnalytics(_ feedback: SummaryFeedback) {
+    private func sendFeedbackToAnalytics(_ feedback: SummaryFeedback) async {
         // Send to enhanced telemetry service
         EnhancedTelemetryService.shared.logSummaryFeedback(
             type: feedback.feedbackType.rawValue,
@@ -128,7 +128,7 @@ class SummaryFeedbackService: ObservableObject {
     
     // MARK: - Data Persistence
     
-    private func saveFeedbackHistory() {
+    private func saveFeedbackHistory() async {
         do {
             let data = try JSONEncoder().encode(feedbackHistory)
             userDefaults.set(data, forKey: feedbackKey)
