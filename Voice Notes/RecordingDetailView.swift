@@ -398,12 +398,26 @@ struct RecordingDetailView: View {
             }
             
             if let summary = recording.summary, !summary.isEmpty {
-                FormattedSummaryText(summary: summary)
-                    .font(.poppins.body)
-                    .textSelection(.enabled)
-                    .padding()
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(8)
+                VStack(alignment: .leading, spacing: 12) {
+                    FormattedSummaryText(summary: summary)
+                        .font(.poppins.body)
+                        .textSelection(.enabled)
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
+                    
+                    // Summary Feedback Buttons
+                    HStack {
+                        Text("Was this summary helpful?")
+                            .font(.poppins.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                        
+                        SummaryFeedbackButtons(recording: recording)
+                    }
+                    .padding(.horizontal, 4)
+                }
             } else if case .summarizing = recording.status {
                 HStack {
                     ProgressView()

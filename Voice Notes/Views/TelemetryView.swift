@@ -36,6 +36,12 @@ struct TelemetryView: View {
             }
             .headerProminence(.increased)
             
+            // Summary Feedback
+            Section("👍 Summary Feedback") {
+                summaryFeedbackSection
+            }
+            .headerProminence(.increased)
+            
             dataManagementSection
         }
         .navigationTitle("Usage Analytics")
@@ -417,6 +423,126 @@ struct TelemetryView: View {
         }
     }
     
+    // MARK: - Summary Feedback Section
+    
+    private var summaryFeedbackSection: some View {
+        let feedbackService = SummaryFeedbackService.shared
+        let stats = feedbackService.getFeedbackStats()
+        let feedbackByMode = feedbackService.getFeedbackByMode()
+        let feedbackByProvider = feedbackService.getFeedbackByProvider()
+        
+        return Group {
+            if stats.totalFeedback > 0 {
+                // Overall feedback stats
+                HStack(spacing: 16) {
+                    MetricCard(
+                        title: "Total Feedback",
+                        value: "\(stats.totalFeedback)",
+                        subtitle: "\(stats.feedbackWithComments) with comments",
+                        icon: "hand.thumbsup.hand.thumbsdown",
+                        color: .blue
+                    )
+                    
+                    MetricCard(
+                        title: "Satisfaction Rate",
+                        value: "\(Int((Double(stats.thumbsUp) / Double(stats.totalFeedback)) * 100))%",
+                        subtitle: "\(stats.thumbsUp) 👍 / \(stats.thumbsDown) 👎",
+                        icon: "chart.pie",
+                        color: stats.thumbsUp >= stats.thumbsDown ? .green : .red
+                    )
+                }
+                
+                // Feedback by AI mode
+                if !feedbackByMode.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Feedback by AI Mode")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        ForEach(feedbackByMode.keys.sorted(), id: \.self) { mode in
+                            let modeFeedback = feedbackByMode[mode]!
+                            let total = modeFeedback.thumbsUp + modeFeedback.thumbsDown
+                            let satisfaction = total > 0 ? Double(modeFeedback.thumbsUp) / Double(total) : 0
+                            
+                            FeedbackModeRow(
+                                mode: mode,
+                                thumbsUp: modeFeedback.thumbsUp,
+                                thumbsDown: modeFeedback.thumbsDown,
+                                satisfactionRate: satisfaction
+                            )
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+                
+                // Feedback by AI provider
+                if !feedbackByProvider.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Feedback by AI Provider")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        ForEach(feedbackByProvider.keys.sorted(), id: \.self) { provider in
+                            let providerFeedback = feedbackByProvider[provider]!
+                            let total = providerFeedback.thumbsUp + providerFeedback.thumbsDown
+                            let satisfaction = total > 0 ? Double(providerFeedback.thumbsUp) / Double(total) : 0
+                            
+                            FeedbackProviderRow(
+                                provider: provider,
+                                thumbsUp: providerFeedback.thumbsUp,
+                                thumbsDown: providerFeedback.thumbsDown,
+                                satisfactionRate: satisfaction
+                            )
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+                
+                // Recent negative feedback
+                let recentNegative = feedbackService.getRecentNegativeFeedback(limit: 5)
+                if !recentNegative.isEmpty {
+                    NavigationLink(destination: NegativeFeedbackDetailView()) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Recent Negative Feedback")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                
+                                Text("\(recentNegative.count) recent issues to review")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "hand.thumbsup.hand.thumbsdown")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    
+                    Text("No feedback yet")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Summary feedback will appear here as users rate AI summaries")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            }
+        }
+    }
+    
     // MARK: - Helper Functions
     
     private func colorForBucket(_ bucket: RecordingBucket) -> Color {
@@ -592,6 +718,195 @@ struct StatRow: View {
                 .foregroundColor(.secondary)
                 .fontWeight(.medium)
         }
+    }
+}
+
+// MARK: - Feedback Row Components
+
+struct FeedbackModeRow: View {
+    let mode: String
+    let thumbsUp: Int
+    let thumbsDown: Int
+    let satisfactionRate: Double
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(mode.capitalized)
+                    .font(.body)
+                    .fontWeight(.medium)
+                
+                Text("\(thumbsUp + thumbsDown) total responses")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(Int(satisfactionRate * 100))%")
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundColor(satisfactionRate >= 0.7 ? .green : satisfactionRate >= 0.4 ? .orange : .red)
+                
+                HStack(spacing: 8) {
+                    Text("\(thumbsUp) 👍")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    
+                    Text("\(thumbsDown) 👎")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct FeedbackProviderRow: View {
+    let provider: String
+    let thumbsUp: Int
+    let thumbsDown: Int
+    let satisfactionRate: Double
+    
+    private var providerDisplayName: String {
+        switch provider.lowercased() {
+        case "openai": return "OpenAI"
+        case "claude", "anthropic": return "Claude"
+        case "gemini": return "Gemini"
+        case "mistral": return "Mistral"
+        case "app_default": return "App Default"
+        default: return provider.capitalized
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(providerDisplayName)
+                    .font(.body)
+                    .fontWeight(.medium)
+                
+                Text("\(thumbsUp + thumbsDown) total responses")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(Int(satisfactionRate * 100))%")
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundColor(satisfactionRate >= 0.7 ? .green : satisfactionRate >= 0.4 ? .orange : .red)
+                
+                HStack(spacing: 8) {
+                    Text("\(thumbsUp) 👍")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    
+                    Text("\(thumbsDown) 👎")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Detailed Negative Feedback View
+
+struct NegativeFeedbackDetailView: View {
+    @StateObject private var feedbackService = SummaryFeedbackService.shared
+    
+    var body: some View {
+        List {
+            let negativeFeedback = feedbackService.getRecentNegativeFeedback(limit: 50)
+            
+            if negativeFeedback.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "hand.thumbsup")
+                        .font(.largeTitle)
+                        .foregroundColor(.green)
+                    
+                    Text("No negative feedback")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Great job! All recent summaries have been well received.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(negativeFeedback, id: \.id) { feedback in
+                    FeedbackDetailRow(feedback: feedback)
+                }
+            }
+        }
+        .navigationTitle("Negative Feedback")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+    }
+}
+
+struct FeedbackDetailRow: View {
+    let feedback: SummaryFeedback
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with metadata
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(feedback.summaryMode.capitalized)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.blue)
+                    
+                    Text(RelativeDateTimeFormatter().localizedString(for: feedback.timestamp, relativeTo: Date()))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(feedback.aiProvider.capitalized)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.orange)
+                    
+                    Text("\(feedback.summaryLength) chars")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            // User feedback text
+            if let userFeedback = feedback.userFeedback, !userFeedback.isEmpty {
+                Text(userFeedback)
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .padding(8)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+            }
+            
+            // Summary preview
+            Text(String(feedback.summaryText.prefix(200)) + (feedback.summaryText.count > 200 ? "..." : ""))
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(8)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+        }
+        .padding(.vertical, 4)
     }
 }
 
