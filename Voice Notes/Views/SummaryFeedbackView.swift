@@ -60,37 +60,18 @@ struct SummaryFeedbackButtons: View {
             FeedbackDetailSheet(
                 recording: recording,
                 onSubmit: { feedback in
-                    // Close sheet first, then submit feedback
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showingFeedbackSheet = false
-                    }
-                    
-                    // Submit feedback after a small delay to allow sheet to close
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        submitFeedback(.thumbsDown, userFeedback: feedback)
-                    }
+                    // INSTANT: No delays, no animations, immediate response
+                    showingFeedbackSheet = false
+                    submitFeedback(.thumbsDown, userFeedback: feedback)
                 },
                 onCancel: {
-                    // Close sheet with animation
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showingFeedbackSheet = false
-                        
-                        // Reset selection if user cancels thumbs down
-                        if let existingFeedback = feedbackService.feedbackHistory.first(where: { $0.recordingId == recording.id }) {
-                            selectedFeedback = existingFeedback.feedbackType
-                        } else {
-                            selectedFeedback = nil
-                        }
-                    }
+                    // INSTANT: No background checks, immediate response
+                    showingFeedbackSheet = false
+                    selectedFeedback = nil  // Simple reset, no async lookups
                 }
             )
         }
-        .onAppear {
-            // Check if feedback was already given for this recording
-            if let existingFeedback = feedbackService.feedbackHistory.first(where: { $0.recordingId == recording.id }) {
-                selectedFeedback = existingFeedback.feedbackType
-            }
-        }
+        // REMOVED: No async initialization checks - UI loads instantly
     }
     
     private func submitFeedback(_ type: FeedbackType, userFeedback: String? = nil) {
@@ -115,29 +96,21 @@ struct SummaryFeedbackButtons: View {
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
         
-        // Submit feedback asynchronously without blocking UI
-        Task { @MainActor in
-            defer {
-                // Always reset isSubmitting state
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isSubmitting = false
-                }
-            }
-            
-            // Remove any existing feedback for this recording
-            feedbackService.feedbackHistory.removeAll { $0.recordingId == recording.id }
-            
-            // Submit the new feedback - this will handle analytics in background
-            feedbackService.submitFeedback(
-                recordingId: recording.id,
-                summaryText: summary,
-                feedbackType: type,
-                userFeedback: userFeedback,
-                recording: recording
-            )
-            
-            print("✅ SummaryFeedback: Successfully submitted \(type.rawValue) feedback")
+        // ZERO-BLOCKING: Immediate UI response, no async/await
+        feedbackService.submitFeedback(
+            recordingId: recording.id,
+            summaryText: summary,
+            feedbackType: type,
+            userFeedback: userFeedback,
+            recording: recording
+        )
+        
+        // Immediate UI completion - no waiting for background work
+        withAnimation(.easeInOut(duration: 0.1)) {
+            isSubmitting = false
         }
+        
+        print("✅ SummaryFeedback: Immediately submitted \(type.rawValue) feedback")
     }
 }
 

@@ -94,6 +94,7 @@ class TitleGenerator {
             case .lecture: return ["Lecture", "Learning", "Notes"]
             case .interview: return ["Interview", "Session", "Notes"]
             case .personal, .none: return ["Voice", "Note", "Recording"]
+            case .some(.patientRecord): return ["Patient", "Record", "Notes"]
             }
         }()
         

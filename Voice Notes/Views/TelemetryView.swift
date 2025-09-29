@@ -426,29 +426,37 @@ struct TelemetryView: View {
     // MARK: - Summary Feedback Section
     
     private var summaryFeedbackSection: some View {
-        let feedbackService = SummaryFeedbackService.shared
-        let stats = feedbackService.getFeedbackStats()
-        let feedbackByMode = feedbackService.getFeedbackByMode()
-        let feedbackByProvider = feedbackService.getFeedbackByProvider()
-        
-        return Group {
-            if stats.totalFeedback > 0 {
+        SummaryFeedbackSectionView()
+    }
+}
+
+// MARK: - Summary Feedback Section View
+
+struct SummaryFeedbackSectionView: View {
+    @ObservedObject private var feedbackService = SummaryFeedbackService.shared
+    @State private var feedbackByMode: [String: (thumbsUp: Int, thumbsDown: Int)] = [:]
+    @State private var feedbackByProvider: [String: (thumbsUp: Int, thumbsDown: Int)] = [:]
+    @State private var recentNegativeFeedback: [SummaryFeedback] = []
+    
+    var body: some View {
+        Group {
+            if feedbackService.feedbackStats.totalFeedback > 0 {
                 // Overall feedback stats
                 HStack(spacing: 16) {
                     MetricCard(
                         title: "Total Feedback",
-                        value: "\(stats.totalFeedback)",
-                        subtitle: "\(stats.feedbackWithComments) with comments",
+                        value: "\(feedbackService.feedbackStats.totalFeedback)",
+                        subtitle: "\(feedbackService.feedbackStats.feedbackWithComments) with comments",
                         icon: "hand.thumbsup.hand.thumbsdown",
                         color: .blue
                     )
                     
                     MetricCard(
                         title: "Satisfaction Rate",
-                        value: "\(Int((Double(stats.thumbsUp) / Double(stats.totalFeedback)) * 100))%",
-                        subtitle: "\(stats.thumbsUp) 👍 / \(stats.thumbsDown) 👎",
+                        value: "\(Int((Double(feedbackService.feedbackStats.thumbsUp) / Double(feedbackService.feedbackStats.totalFeedback)) * 100))%",
+                        subtitle: "\(feedbackService.feedbackStats.thumbsUp) 👍 / \(feedbackService.feedbackStats.thumbsDown) 👎",
                         icon: "chart.pie",
-                        color: stats.thumbsUp >= stats.thumbsDown ? .green : .red
+                        color: feedbackService.feedbackStats.thumbsUp >= feedbackService.feedbackStats.thumbsDown ? .green : .red
                     )
                 }
                 
@@ -499,8 +507,7 @@ struct TelemetryView: View {
                 }
                 
                 // Recent negative feedback
-                let recentNegative = feedbackService.getRecentNegativeFeedback(limit: 5)
-                if !recentNegative.isEmpty {
+                if !recentNegativeFeedback.isEmpty {
                     NavigationLink(destination: NegativeFeedbackDetailView()) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
@@ -508,7 +515,7 @@ struct TelemetryView: View {
                                     .font(.headline)
                                     .fontWeight(.semibold)
                                 
-                                Text("\(recentNegative.count) recent issues to review")
+                                Text("\(recentNegativeFeedback.count) recent issues to review")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -541,10 +548,21 @@ struct TelemetryView: View {
                 .padding(.vertical, 20)
             }
         }
+        .task {
+            await loadFeedbackData()
+        }
     }
     
-    // MARK: - Helper Functions
-    
+    private func loadFeedbackData() async {
+        feedbackByMode = await feedbackService.getFeedbackByMode()
+        feedbackByProvider = await feedbackService.getFeedbackByProvider()
+        recentNegativeFeedback = await feedbackService.getRecentNegativeFeedback(limit: 5)
+    }
+}
+
+// MARK: - Helper Functions Extension
+
+extension TelemetryView {
     private func colorForBucket(_ bucket: RecordingBucket) -> Color {
         switch bucket {
         case .short: return .green
@@ -820,10 +838,10 @@ struct FeedbackProviderRow: View {
 
 struct NegativeFeedbackDetailView: View {
     @ObservedObject private var feedbackService = SummaryFeedbackService.shared
+    @State private var negativeFeedback: [SummaryFeedback] = []
     
     var body: some View {
         List {
-            let negativeFeedback = feedbackService.getRecentNegativeFeedback(limit: 50)
             
             if negativeFeedback.isEmpty {
                 VStack(spacing: 12) {
@@ -853,6 +871,9 @@ struct NegativeFeedbackDetailView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .task {
+            negativeFeedback = await feedbackService.getRecentNegativeFeedback(limit: 50)
+        }
     }
 }
 
