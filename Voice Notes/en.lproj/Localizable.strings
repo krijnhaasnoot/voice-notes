@@ -1,0 +1,218 @@
+/* English Localization for Voice Notes */
+
+/* Tab Bar Items */
+"tab.home" = "Home";
+"tab.recordings" = "Recordings";
+"tab.documents" = "Lists";
+"tab.settings" = "Settings";
+
+/* Home View */
+"home.ready_to_record" = "Ready to record";
+"home.tap_to_start" = "Tap to start recording";
+"home.recording" = "Recording";
+"home.recording_paused" = "Recording paused";
+"home.recent_recordings" = "Recent Recordings";
+"home.view_all" = "View All";
+"home.recording_settings" = "Recording Settings";
+"home.no_recordings_message" = "Your voice notes will appear in the Recordings tab after recording.";
+
+/* Recording States */
+"recording.new_recording" = "New Recording";
+"recording.transcribing" = "Transcribing";
+"recording.summarizing" = "Summarizing";
+"recording.processing_complete" = "Processing complete";
+"recording.failed" = "Failed";
+"recording.tap_to_view" = "Tap to view details";
+
+/* Recording Detail View */
+"recording.details" = "Recording Details";
+"recording.delete" = "Delete";
+"recording.done" = "Done";
+"recording.share" = "Share";
+"recording.edit" = "Edit";
+"recording.play" = "Play";
+"recording.pause" = "Pause";
+"recording.retry" = "Retry";
+"recording.transcript" = "Transcript";
+"recording.summary" = "Summary";
+"recording.action_items" = "Action Items";
+"recording.tags" = "Tags";
+"recording.add_tag" = "Add Tag";
+"recording.duration" = "Duration";
+"recording.date" = "Date";
+"recording.file_size" = "File Size";
+
+/* Alert Messages */
+"alert.delete_recording" = "Delete Recording";
+"alert.delete_recording_message" = "Are you sure you want to delete this recording? This action cannot be undone.";
+"alert.delete" = "Delete";
+"alert.cancel" = "Cancel";
+
+/* Lists/Documents */
+"lists.title" = "Lists";
+"lists.create_first" = "Create your first document";
+"lists.organize_notes" = "Organize your voice notes into actionable documents";
+"lists.no_lists" = "No lists yet";
+"lists.create_todo_shopping" = "Create a To-Do, Shopping, Ideas, or Meeting list.";
+
+/* Document Types */
+"document.todo" = "To-Do";
+"document.shopping" = "Shopping";
+"document.ideas" = "Ideas";
+"document.meeting" = "Meeting";
+"document.tasks" = "Tasks";
+
+/* Document Detail */
+"document.new_list" = "New List";
+"document.list_title" = "List Title";
+"document.list_type" = "List Type";
+"document.create" = "Create";
+"document.save" = "Save";
+"document.add_new_item" = "Add new item...";
+"document.no_items" = "No items";
+"document.add_items_or_save" = "Add items or save action items from a recording.";
+"document.completed" = "completed";
+"document.add" = "Add";
+
+/* Filter Options */
+"filter.all" = "All";
+"filter.open" = "Open";
+"filter.done" = "Done";
+
+/* Settings */
+"settings.title" = "Settings";
+"settings.ai_provider" = "AI Provider";
+"settings.ai_provider_settings" = "AI Provider Settings";
+"settings.configure_providers" = "Configure OpenAI, Claude, Gemini, or Mistral";
+"settings.usage_analytics" = "Usage Analytics";
+"settings.view_performance" = "View AI provider performance stats";
+"settings.manage_tags" = "Manage Tags";
+"settings.organize_rename_merge" = "Organize, rename, merge, and delete tags";
+"settings.summary_settings" = "Summary Settings";
+"settings.ai_summary_mode" = "AI Summary Mode";
+"settings.summary_length" = "Summary Length";
+"settings.auto_detect_mode" = "Auto-detect mode";
+"settings.privacy_data" = "Privacy & Data";
+"settings.privacy_policy" = "Privacy Policy";
+"settings.data_usage" = "Data Usage";
+"settings.app_info" = "App Info";
+"settings.version" = "Version";
+"settings.build" = "Build";
+"settings.support" = "Support";
+
+/* AI Summary Modes */
+"summary.mode.personal" = "Personal";
+"summary.mode.primaryCare" = "Primary Care";
+"summary.mode.dentist" = "Dentist";
+"summary.mode.techTeam" = "Tech Team";
+"summary.mode.planning" = "Planning";
+"summary.mode.alignment" = "Alignment";
+"summary.mode.brainstorm" = "Brainstorm";
+"summary.mode.lecture" = "Lecture";
+"summary.mode.interview" = "Interview";
+
+/* AI Summary Mode Descriptions */
+"summary.desc.personal" = "For general conversations and topics";
+"summary.desc.primaryCare" = "For primary care consultations with patients";
+"summary.desc.dentist" = "For dental treatments and consultations";
+"summary.desc.techTeam" = "For technical team meetings and development discussions";
+"summary.desc.planning" = "For planning and project meetings";
+"summary.desc.alignment" = "For alignment and strategic sessions";
+"summary.desc.brainstorm" = "For creative brainstorming and ideation sessions";
+"summary.desc.lecture" = "For lectures, talks, and learning content";
+"summary.desc.interview" = "For interviews, Q&A sessions, and structured conversations";
+
+/* Summary Lengths */
+"summary.length.brief" = "Brief";
+"summary.length.standard" = "Standard";
+"summary.length.detailed" = "Detailed";
+
+/* AI Providers */
+"provider.openai" = "OpenAI";
+"provider.claude" = "Claude";
+"provider.gemini" = "Gemini";
+"provider.mistral" = "Mistral";
+"provider.app_default" = "App Default";
+
+/* Progress and Status */
+"progress.transcribing" = "Transcribing... %d%%";
+"progress.summarizing" = "Summarizing... %d%%";
+"status.processing" = "Processing...";
+"status.completed" = "Completed";
+"status.failed" = "Failed";
+
+/* Actions */
+"action.save_to_list" = "Save to List";
+"action.save_all" = "Save All to List (%d)";
+"action.save_selected" = "Save Selected to List (%d)";
+"action.share" = "Share";
+"action.copy" = "Copy";
+"action.delete" = "Delete";
+"action.edit" = "Edit";
+"action.rename" = "Rename";
+"action.merge" = "Merge";
+
+/* Sharing */
+"share.shared_from" = "Shared from Voice Notes";
+"share.notes" = "Notes:";
+"share.due" = "due: %@";
+
+/* Toast Messages */
+"toast.added_items" = "Added %d items to %@";
+"toast.undo" = "Undo";
+"toast.open" = "Open";
+
+/* Calendar */
+"calendar.today" = "Today";
+"calendar.this_week" = "This Week";
+"calendar.this_month" = "This Month";
+
+/* Errors */
+"error.transcription_failed" = "Transcription failed";
+"error.summarization_failed" = "Summarization failed";
+"error.api_key_missing" = "API key missing";
+"error.network_error" = "Network error";
+"error.audio_playback_failed" = "Audio playback failed: %@";
+"error.recording_not_found" = "Recording not found";
+
+/* Tour and Onboarding */
+"tour.welcome" = "Welcome to Voice Notes";
+"tour.record_voice_notes" = "Record Voice Notes";
+"tour.ai_summaries" = "AI Summaries";
+"tour.organize_lists" = "Organize in Lists";
+"tour.get_started" = "Get Started";
+"tour.next" = "Next";
+"tour.skip" = "Skip";
+"tour.done" = "Done";
+
+/* Background Processing */
+"background.processing" = "Processing in background";
+"background.transcription_scheduled" = "Transcription scheduled";
+"background.summary_scheduled" = "Summary scheduled";
+
+/* Watch */
+"watch.start_recording" = "Start Recording";
+"watch.stop_recording" = "Stop Recording";
+"watch.voice_notes" = "Voice Notes";
+
+/* Tags */
+"tags.manage" = "Manage Tags";
+"tags.add" = "Add Tag";
+"tags.no_tags" = "No tags yet";
+"tags.will_appear" = "Tags will appear here as you add them to your recordings and lists. Use tags to organize and find your content quickly.";
+"tags.rename" = "Rename Tag";
+"tags.delete" = "Delete Tag";
+"tags.merge" = "Merge Tags";
+"tags.new_name" = "New name";
+
+/* Miscellaneous */
+"misc.items" = "items";
+"misc.item" = "item";
+"misc.minutes" = "minutes";
+"misc.seconds" = "seconds";
+"misc.ago" = "ago";
+"misc.just_now" = "just now";
+"misc.loading" = "Loading...";
+"misc.search" = "Search";
+"misc.close" = "Close";
+"misc.continue" = "Continue";

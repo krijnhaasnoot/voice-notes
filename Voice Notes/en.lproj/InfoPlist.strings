@@ -1,0 +1,9 @@
+/* English InfoPlist Localization */
+
+/* App Name */
+"CFBundleName" = "Voice Notes";
+"CFBundleDisplayName" = "Voice Notes";
+
+/* Permission descriptions */
+"NSMicrophoneUsageDescription" = "Voice Notes needs microphone access to record voice notes.";
+"NSSpeechRecognitionUsageDescription" = "Voice Notes uses speech recognition to automatically transcribe your recordings.";

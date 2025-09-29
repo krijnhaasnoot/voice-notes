@@ -11,9 +11,9 @@ enum SummaryLength: String, CaseIterable, Identifiable {
     
     var displayName: String {
         switch self {
-        case .brief: return "summary.length.brief".localized
-        case .standard: return "summary.length.standard".localized
-        case .detailed: return "summary.length.detailed".localized
+        case .brief: return NSLocalizedString("summary.length.brief", comment: "Brief summary length")
+        case .standard: return NSLocalizedString("summary.length.standard", comment: "Standard summary length") 
+        case .detailed: return NSLocalizedString("summary.length.detailed", comment: "Detailed summary length")
         }
     }
     
@@ -53,15 +53,15 @@ enum SummaryMode: String, CaseIterable, Identifiable {
     
     var displayName: String {
         switch self {
-        case .primaryCare: return "summary.mode.primaryCare".localized
-        case .dentist:     return "summary.mode.dentist".localized
-        case .techTeam:    return "summary.mode.techTeam".localized
-        case .planning:    return "summary.mode.planning".localized
-        case .alignment:   return "summary.mode.alignment".localized
-        case .brainstorm:  return "summary.mode.brainstorm".localized
-        case .lecture:     return "summary.mode.lecture".localized
-        case .interview:   return "summary.mode.interview".localized
-        case .personal:    return "summary.mode.personal".localized
+        case .primaryCare: return NSLocalizedString("summary.mode.primaryCare", comment: "Primary care summary mode")
+        case .dentist:     return NSLocalizedString("summary.mode.dentist", comment: "Dentist summary mode")
+        case .techTeam:    return NSLocalizedString("summary.mode.techTeam", comment: "Tech team summary mode")
+        case .planning:    return NSLocalizedString("summary.mode.planning", comment: "Planning summary mode")
+        case .alignment:   return NSLocalizedString("summary.mode.alignment", comment: "Alignment summary mode")
+        case .brainstorm:  return NSLocalizedString("summary.mode.brainstorm", comment: "Brainstorm summary mode")
+        case .lecture:     return NSLocalizedString("summary.mode.lecture", comment: "Lecture summary mode")
+        case .interview:   return NSLocalizedString("summary.mode.interview", comment: "Interview summary mode")
+        case .personal:    return NSLocalizedString("summary.mode.personal", comment: "Personal summary mode")
         }
     }
     
