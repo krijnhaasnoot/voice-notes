@@ -56,7 +56,7 @@ struct RecordingRow: View {
             HStack {
                 ProgressView(value: progress)
                     .frame(width: 80)
-                Text("Transcribing... \(Int(progress * 100))%")
+                Text(L10n.Progress.transcribing.localized(with: Int(progress * 100)))
                     .font(.caption)
                     .foregroundColor(.blue)
             }
@@ -65,7 +65,7 @@ struct RecordingRow: View {
             HStack {
                 ProgressView(value: progress)
                     .frame(width: 80)
-                Text("Summarizing... \(Int(progress * 100))%")
+                Text(L10n.Progress.summarizing.localized(with: Int(progress * 100)))
                     .font(.caption)
                     .foregroundColor(.orange)
             }
@@ -116,7 +116,7 @@ struct RecordingRow: View {
         }
         
         // Fallback while title is being generated
-        return "New Recording"
+        return L10n.Recording.newRecording.localized
     }
     
     

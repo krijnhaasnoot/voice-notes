@@ -62,7 +62,7 @@ struct RecordingsView: View {
                 }
             }
         }
-        .navigationTitle("Recordings")
+        .navigationTitle(L10n.Tab.recordings.localized)
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)

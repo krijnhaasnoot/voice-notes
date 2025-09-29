@@ -1,0 +1,218 @@
+/* Dutch Localization for Voice Notes */
+
+/* Tab Bar Items */
+"tab.home" = "Home";
+"tab.recordings" = "Opnames";
+"tab.documents" = "Lijsten";
+"tab.settings" = "Instellingen";
+
+/* Home View */
+"home.ready_to_record" = "Klaar om op te nemen";
+"home.tap_to_start" = "Tik om op te nemen";
+"home.recording" = "Opnemen";
+"home.recording_paused" = "Opname gepauzeerd";
+"home.recent_recordings" = "Recente opnames";
+"home.view_all" = "Alles bekijken";
+"home.recording_settings" = "Opname-instellingen";
+"home.no_recordings_message" = "Je spraaknotities verschijnen in het tabblad Opnames na het opnemen.";
+
+/* Recording States */
+"recording.new_recording" = "Nieuwe opname";
+"recording.transcribing" = "Transcriberen";
+"recording.summarizing" = "Samenvatten";
+"recording.processing_complete" = "Verwerking voltooid";
+"recording.failed" = "Mislukt";
+"recording.tap_to_view" = "Tik om details te bekijken";
+
+/* Recording Detail View */
+"recording.details" = "Opnamedetails";
+"recording.delete" = "Verwijderen";
+"recording.done" = "Klaar";
+"recording.share" = "Delen";
+"recording.edit" = "Bewerken";
+"recording.play" = "Afspelen";
+"recording.pause" = "Pauzeren";
+"recording.retry" = "Opnieuw proberen";
+"recording.transcript" = "Transcript";
+"recording.summary" = "Samenvatting";
+"recording.action_items" = "Actiepunten";
+"recording.tags" = "Tags";
+"recording.add_tag" = "Tag toevoegen";
+"recording.duration" = "Duur";
+"recording.date" = "Datum";
+"recording.file_size" = "Bestandsgrootte";
+
+/* Alert Messages */
+"alert.delete_recording" = "Opname verwijderen";
+"alert.delete_recording_message" = "Weet je zeker dat je deze opname wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.";
+"alert.delete" = "Verwijderen";
+"alert.cancel" = "Annuleren";
+
+/* Lists/Documents */
+"lists.title" = "Lijsten";
+"lists.create_first" = "Maak je eerste document";
+"lists.organize_notes" = "Organiseer je spraaknotities in uitvoerbare documenten";
+"lists.no_lists" = "Nog geen lijsten";
+"lists.create_todo_shopping" = "Maak een To-Do, Boodschappen, Ideeën of Vergaderlijst.";
+
+/* Document Types */
+"document.todo" = "To-Do";
+"document.shopping" = "Boodschappen";
+"document.ideas" = "Ideeën";
+"document.meeting" = "Vergadering";
+"document.tasks" = "Taken";
+
+/* Document Detail */
+"document.new_list" = "Nieuwe lijst";
+"document.list_title" = "Lijsttitel";
+"document.list_type" = "Lijsttype";
+"document.create" = "Aanmaken";
+"document.save" = "Opslaan";
+"document.add_new_item" = "Nieuw item toevoegen...";
+"document.no_items" = "Geen items";
+"document.add_items_or_save" = "Voeg items toe of sla actiepunten van een opname op.";
+"document.completed" = "voltooid";
+"document.add" = "Toevoegen";
+
+/* Filter Options */
+"filter.all" = "Alles";
+"filter.open" = "Open";
+"filter.done" = "Klaar";
+
+/* Settings */
+"settings.title" = "Instellingen";
+"settings.ai_provider" = "AI-provider";
+"settings.ai_provider_settings" = "AI-providerinstellingen";
+"settings.configure_providers" = "OpenAI, Claude, Gemini of Mistral configureren";
+"settings.usage_analytics" = "Gebruiksanalyses";
+"settings.view_performance" = "AI-providerprestaties bekijken";
+"settings.manage_tags" = "Tags beheren";
+"settings.organize_rename_merge" = "Tags organiseren, hernoemen, samenvoegen en verwijderen";
+"settings.summary_settings" = "Samenvattingsinstellingen";
+"settings.ai_summary_mode" = "AI-samenvattingsmodus";
+"settings.summary_length" = "Samenvattingslengte";
+"settings.auto_detect_mode" = "Modus automatisch detecteren";
+"settings.privacy_data" = "Privacy en gegevens";
+"settings.privacy_policy" = "Privacybeleid";
+"settings.data_usage" = "Gegevensgebruik";
+"settings.app_info" = "App-informatie";
+"settings.version" = "Versie";
+"settings.build" = "Build";
+"settings.support" = "Ondersteuning";
+
+/* AI Summary Modes */
+"summary.mode.personal" = "Persoonlijk";
+"summary.mode.primaryCare" = "Eerstelijnszorg";
+"summary.mode.dentist" = "Tandarts";
+"summary.mode.techTeam" = "Technisch team";
+"summary.mode.planning" = "Planning";
+"summary.mode.alignment" = "Afstemming";
+"summary.mode.brainstorm" = "Brainstorm";
+"summary.mode.lecture" = "Lezing";
+"summary.mode.interview" = "Interview";
+
+/* AI Summary Mode Descriptions */
+"summary.desc.personal" = "Voor algemene gesprekken en onderwerpen";
+"summary.desc.primaryCare" = "Voor eerstelijnszorgconsulten met patiënten";
+"summary.desc.dentist" = "Voor tandheelkundige behandelingen en consulten";
+"summary.desc.techTeam" = "Voor technische teamvergaderingen en ontwikkelingsdiscussies";
+"summary.desc.planning" = "Voor planning- en projectvergaderingen";
+"summary.desc.alignment" = "Voor afstemmings- en strategische sessies";
+"summary.desc.brainstorm" = "Voor creatieve brainstormsessies en ideevorming";
+"summary.desc.lecture" = "Voor lezingen, talks en leerinhoud";
+"summary.desc.interview" = "Voor interviews, Q&A-sessies en gestructureerde gesprekken";
+
+/* Summary Lengths */
+"summary.length.brief" = "Kort";
+"summary.length.standard" = "Standaard";
+"summary.length.detailed" = "Gedetailleerd";
+
+/* AI Providers */
+"provider.openai" = "OpenAI";
+"provider.claude" = "Claude";
+"provider.gemini" = "Gemini";
+"provider.mistral" = "Mistral";
+"provider.app_default" = "App standaard";
+
+/* Progress and Status */
+"progress.transcribing" = "Transcriberen... %d%%";
+"progress.summarizing" = "Samenvatten... %d%%";
+"status.processing" = "Verwerken...";
+"status.completed" = "Voltooid";
+"status.failed" = "Mislukt";
+
+/* Actions */
+"action.save_to_list" = "Opslaan naar lijst";
+"action.save_all" = "Alles opslaan naar lijst (%d)";
+"action.save_selected" = "Geselecteerde opslaan naar lijst (%d)";
+"action.share" = "Delen";
+"action.copy" = "Kopiëren";
+"action.delete" = "Verwijderen";
+"action.edit" = "Bewerken";
+"action.rename" = "Hernoemen";
+"action.merge" = "Samenvoegen";
+
+/* Sharing */
+"share.shared_from" = "Gedeeld vanuit Voice Notes";
+"share.notes" = "Notities:";
+"share.due" = "vervaldatum: %@";
+
+/* Toast Messages */
+"toast.added_items" = "%d items toegevoegd aan %@";
+"toast.undo" = "Ongedaan maken";
+"toast.open" = "Openen";
+
+/* Calendar */
+"calendar.today" = "Vandaag";
+"calendar.this_week" = "Deze week";
+"calendar.this_month" = "Deze maand";
+
+/* Errors */
+"error.transcription_failed" = "Transcriptie mislukt";
+"error.summarization_failed" = "Samenvatting mislukt";
+"error.api_key_missing" = "API-sleutel ontbreekt";
+"error.network_error" = "Netwerkfout";
+"error.audio_playback_failed" = "Afspelen van audio mislukt: %@";
+"error.recording_not_found" = "Opname niet gevonden";
+
+/* Tour and Onboarding */
+"tour.welcome" = "Welkom bij Voice Notes";
+"tour.record_voice_notes" = "Neem spraaknotities op";
+"tour.ai_summaries" = "AI-samenvattingen";
+"tour.organize_lists" = "Organiseer in lijsten";
+"tour.get_started" = "Aan de slag";
+"tour.next" = "Volgende";
+"tour.skip" = "Overslaan";
+"tour.done" = "Klaar";
+
+/* Background Processing */
+"background.processing" = "Verwerken op de achtergrond";
+"background.transcription_scheduled" = "Transcriptie gepland";
+"background.summary_scheduled" = "Samenvatting gepland";
+
+/* Watch */
+"watch.start_recording" = "Opname starten";
+"watch.stop_recording" = "Opname stoppen";
+"watch.voice_notes" = "Voice Notes";
+
+/* Tags */
+"tags.manage" = "Tags beheren";
+"tags.add" = "Tag toevoegen";
+"tags.no_tags" = "Nog geen tags";
+"tags.will_appear" = "Tags verschijnen hier als je ze toevoegt aan je opnames en lijsten. Gebruik tags om je inhoud snel te organiseren en te vinden.";
+"tags.rename" = "Tag hernoemen";
+"tags.delete" = "Tag verwijderen";
+"tags.merge" = "Tags samenvoegen";
+"tags.new_name" = "Nieuwe naam";
+
+/* Miscellaneous */
+"misc.items" = "items";
+"misc.item" = "item";
+"misc.minutes" = "minuten";
+"misc.seconds" = "seconden";
+"misc.ago" = "geleden";
+"misc.just_now" = "zojuist";
+"misc.loading" = "Laden...";
+"misc.search" = "Zoeken";
+"misc.close" = "Sluiten";
+"misc.continue" = "Doorgaan";

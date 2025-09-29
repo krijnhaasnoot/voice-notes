@@ -1,0 +1,9 @@
+/* Dutch InfoPlist Localization */
+
+/* App Name */
+"CFBundleName" = "Voice Notes";
+"CFBundleDisplayName" = "Voice Notes";
+
+/* Permission descriptions (if needed) */
+"NSMicrophoneUsageDescription" = "Voice Notes heeft toegang tot de microfoon nodig om spraaknotities op te nemen.";
+"NSSpeechRecognitionUsageDescription" = "Voice Notes gebruikt spraakherkenning om je opnames automatisch te transcriberen.";

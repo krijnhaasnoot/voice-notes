@@ -11,9 +11,9 @@ enum SummaryLength: String, CaseIterable, Identifiable {
     
     var displayName: String {
         switch self {
-        case .brief: return "Brief"
-        case .standard: return "Standard"
-        case .detailed: return "Detailed"
+        case .brief: return "summary.length.brief".localized
+        case .standard: return "summary.length.standard".localized
+        case .detailed: return "summary.length.detailed".localized
         }
     }
     
@@ -53,15 +53,15 @@ enum SummaryMode: String, CaseIterable, Identifiable {
     
     var displayName: String {
         switch self {
-        case .primaryCare: return "Primary Care (GP)"
-        case .dentist:     return "Dentist"
-        case .techTeam:    return "Tech Team"
-        case .planning:    return "Planning"
-        case .alignment:   return "Alignment / 1:1"
-        case .brainstorm:  return "Brainstorm Session"
-        case .lecture:     return "Lecture / Learning"
-        case .interview:   return "Interview"
-        case .personal:    return "General Summary"
+        case .primaryCare: return "summary.mode.primaryCare".localized
+        case .dentist:     return "summary.mode.dentist".localized
+        case .techTeam:    return "summary.mode.techTeam".localized
+        case .planning:    return "summary.mode.planning".localized
+        case .alignment:   return "summary.mode.alignment".localized
+        case .brainstorm:  return "summary.mode.brainstorm".localized
+        case .lecture:     return "summary.mode.lecture".localized
+        case .interview:   return "summary.mode.interview".localized
+        case .personal:    return "summary.mode.personal".localized
         }
     }
     

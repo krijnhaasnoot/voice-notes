@@ -10,10 +10,10 @@ enum DocumentType: String, CaseIterable, Codable {
     
     var displayName: String {
         switch self {
-        case .todo: return "To-Do"
-        case .shopping: return "Shopping"
-        case .ideas: return "Ideas"
-        case .meeting: return "Meeting"
+        case .todo: return L10n.Document.todo.localized
+        case .shopping: return L10n.Document.shopping.localized
+        case .ideas: return L10n.Document.ideas.localized
+        case .meeting: return L10n.Document.meeting.localized
         }
     }
     

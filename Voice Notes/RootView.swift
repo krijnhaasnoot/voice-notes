@@ -10,10 +10,10 @@ enum Tab: String, CaseIterable {
     
     var title: String {
         switch self {
-        case .home: return "Home"
-        case .recordings: return "Recordings"
-        case .documents: return "Lists"
-        case .settings: return "Settings"
+        case .home: return L10n.Tab.home.localized
+        case .recordings: return L10n.Tab.recordings.localized
+        case .documents: return L10n.Tab.documents.localized
+        case .settings: return L10n.Tab.settings.localized
         }
     }
     
@@ -130,7 +130,7 @@ struct DocumentsView: View {
                 documentsListView
             }
         }
-        .navigationTitle("Lists")
+        .navigationTitle(L10n.Lists.title.localized)
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -1050,14 +1050,14 @@ struct HomeView: View {
     private var recentRecordingsSection: some View {
         VStack(spacing: 16) {
             HStack {
-                Text("Recent Recordings")
+                Text(L10n.Home.recentRecordings.localized)
                     .font(.poppins.title3)
                     .fontWeight(.semibold)
                     .foregroundStyle(.primary)
                 
                 Spacer()
                 
-                Button("View All") {
+                Button(L10n.Home.viewAll.localized) {
                     appRouter.selectedTab = .recordings
                 }
                 .font(.poppins.body)
@@ -1389,13 +1389,13 @@ extension HomeView {
         if isPaused {
             let minutes = Int(audioRecorder.recordingDuration) / 60
             let seconds = Int(audioRecorder.recordingDuration) % 60
-            return "Recording paused - \(String(format: "%02d:%02d", minutes, seconds))"
+            return L10n.Home.recordingPaused.localized + " - \(String(format: "%02d:%02d", minutes, seconds))"
         } else if audioRecorder.isRecording {
             let minutes = Int(audioRecorder.recordingDuration) / 60
             let seconds = Int(audioRecorder.recordingDuration) % 60
-            return "Recording - \(String(format: "%02d:%02d", minutes, seconds))"
+            return L10n.Home.recording.localized + " - \(String(format: "%02d:%02d", minutes, seconds))"
         } else {
-            return "Tap to start recording"
+            return L10n.Home.tapToStart.localized
         }
     }
 
