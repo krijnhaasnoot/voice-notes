@@ -819,7 +819,7 @@ struct FeedbackProviderRow: View {
 // MARK: - Detailed Negative Feedback View
 
 struct NegativeFeedbackDetailView: View {
-    @StateObject private var feedbackService = SummaryFeedbackService.shared
+    @ObservedObject private var feedbackService = SummaryFeedbackService.shared
     
     var body: some View {
         List {

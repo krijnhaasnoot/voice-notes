@@ -4,7 +4,7 @@ import SwiftUI
 
 struct SummaryFeedbackButtons: View {
     let recording: Recording
-    @StateObject private var feedbackService = SummaryFeedbackService.shared
+    @ObservedObject private var feedbackService = SummaryFeedbackService.shared
     @State private var selectedFeedback: FeedbackType? = nil
     @State private var showingFeedbackSheet = false
     @State private var feedbackText = ""
@@ -22,14 +22,22 @@ struct SummaryFeedbackButtons: View {
                     .frame(width: 44, height: 32)
                     .background(selectedFeedback == .thumbsUp ? Color.green.opacity(0.1) : Color.clear)
                     .cornerRadius(8)
+                    .scaleEffect(isSubmitting && selectedFeedback == .thumbsUp ? 0.95 : 1.0)
+                    .animation(.easeInOut(duration: 0.1), value: isSubmitting)
             }
             .buttonStyle(.plain)
             .disabled(isSubmitting)
             
             // Thumbs Down Button  
             Button(action: {
-                selectedFeedback = .thumbsDown
-                showingFeedbackSheet = true
+                // Provide immediate haptic feedback
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
+                
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedFeedback = .thumbsDown
+                    showingFeedbackSheet = true
+                }
             }) {
                 Image(systemName: selectedFeedback == .thumbsDown ? "hand.thumbsdown.fill" : "hand.thumbsdown")
                     .font(.system(size: 18))
@@ -37,6 +45,8 @@ struct SummaryFeedbackButtons: View {
                     .frame(width: 44, height: 32)
                     .background(selectedFeedback == .thumbsDown ? Color.red.opacity(0.1) : Color.clear)
                     .cornerRadius(8)
+                    .scaleEffect(isSubmitting && selectedFeedback == .thumbsDown ? 0.95 : 1.0)
+                    .animation(.easeInOut(duration: 0.1), value: isSubmitting)
             }
             .buttonStyle(.plain)
             .disabled(isSubmitting)
@@ -55,6 +65,14 @@ struct SummaryFeedbackButtons: View {
                 },
                 onCancel: {
                     showingFeedbackSheet = false
+                    // Reset selection if user cancels thumbs down
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if let existingFeedback = feedbackService.feedbackHistory.first(where: { $0.recordingId == recording.id }) {
+                            selectedFeedback = existingFeedback.feedbackType
+                        } else {
+                            selectedFeedback = nil
+                        }
+                    }
                 }
             )
         }
@@ -72,27 +90,56 @@ struct SummaryFeedbackButtons: View {
             return
         }
         
-        isSubmitting = true
+        // Prevent multiple submissions
+        guard !isSubmitting else {
+            print("⚠️ SummaryFeedback: Already submitting, ignoring duplicate tap")
+            return
+        }
         
-        // Remove any existing feedback for this recording
-        feedbackService.feedbackHistory.removeAll { $0.recordingId == recording.id }
+        // Immediate UI feedback
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedFeedback = type
+            isSubmitting = true
+        }
         
-        feedbackService.submitFeedback(
-            recordingId: recording.id,
-            summaryText: summary,
-            feedbackType: type,
-            userFeedback: userFeedback,
-            recording: recording
-        )
-        
-        selectedFeedback = type
-        
-        // Provide haptic feedback
+        // Provide haptic feedback immediately
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            isSubmitting = false
+        // Submit feedback on background thread
+        Task {
+            do {
+                // Remove any existing feedback for this recording (on background thread)
+                await MainActor.run {
+                    feedbackService.feedbackHistory.removeAll { $0.recordingId == recording.id }
+                }
+                
+                // Submit the new feedback
+                await MainActor.run {
+                    feedbackService.submitFeedback(
+                        recordingId: recording.id,
+                        summaryText: summary,
+                        feedbackType: type,
+                        userFeedback: userFeedback,
+                        recording: recording
+                    )
+                }
+                
+                // Update UI after a short delay
+                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                
+                await MainActor.run {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isSubmitting = false
+                    }
+                }
+                
+            } catch {
+                print("❌ SummaryFeedback: Error submitting feedback: \(error)")
+                await MainActor.run {
+                    isSubmitting = false
+                }
+            }
         }
     }
 }

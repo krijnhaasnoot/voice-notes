@@ -80,10 +80,12 @@ class SummaryFeedbackService: ObservableObject {
         
         // Add to local history
         feedbackHistory.append(feedback)
-        saveFeedbackHistory()
         
-        // Send to analytics
-        sendFeedbackToAnalytics(feedback)
+        // Save and send analytics on background queue to avoid blocking UI
+        Task {
+            saveFeedbackHistory()
+            sendFeedbackToAnalytics(feedback)
+        }
         
         print("📝 SummaryFeedback: Collected \(feedbackType.rawValue) feedback for recording \(recordingId)")
         if let userText = userFeedback {
