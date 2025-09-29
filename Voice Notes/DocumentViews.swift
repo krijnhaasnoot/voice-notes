@@ -689,11 +689,16 @@ struct DocumentDetailView: View {
     
     private var addItemBar: some View {
         HStack(spacing: 12) {
-            Image(systemName: "plus.circle.fill")
-                .font(.poppins.regular(size: 20))
-                .foregroundColor(.blue)
+            Button(action: {
+                isNewItemFocused = true
+            }) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.poppins.regular(size: 20))
+                    .foregroundColor(.blue)
+            }
+            .buttonStyle(.plain)
             
-            TextField("", text: $newItemText)
+            TextField("Add new item...", text: $newItemText)
                 .textFieldStyle(.plain)
                 .focused($isNewItemFocused)
                 .onSubmit {
