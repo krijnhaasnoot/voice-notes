@@ -14,7 +14,7 @@ struct SummaryFeedback: Codable {
     let feedbackType: FeedbackType
     let userFeedback: String?
     let summaryMode: String
-    let summaryLength: String
+    let summaryLengthSetting: String
     let aiProvider: String
     let timestamp: Date
     let transcriptLength: Int
@@ -26,7 +26,7 @@ struct SummaryFeedback: Codable {
         feedbackType: FeedbackType,
         userFeedback: String? = nil,
         summaryMode: String,
-        summaryLength: String,
+        summaryLengthSetting: String,
         aiProvider: String,
         transcriptLength: Int
     ) {
@@ -36,7 +36,7 @@ struct SummaryFeedback: Codable {
         self.feedbackType = feedbackType
         self.userFeedback = userFeedback
         self.summaryMode = summaryMode
-        self.summaryLength = summaryLength
+        self.summaryLengthSetting = summaryLengthSetting
         self.aiProvider = aiProvider
         self.timestamp = Date()
         self.transcriptLength = transcriptLength
@@ -73,7 +73,7 @@ class SummaryFeedbackService: ObservableObject {
             feedbackType: feedbackType,
             userFeedback: userFeedback,
             summaryMode: recording.detectedMode ?? "personal",
-            summaryLength: UserDefaults.standard.string(forKey: "defaultSummaryLength") ?? "standard",
+            summaryLengthSetting: UserDefaults.standard.string(forKey: "defaultSummaryLength") ?? "standard",
             aiProvider: recording.preferredSummaryProvider ?? "app_default",
             transcriptLength: recording.transcript?.count ?? 0
         )
@@ -98,7 +98,7 @@ class SummaryFeedbackService: ObservableObject {
         EnhancedTelemetryService.shared.logSummaryFeedback(
             type: feedback.feedbackType.rawValue,
             mode: feedback.summaryMode,
-            length: feedback.summaryLength,
+            length: feedback.summaryLengthSetting,
             provider: feedback.aiProvider,
             hasUserFeedback: feedback.userFeedback != nil,
             transcriptLength: feedback.transcriptLength,
@@ -109,7 +109,7 @@ class SummaryFeedbackService: ObservableObject {
         var eventData: [String: Any] = [
             "feedback_type": feedback.feedbackType.rawValue,
             "summary_mode": feedback.summaryMode,
-            "summary_length": feedback.summaryLength,
+            "summary_length": feedback.summaryLengthSetting,
             "ai_provider": feedback.aiProvider,
             "transcript_length": feedback.transcriptLength,
             "summary_length": feedback.summaryLength,
@@ -121,7 +121,7 @@ class SummaryFeedbackService: ObservableObject {
             // Don't send actual feedback text to general analytics for privacy
         }
         
-        Analytics.track("summary_feedback_submitted", properties: eventData)
+        Analytics.track("summary_feedback_submitted", props: eventData)
     }
     
     // MARK: - Data Persistence
@@ -222,21 +222,17 @@ extension EnhancedTelemetryService {
         transcriptLength: Int,
         summaryLength: Int
     ) {
-        let event = TelemetryEvent(
-            type: "summary_feedback",
-            data: [
-                "feedback_type": type,
-                "summary_mode": mode,
-                "summary_length": length,
-                "ai_provider": provider,
-                "has_user_feedback": hasUserFeedback,
-                "transcript_length": transcriptLength,
-                "summary_length": summaryLength,
-                "session_id": getCurrentSessionId()
-            ]
-        )
+        let eventProperties: [String: Any] = [
+            "feedback_type": type,
+            "summary_mode": mode,
+            "summary_length": length,
+            "ai_provider": provider,
+            "has_user_feedback": hasUserFeedback,
+            "transcript_length": transcriptLength,
+            "summary_length": summaryLength
+        ]
         
-        logEvent(event)
+        logEvent("summary_feedback", properties: eventProperties)
         print("📊 EnhancedTelemetry: Logged summary feedback - \(type) for \(provider)")
     }
 }
