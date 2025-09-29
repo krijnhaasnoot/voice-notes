@@ -40,6 +40,7 @@ enum SummaryLength: String, CaseIterable, Identifiable {
 // Mode-specific summary templates
 enum SummaryMode: String, CaseIterable, Identifiable {
     case primaryCare = "primaryCare"
+    case patientRecord = "patientRecord"
     case dentist = "dentist"
     case techTeam = "techTeam"
     case planning = "planning"
@@ -54,6 +55,7 @@ enum SummaryMode: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .primaryCare: return NSLocalizedString("summary.mode.primaryCare", comment: "Primary care summary mode")
+        case .patientRecord: return NSLocalizedString("summary.mode.patientRecord", comment: "Patient record summary mode")
         case .dentist:     return NSLocalizedString("summary.mode.dentist", comment: "Dentist summary mode")
         case .techTeam:    return NSLocalizedString("summary.mode.techTeam", comment: "Tech team summary mode")
         case .planning:    return NSLocalizedString("summary.mode.planning", comment: "Planning summary mode")
@@ -68,6 +70,7 @@ enum SummaryMode: String, CaseIterable, Identifiable {
     var shortDescription: String {
         switch self {
         case .primaryCare: return "Medical consultations and healthcare discussions"
+        case .patientRecord: return "Comprehensive patient documentation and medical records"
         case .dentist:     return "Dental treatments and oral health consultations"
         case .techTeam:    return "Technical meetings and development discussions"
         case .planning:    return "Project planning and strategic sessions"
@@ -86,6 +89,9 @@ enum SummaryMode: String, CaseIterable, Identifiable {
         switch self {
         case .primaryCare:
             return "Summarize this primary care consultation in a clear and structured way. Start with patient context and presenting complaint. Identify the healthcare provider and patient interaction. Highlight clinical findings, diagnosis, and treatment decisions. Extract key medical themes, clinical decisions, follow-up questions, and next steps. Use medical headings and bullet points to keep it organized. Keep it factual and concise; do not add clinical interpretations not stated in the recording. Maintain a professional medical tone for quick clinical reference. Use sections: **Patient Context**, **Chief Complaint**, **Clinical Findings**, **Treatment Plan**, **Follow-up Actions**. " + lengthInstruction + " " + baseFormatting
+            
+        case .patientRecord:
+            return "Create a comprehensive patient dossier entry based on this medical consultation or examination. Document all relevant patient information in a structured medical record format. Include patient demographics if mentioned, medical history, current symptoms and complaints, physical examination findings, diagnostic test results, clinical assessments and diagnoses, prescribed treatments and medications, patient education provided, and follow-up plans. Maintain strict medical confidentiality and accuracy. Only document information explicitly stated in the recording. Use professional medical terminology and structured sections: **Patient Information**, **Medical History**, **Present Illness**, **Physical Examination**, **Diagnostic Results**, **Assessment & Diagnosis**, **Treatment Plan**, **Medications Prescribed**, **Patient Education**, **Follow-up Plan**, **Additional Notes**. " + lengthInstruction + " " + baseFormatting
             
         case .dentist:
             return "Summarize this dental consultation in a clear and structured way. Start with patient context and dental concerns. Identify the dentist and patient interaction. Highlight dental findings, procedures performed, and treatment recommendations. Extract key dental themes, treatment decisions, patient questions, and next steps. Use dental headings and bullet points to keep it organized. Keep it factual and concise; do not add clinical interpretations not stated in the recording. Maintain a professional dental tone for quick reference. Use sections: **Patient Context**, **Dental Assessment**, **Procedures Performed**, **Treatment Recommendations**, **Follow-up Care**. " + lengthInstruction + " " + baseFormatting
@@ -116,6 +122,7 @@ enum SummaryMode: String, CaseIterable, Identifiable {
     var color: Color {
         switch self {
         case .primaryCare: return .red
+        case .patientRecord: return .teal
         case .dentist: return .blue
         case .techTeam: return .purple
         case .planning: return .orange
@@ -130,6 +137,7 @@ enum SummaryMode: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .primaryCare: return "cross.fill"
+        case .patientRecord: return "folder.fill.badge.plus"
         case .dentist: return "mouth.fill"
         case .techTeam: return "laptopcomputer"
         case .planning: return "calendar"

@@ -5,23 +5,25 @@ extension SummaryMode {
     var description: String {
         switch self {
         case .primaryCare:
-            return "For primary care consultations with patients"
+            return NSLocalizedString("summary.desc.primaryCare", comment: "Primary care mode description")
+        case .patientRecord:
+            return NSLocalizedString("summary.desc.patientRecord", comment: "Patient record mode description")
         case .dentist:
-            return "For dental treatments and consultations"
+            return NSLocalizedString("summary.desc.dentist", comment: "Dentist mode description")
         case .techTeam:
-            return "For technical team meetings and development discussions"
+            return NSLocalizedString("summary.desc.techTeam", comment: "Tech team mode description")
         case .planning:
-            return "For planning and project meetings"
+            return NSLocalizedString("summary.desc.planning", comment: "Planning mode description")
         case .alignment:
-            return "For alignment and strategic sessions"
+            return NSLocalizedString("summary.desc.alignment", comment: "Alignment mode description")
         case .brainstorm:
-            return "For creative brainstorming and ideation sessions"
+            return NSLocalizedString("summary.desc.brainstorm", comment: "Brainstorm mode description")
         case .lecture:
-            return "For lectures, talks, and learning content"
+            return NSLocalizedString("summary.desc.lecture", comment: "Lecture mode description")
         case .interview:
-            return "For interviews, Q&A sessions, and structured conversations"
+            return NSLocalizedString("summary.desc.interview", comment: "Interview mode description")
         case .personal:
-            return "For general conversations and topics"
+            return NSLocalizedString("summary.desc.personal", comment: "Personal mode description")
         }
     }
 }

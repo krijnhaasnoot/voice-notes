@@ -103,6 +103,7 @@
 /* AI Summary Modes */
 "summary.mode.personal" = "Persoonlijk";
 "summary.mode.primaryCare" = "Eerstelijnszorg";
+"summary.mode.patientRecord" = "Patiënten Dossier";
 "summary.mode.dentist" = "Tandarts";
 "summary.mode.techTeam" = "Technisch team";
 "summary.mode.planning" = "Planning";
@@ -114,6 +115,7 @@
 /* AI Summary Mode Descriptions */
 "summary.desc.personal" = "Voor algemene gesprekken en onderwerpen";
 "summary.desc.primaryCare" = "Voor eerstelijnszorgconsulten met patiënten";
+"summary.desc.patientRecord" = "Voor uitgebreide patiëntendocumentatie en medische dossiers";
 "summary.desc.dentist" = "Voor tandheelkundige behandelingen en consulten";
 "summary.desc.techTeam" = "Voor technische teamvergaderingen en ontwikkelingsdiscussies";
 "summary.desc.planning" = "Voor planning- en projectvergaderingen";

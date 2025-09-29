@@ -103,6 +103,7 @@
 /* AI Summary Modes */
 "summary.mode.personal" = "Personal";
 "summary.mode.primaryCare" = "Primary Care";
+"summary.mode.patientRecord" = "Patient Record";
 "summary.mode.dentist" = "Dentist";
 "summary.mode.techTeam" = "Tech Team";
 "summary.mode.planning" = "Planning";
@@ -114,6 +115,7 @@
 /* AI Summary Mode Descriptions */
 "summary.desc.personal" = "For general conversations and topics";
 "summary.desc.primaryCare" = "For primary care consultations with patients";
+"summary.desc.patientRecord" = "For comprehensive patient documentation and medical records";
 "summary.desc.dentist" = "For dental treatments and consultations";
 "summary.desc.techTeam" = "For technical team meetings and development discussions";
 "summary.desc.planning" = "For planning and project meetings";
