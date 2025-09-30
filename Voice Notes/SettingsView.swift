@@ -405,15 +405,6 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Done") {
-                    dismiss()
-                }
-                .font(.poppins.headline)
-                .foregroundColor(.blue)
-            }
-        }
         .sheet(isPresented: $showingTour) {
             AppTourView(onComplete: {
                 showingTour = false

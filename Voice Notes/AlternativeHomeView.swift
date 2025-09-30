@@ -18,6 +18,34 @@ struct AlternativeHomeView: View {
     @State private var sessionRecordingIds: Set<UUID> = []
     @State private var appDidBecomeActive = false
     
+    // Computed properties for stable UI state
+    private var recordingButtonGradient: LinearGradient {
+        if audioRecorder.isRecording {
+            if isPaused {
+                return LinearGradient(colors: [.orange.opacity(0.8), .orange], startPoint: .top, endPoint: .bottom)
+            } else {
+                return LinearGradient(colors: [.red.opacity(0.8), .red], startPoint: .top, endPoint: .bottom)
+            }
+        } else {
+            return LinearGradient(colors: [.blue.opacity(0.8), .blue], startPoint: .top, endPoint: .bottom)
+        }
+    }
+    
+    private var recordingButtonIcon: String {
+        if audioRecorder.isRecording {
+            return isPaused ? "play.fill" : "stop.fill"
+        } else {
+            return "mic.fill"
+        }
+    }
+    
+    private var recordingButtonScale: CGFloat {
+        if audioRecorder.isRecording && !isPaused {
+            return 0.95
+        } else {
+            return 1.0
+        }
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -93,7 +121,13 @@ struct AlternativeHomeView: View {
                         // Main record button (larger)
                         Button(action: {
                             if permissionGranted {
-                                toggleRecording()
+                                if audioRecorder.isRecording && isPaused {
+                                    // If paused, resume recording
+                                    togglePause()
+                                } else {
+                                    // Normal record/stop behavior
+                                    toggleRecording()
+                                }
                             } else {
                                 requestPermissions()
                             }
@@ -109,12 +143,10 @@ struct AlternativeHomeView: View {
                                     .shadow(color: .black.opacity(0.15), radius: 12, y: 6)
                                 
                                 Circle()
-                                    .fill(audioRecorder.isRecording ? 
-                                          LinearGradient(colors: [.red.opacity(0.8), .red], startPoint: .top, endPoint: .bottom) : 
-                                          LinearGradient(colors: [.blue.opacity(0.8), .blue], startPoint: .top, endPoint: .bottom))
+                                    .fill(recordingButtonGradient)
                                     .frame(width: 90, height: 90)
                                     .overlay {
-                                        Image(systemName: audioRecorder.isRecording ? "stop.fill" : "mic.fill")
+                                        Image(systemName: recordingButtonIcon)
                                             .font(.system(size: 36, weight: .bold))
                                             .foregroundStyle(.white)
                                             .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
@@ -123,8 +155,8 @@ struct AlternativeHomeView: View {
                         }
                         .buttonStyle(.plain)
                         .contentShape(Circle())
-                        .scaleEffect(audioRecorder.isRecording ? 0.95 : 1.0)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: audioRecorder.isRecording)
+                        .scaleEffect(recordingButtonScale)
+                        .animation(.easeInOut(duration: 0.2), value: recordingButtonScale)
                         .accessibilityLabel(audioRecorder.isRecording ? "Stop recording" : "Start recording")
                         .applyIf(isLiquidGlassAvailable) { view in
                             view.glassEffect(.regular.interactive())

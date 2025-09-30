@@ -4,6 +4,7 @@ struct TelemetryView: View {
     private let telemetryService = EnhancedTelemetryService.shared
     private let aggregator = TelemetryAggregator()
     @ObservedObject var recordingsManager: RecordingsManager
+    @ObservedObject private var aggregatedService = AggregatedAnalyticsService.shared
     
     @State private var selectedRange: AnalysisRange = AnalysisRange(days: 30)
     @State private var showingExportSheet = false
@@ -14,6 +15,13 @@ struct TelemetryView: View {
     var body: some View {
         List {
             overallStatsSection
+            
+            // Global Insights
+            Section("📈 Global Insights") {
+                globalInsightsSection
+            }
+            .headerProminence(.increased)
+            
             periodSelectionSection
             
             // Core Usage Metrics
@@ -53,6 +61,45 @@ struct TelemetryView: View {
                 ShareSheet(items: [data])
             }
         }
+        .task {
+            await loadAggregatedData()
+        }
+        .refreshable {
+            await loadAggregatedData()
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func loadAggregatedData() async {
+        await aggregatedService.fetchAggregatedMetrics()
+        await aggregatedService.getUserSegments()
+    }
+    
+    private func formatLargeNumber(_ number: Int) -> String {
+        if number >= 1000000 {
+            return String(format: "%.1fM", Double(number) / 1000000.0)
+        } else if number >= 1000 {
+            return String(format: "%.1fK", Double(number) / 1000.0)
+        } else {
+            return "\(number)"
+        }
+    }
+    
+    private func formatDurationHours(_ hours: Double) -> String {
+        if hours >= 8760 { // More than a year
+            return String(format: "%.1f years", hours / 8760)
+        } else if hours >= 24 { // More than a day
+            return String(format: "%.0f days", hours / 24)
+        } else {
+            return String(format: "%.0fh", hours)
+        }
+    }
+    
+    private func formatRelativeTime(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
     
     // MARK: - Overall Stats Tiles
@@ -60,37 +107,178 @@ struct TelemetryView: View {
     private var overallStatsSection: some View {
         Section {
             VStack(spacing: 16) {
-                // Top row - Main stats
+                // Header for admin context
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("🌍 Global Analytics")
+                            .font(.poppins.headline)
+                            .fontWeight(.bold)
+                        Text("Aggregated data from all users")
+                            .font(.poppins.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    if aggregatedService.isLoading {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else if let lastUpdated = aggregatedService.lastUpdated {
+                        Text("Updated \(formatRelativeTime(lastUpdated))")
+                            .font(.poppins.caption2)
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                    }
+                }
+                .padding(.bottom, 8)
+                
+                // Top row - User & Usage stats
                 HStack(spacing: 16) {
                     StatCard(
-                        icon: "waveform",
-                        value: "\(recordingsManager.recordings.count)",
-                        label: "Recording\(recordingsManager.recordings.count == 1 ? "" : "s")"
+                        icon: "person.3.fill",
+                        value: "\(aggregatedService.aggregatedMetrics?.totalUsers ?? 0)",
+                        label: "Total Users"
                     )
                     
                     StatCard(
-                        icon: "clock",
-                        value: totalDurationText,
-                        label: "Total Time"
+                        icon: "person.2.wave.2.fill",
+                        value: "\(aggregatedService.aggregatedMetrics?.activeUsers ?? 0)",
+                        label: "Active Users"
                     )
                 }
                 
-                // Second row - Additional insights
+                // Second row - Recording stats
                 HStack(spacing: 16) {
                     StatCard(
-                        icon: "calendar",
-                        value: daysSinceFirstRecording,
-                        label: "Days Active"
+                        icon: "waveform",
+                        value: formatLargeNumber(aggregatedService.aggregatedMetrics?.totalRecordings ?? 0),
+                        label: "Total Recordings"
                     )
                     
                     StatCard(
+                        icon: "clock.fill",
+                        value: formatDurationHours(aggregatedService.aggregatedMetrics?.totalDurationHours ?? 0),
+                        label: "Recording Time"
+                    )
+                }
+                
+                // Third row - Performance metrics
+                HStack(spacing: 16) {
+                    StatCard(
                         icon: "chart.line.uptrend.xyaxis",
-                        value: averageRecordingsPerWeek,
-                        label: "Per Week"
+                        value: String(format: "%.1f%%", (aggregatedService.aggregatedMetrics?.retentionRate ?? 0) * 100),
+                        label: "Retention Rate"
+                    )
+                    
+                    StatCard(
+                        icon: "timer",
+                        value: String(format: "%.1f min", aggregatedService.aggregatedMetrics?.averageSessionLength ?? 0),
+                        label: "Avg Session"
                     )
                 }
             }
             .padding(.vertical, 8)
+        }
+    }
+    
+    // MARK: - Global Insights Section
+    
+    private var globalInsightsSection: some View {
+        VStack(spacing: 16) {
+            // Top Summary Modes
+            if let metrics = aggregatedService.aggregatedMetrics {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("📝 Most Popular Summary Modes")
+                        .font(.poppins.headline)
+                        .fontWeight(.semibold)
+                    
+                    let sortedModes = metrics.topSummaryModes.sorted { $0.value > $1.value }.prefix(5)
+                    ForEach(Array(sortedModes), id: \.key) { mode, count in
+                        HStack {
+                            Text(mode.capitalized)
+                                .font(.poppins.body)
+                            Spacer()
+                            Text("\(formatLargeNumber(count))")
+                                .font(.poppins.body)
+                                .foregroundColor(.secondary)
+                                .fontWeight(.medium)
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+                
+                Divider()
+                
+                // User Segments
+                if !aggregatedService.userSegments.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("👥 User Segments")
+                            .font(.poppins.headline)
+                            .fontWeight(.semibold)
+                        
+                        ForEach(aggregatedService.userSegments, id: \.segment) { segment in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(segment.segment)
+                                        .font(.poppins.body)
+                                        .fontWeight(.medium)
+                                    Text("\(segment.userCount) users • \(String(format: "%.1f", segment.averageRecordings)) avg recordings")
+                                        .font(.poppins.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                Text("\(String(format: "%.1f", segment.churnRate * 100))%")
+                                    .font(.poppins.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(segment.churnRate > 0.5 ? .red : segment.churnRate > 0.3 ? .orange : .green)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    
+                    Divider()
+                }
+                
+                // Peak Usage Time
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("⏰ Peak Usage Insights")
+                        .font(.poppins.headline)
+                        .fontWeight(.semibold)
+                    
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Peak Time")
+                                .font(.poppins.caption)
+                                .foregroundColor(.secondary)
+                            Text(aggregatedService.getPeakUsageTime())
+                                .font(.poppins.body)
+                                .fontWeight(.medium)
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing) {
+                            Text("Retention Rate")
+                                .font(.poppins.caption)
+                                .foregroundColor(.secondary)
+                            Text(String(format: "%.1f%%", metrics.retentionRate * 100))
+                                .font(.poppins.body)
+                                .fontWeight(.medium)
+                                .foregroundColor(metrics.retentionRate > 0.6 ? .green : metrics.retentionRate > 0.4 ? .orange : .red)
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+            } else {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading global insights...")
+                        .font(.poppins.body)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+            }
         }
     }
     
@@ -558,6 +746,7 @@ struct SummaryFeedbackSectionView: View {
         feedbackByProvider = await feedbackService.getFeedbackByProvider()
         recentNegativeFeedback = await feedbackService.getRecentNegativeFeedback(limit: 5)
     }
+    
 }
 
 // MARK: - Helper Functions Extension
