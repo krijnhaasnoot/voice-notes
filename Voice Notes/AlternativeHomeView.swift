@@ -7,6 +7,7 @@ struct AlternativeHomeView: View {
     @ObservedObject var recordingsManager: RecordingsManager
     @EnvironmentObject var appRouter: AppRouter
     @ObservedObject private var usageVM = UsageViewModel.shared
+    @AppStorage("hasCompletedTour") private var hasCompletedTour = false
 
     @State private var showingPermissionAlert = false
     @State private var permissionGranted = false
@@ -232,7 +233,10 @@ struct AlternativeHomeView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            requestPermissions()
+            // Only request permissions if tour has been completed
+            if hasCompletedTour {
+                requestPermissions()
+            }
             appDidBecomeActive = true
             Task {
                 await usageVM.refresh()

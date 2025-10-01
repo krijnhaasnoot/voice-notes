@@ -777,7 +777,7 @@ struct HomeView: View {
     @ObservedObject var audioRecorder: AudioRecorder
     @ObservedObject var recordingsManager: RecordingsManager
     @EnvironmentObject var appRouter: AppRouter
-    
+
     @State private var showingPermissionAlert = false
     @State private var permissionGranted = false
     @State private var selectedRecording: Recording?
@@ -786,6 +786,7 @@ struct HomeView: View {
     @State private var showingAlternativeView = false
     @State private var isPaused = false
     @AppStorage("useCompactView") private var useCompactView = true
+    @AppStorage("hasCompletedTour") private var hasCompletedTour = false
     
     // AI Summary mode settings
     @AppStorage("defaultMode") private var defaultMode: String = SummaryMode.personal.rawValue
@@ -882,7 +883,12 @@ struct HomeView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { requestPermissions() }
+        .onAppear {
+            // Only request permissions if tour has been completed
+            if hasCompletedTour {
+                requestPermissions()
+            }
+        }
         .alert("Permissions Required", isPresented: $showingPermissionAlert) {
             Button("Settings") {
                 if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
