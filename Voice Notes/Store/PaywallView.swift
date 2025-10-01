@@ -49,7 +49,7 @@ struct PaywallView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.green)
 
-                                    Text("Full access to all features")
+                                    Text("One-time trial • No expiration")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }

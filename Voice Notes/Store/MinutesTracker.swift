@@ -29,15 +29,16 @@ class MinutesTracker: ObservableObject {
     private func loadStoredData() {
         print("📊 MinutesTracker: Loading stored data...")
 
-        // Check if we need to reset for new month
+        // Check if we need to reset for new month (only for paid subscriptions)
         if let storedPeriodStart = userDefaults.object(forKey: periodStartKey) as? Date {
             currentPeriodStart = storedPeriodStart
             let daysSince = Calendar.current.dateComponents([.day], from: storedPeriodStart, to: Date()).day ?? 0
 
             print("📊 Period started: \(storedPeriodStart), days since: \(daysSince)")
 
-            // If more than 30 days have passed, reset the period
-            if daysSince >= 30 {
+            // If more than 30 days have passed and user has a paid subscription, reset the period
+            // Free tier never resets - it's a one-time 30 minute trial
+            if daysSince >= 30 && !isFreeTier {
                 print("📊 Period expired, resetting...")
                 resetPeriod()
             } else {

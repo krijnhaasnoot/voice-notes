@@ -72,9 +72,15 @@ struct MinutesMeterView: View {
                         .font(.headline)
                         .fontWeight(.bold)
 
-                    Text("\(minutesTracker.monthlyLimit) minutes per month")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    if minutesTracker.isFreeTier {
+                        Text("\(minutesTracker.monthlyLimit) minutes total")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("\(minutesTracker.monthlyLimit) minutes per month")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 Spacer()
