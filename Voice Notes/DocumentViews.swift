@@ -361,7 +361,7 @@ struct DocumentDetailView: View {
     @FocusState private var itemFocus: UUID?
     @FocusState private var titleFocus: Bool
     @State private var isRecordingNewItem = false
-    @StateObject private var voiceRecorder = VoiceRecorder()
+    @StateObject private var voiceRecorder = DocumentVoiceRecorder()
     @State private var showingAddTagSheet = false
     
     private var filteredItems: [DocItem] {

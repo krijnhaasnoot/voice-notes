@@ -327,16 +327,24 @@ final class RecordingsManager: ObservableObject {
     }
     
     func startTranscription(for recording: Recording, languageHint: String? = nil) {
+        // Check if Own Key subscriber has API key configured
+        let subscriptionManager = SubscriptionManager.shared
+        if subscriptionManager.isOwnKeySubscriber && !subscriptionManager.hasApiKeyConfigured {
+            print("🎯 RecordingsManager: ❌ Cannot start transcription - Own Key subscriber without API key")
+            updateRecording(recording.id, status: .failed(reason: "API key required. Please add your API key in Settings."))
+            return
+        }
+
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let audioURL = documentsPath.appendingPathComponent(recording.fileName)
-        
+
         print("🎯 RecordingsManager: Starting transcription for recording \(recording.id)")
         print("    File: \(recording.fileName)")
         print("    AudioURL: \(audioURL.path)")
         print("    File exists: \(FileManager.default.fileExists(atPath: audioURL.path))")
-        
+
         updateRecording(recording.id, status: .transcribing(progress: 0.0), languageHint: languageHint)
-        
+
         // Use direct service call like RecordingViewModel does (bypassing ProcessingManager for now)
         Task {
             await performDirectTranscription(recordingId: recording.id, audioURL: audioURL, languageHint: languageHint)
@@ -379,7 +387,14 @@ final class RecordingsManager: ObservableObject {
                 
                 // Start summarization
                 if !transcript.isEmpty {
-                    performDirectSummarization(recordingId: recordingId, transcript: transcript)
+                    // Check if Own Key subscriber has API key configured
+                    let subscriptionManager = SubscriptionManager.shared
+                    if subscriptionManager.isOwnKeySubscriber && !subscriptionManager.hasApiKeyConfigured {
+                        print("🎯 RecordingsManager: ❌ Cannot start summarization - Own Key subscriber without API key")
+                        updateRecording(recordingId, status: .failed(reason: "API key required. Please add your API key in Settings."))
+                    } else {
+                        performDirectSummarization(recordingId: recordingId, transcript: transcript)
+                    }
                 }
             }
             
@@ -484,11 +499,19 @@ final class RecordingsManager: ObservableObject {
     
     func retrySummarization(for recording: Recording) {
         guard let transcript = recording.transcript, !transcript.isEmpty else { return }
-        
+
+        // Check if Own Key subscriber has API key configured
+        let subscriptionManager = SubscriptionManager.shared
+        if subscriptionManager.isOwnKeySubscriber && !subscriptionManager.hasApiKeyConfigured {
+            print("🎯 RecordingsManager: ❌ Cannot start summarization - Own Key subscriber without API key")
+            updateRecording(recording.id, status: .failed(reason: "API key required. Please add your API key in Settings."))
+            return
+        }
+
         telemetryService.logRetryTap(kind: "summarize")
         Analytics.track("retry_tapped", props: ["type": "summary"])
         updateRecording(recording.id, status: .summarizing(progress: 0.0))
-        
+
         // Use direct summarization like the main flow
         performDirectSummarization(recordingId: recording.id, transcript: transcript)
     }

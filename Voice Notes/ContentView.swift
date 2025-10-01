@@ -11,6 +11,8 @@ import Speech
 struct ContentView: View {
     @StateObject private var audioRecorder = AudioRecorder.shared
     @StateObject private var recordingsManager = RecordingsManager.shared
+    @StateObject private var minutesTracker = MinutesTracker.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @State private var showingPermissionAlert = false
     @State private var permissionGranted = false
     @State private var selectedRecording: Recording?
@@ -22,6 +24,9 @@ struct ContentView: View {
     @State private var showingSettings = false
     @State private var searchText = ""
     @State private var showingAlternativeView = false
+    @State private var showingPaywall = false
+    @State private var showingMinutesExhaustedAlert = false
+    @State private var showingApiKeyAlert = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -48,6 +53,10 @@ struct ContentView: View {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 20) {
                                 VStack(spacing: 16) {
+                                    // Minutes meter
+                                    MinutesMeterView(compact: true)
+                                        .padding(.horizontal)
+
                                     recordButton
 
                                     recordingStatusView
@@ -126,24 +135,54 @@ struct ContentView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsView(showingAlternativeView: $showingAlternativeView, recordingsManager: recordingsManager)
         }
+        .sheet(isPresented: $showingPaywall) {
+            PaywallView(canDismiss: true)
+        }
+        .alert("Minutes Exhausted", isPresented: $showingMinutesExhaustedAlert) {
+            Button("Upgrade", role: nil) {
+                showingPaywall = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You've used all \(minutesTracker.monthlyLimit) minutes for this month. Upgrade to continue recording.")
+        }
+        .alert("API Key Required", isPresented: $showingApiKeyAlert) {
+            Button("Open Settings", role: nil) {
+                showingSettings = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You're on the Own Key plan. Please add your API key in AI Provider Settings to start recording.")
+        }
     }
 
     private var recordButton: some View {
-        Button(action: {
-            if permissionGranted {
-                toggleRecording()
+        let canStartRecording = minutesTracker.canRecord && subscriptionManager.canRecord
+
+        return Button(action: {
+            if !audioRecorder.isRecording {
+                if !minutesTracker.canRecord {
+                    showingMinutesExhaustedAlert = true
+                } else if subscriptionManager.isOwnKeySubscriber && !subscriptionManager.hasApiKeyConfigured {
+                    showingApiKeyAlert = true
+                } else if permissionGranted {
+                    toggleRecording()
+                } else {
+                    requestPermissions()
+                }
             } else {
-                requestPermissions()
+                toggleRecording()
             }
         }) {
             Circle()
-                .fill(audioRecorder.isRecording ? Color.red : Color.blue)
+                .fill(audioRecorder.isRecording ? Color.red : (canStartRecording ? Color.blue : Color.gray))
                 .frame(width: 60, height: 60)
                 .overlay(
                     Image(systemName: audioRecorder.isRecording ? "stop.fill" : "mic.fill")
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(.white)
                 )
+                .opacity((!audioRecorder.isRecording && !canStartRecording) ? 0.5 : 1.0)
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
@@ -197,14 +236,23 @@ struct ContentView: View {
                 let result = await MainActor.run {
                     audioRecorder.stopRecording()
                 }
-                
+
+                print("🎙️ ContentView: Recording stopped. Duration: \(result.duration) seconds")
+
+                // Track minutes used
+                await MainActor.run {
+                    print("🎙️ ContentView: About to track usage...")
+                    minutesTracker.addUsage(seconds: result.duration)
+                    print("🎙️ ContentView: Usage tracked!")
+                }
+
                 if let fileName = currentRecordingFileName {
                     let newRecording = Recording(fileName: fileName, date: Date(), duration: result.duration, title: "")
-                    
+
                     await MainActor.run {
                         recordingsManager.addRecording(newRecording)
                     }
-                    
+
                     // Only start transcription if we have a valid file with content
                     if let fileSize = result.fileSize, fileSize > 0 {
                         print("🎯 ContentView: Starting transcription for \(fileName) (size: \(fileSize) bytes)")
@@ -214,7 +262,7 @@ struct ContentView: View {
                     } else {
                         print("🎯 ContentView: ❌ NOT starting transcription - fileSize: \(result.fileSize ?? -1)")
                     }
-                    
+
                     currentRecordingFileName = nil
                 }
             } else {

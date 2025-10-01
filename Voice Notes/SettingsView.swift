@@ -35,12 +35,15 @@ struct SettingsView: View {
     @AppStorage("defaultDocumentType") private var defaultDocumentType: String = DocumentType.todo.rawValue
     @AppStorage("autoSaveToDocuments") private var autoSaveToDocuments: Bool = false
     @AppStorage("useCompactView") private var useCompactView: Bool = true
-    
+
     @Binding var showingAlternativeView: Bool
     @ObservedObject var recordingsManager: RecordingsManager
+    @StateObject private var minutesTracker = MinutesTracker.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showingTour = false
-    
+    @State private var showingPaywall = false
+
     // MARK: - Analytics PIN & Sheet State
     @AppStorage("analyticsPIN") private var analyticsPIN: String = ""
     @State private var showAnalytics = false
@@ -62,6 +65,47 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // Subscription & Minutes Section
+                Section(header: Text("Subscription")) {
+                    MinutesMeterView(compact: false)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+
+                    Button(action: { showingPaywall = true }) {
+                        HStack {
+                            Image(systemName: subscriptionManager.isSubscribed ? "checkmark.seal.fill" : "star.circle.fill")
+                                .foregroundColor(subscriptionManager.isSubscribed ? .green : .yellow)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                if let subscription = subscriptionManager.activeSubscription {
+                                    Text(subscription.displayName)
+                                        .font(.poppins.body)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.primary)
+
+                                    Text("\(subscription.monthlyMinutes) minutes per month")
+                                        .font(.poppins.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Text("Free Trial")
+                                        .font(.poppins.body)
+                                        .foregroundColor(.primary)
+
+                                    Text("60 minutes available")
+                                        .font(.poppins.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                        }
+                    }
+                }
+
                 Section(header: Text("AI Provider")) {
                 NavigationLink(destination: AIProviderSettingsView()) {
                     HStack {
@@ -453,6 +497,9 @@ struct SettingsView: View {
                         }
                     }
             }
+        }
+        .sheet(isPresented: $showingPaywall) {
+            PaywallView(canDismiss: true)
         }
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)

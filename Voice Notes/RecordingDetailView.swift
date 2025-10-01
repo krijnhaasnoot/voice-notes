@@ -5,6 +5,8 @@ struct RecordingDetailView: View {
     let recordingId: UUID
     @ObservedObject var recordingsManager: RecordingsManager
     @EnvironmentObject var documentStore: DocumentStore
+    @StateObject private var minutesTracker = MinutesTracker.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @State private var audioPlayer: AVAudioPlayer?
     @State private var isPlaying = false
     @State private var showingDeleteAlert = false
@@ -24,6 +26,8 @@ struct RecordingDetailView: View {
     @State private var selectedSummaryMode: SummaryMode = .personal
     @State private var selectedSummaryLength: SummaryLength = .standard
     @State private var showingAddTagSheet = false
+    @State private var showingPaywall = false
+    @State private var showingMinutesExhaustedAlert = false
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
@@ -33,13 +37,19 @@ struct RecordingDetailView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {
                             headerSection(recording)
-                            tagsSection(recording)
+
+                            // API Key warning for Own Key subscribers
+                            if subscriptionManager.isOwnKeySubscriber && !subscriptionManager.hasApiKeyConfigured {
+                                apiKeyWarningBanner
+                            }
+
+                            recordingInfoSection(recording)
                             summarySection(recording)
                             transcriptSection(recording)
                             actionItemsSection(recording)
-                            recordingInfoSection(recording)
                             playbackSection(recording)
-                            
+                            tagsSection(recording)
+
                             // Share/Copy buttons at bottom
                             if hasContent(recording) {
                                 shareSection(recording)
@@ -118,6 +128,17 @@ struct RecordingDetailView: View {
                 recordingsManager.addTagToRecording(recordingId: recordingId, tag: tag)
             }
         }
+        .sheet(isPresented: $showingPaywall) {
+            PaywallView(canDismiss: true)
+        }
+        .alert("Minutes Exhausted", isPresented: $showingMinutesExhaustedAlert) {
+            Button("Upgrade", role: nil) {
+                showingPaywall = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You've used all \(minutesTracker.monthlyLimit) minutes for this month. Upgrade to continue recording.")
+        }
         .overlay(alignment: .bottom) {
             if showingToast {
                 toastView
@@ -156,13 +177,77 @@ struct RecordingDetailView: View {
             Spacer()
         }
     }
+
+    private var apiKeyWarningBanner: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "key.fill")
+                    .foregroundColor(.orange)
+                    .font(.title2)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("API Key Required")
+                        .font(.poppins.body)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+
+                    Text("You're on the Own Key plan. Add your API key to use transcription and summaries.")
+                        .font(.poppins.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+
+            NavigationLink(destination: AIProviderSettingsView()) {
+                HStack {
+                    Image(systemName: "gear")
+                    Text("Open AI Provider Settings")
+                        .fontWeight(.medium)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.orange)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding()
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(12)
+    }
     
     private func tagsSection(_ recording: Recording) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Tags")
-                .font(.poppins.headline)
-                .fontWeight(.semibold)
-            
+            HStack {
+                Text("Tags")
+                    .font(.poppins.headline)
+                    .fontWeight(.semibold)
+
+                Spacer()
+
+                // Auto-tag button
+                if recording.tags.isEmpty && (recording.summary != nil || recording.transcript != nil) {
+                    Button(action: {
+                        autoGenerateTags(for: recording)
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 12))
+                            Text("Auto-fill")
+                                .font(.poppins.caption)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .cornerRadius(8)
+                    }
+                }
+            }
+
             TagRowView(
                 tags: recording.tags,
                 maxVisible: 10,
@@ -279,9 +364,15 @@ struct RecordingDetailView: View {
                         .foregroundColor(.blue)
                 } else if case .failed = recording.status, recording.transcript == nil {
                     Button("Retry") {
-                        recordingsManager.retryTranscription(for: recording)
+                        if !minutesTracker.canRecord {
+                            showingMinutesExhaustedAlert = true
+                        } else {
+                            recordingsManager.retryTranscription(for: recording)
+                        }
                     }
                     .font(.poppins.body)
+                    .disabled(!minutesTracker.canRecord)
+                    .opacity(minutesTracker.canRecord ? 1.0 : 0.5)
                     .foregroundColor(.blue)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -999,9 +1090,15 @@ struct RecordingDetailView: View {
             }
             
             Button("Retry") {
-                retryWithSettings(for: recording)
+                if !minutesTracker.canRecord {
+                    showingMinutesExhaustedAlert = true
+                } else {
+                    retryWithSettings(for: recording)
+                }
             }
             .font(.poppins.body)
+            .disabled(!minutesTracker.canRecord)
+            .opacity(minutesTracker.canRecord ? 1.0 : 0.5)
             .foregroundColor(.blue)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -1774,6 +1871,77 @@ struct ActionItemRow: View {
         }
         .onLongPressGesture {
             onSave()
+        }
+    }
+}
+
+// MARK: - Auto-Tagging Extension
+extension RecordingDetailView {
+    private func autoGenerateTags(for recording: Recording) {
+        var suggestedTags: [String] = []
+
+        // Combine summary and transcript for analysis
+        let content = [recording.summary, recording.transcript]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .lowercased()
+
+        // Common categories and keywords
+        let tagCategories: [String: [String]] = [
+            "work": ["meeting", "project", "task", "deadline", "client", "presentation", "email", "office"],
+            "personal": ["family", "friend", "relationship", "home", "life", "personal"],
+            "health": ["health", "doctor", "medicine", "exercise", "fitness", "diet", "wellness"],
+            "finance": ["money", "budget", "expense", "payment", "invoice", "financial", "bank", "investment"],
+            "ideas": ["idea", "brainstorm", "concept", "innovation", "creative", "inspiration"],
+            "shopping": ["buy", "shop", "purchase", "order", "store", "product"],
+            "travel": ["travel", "trip", "vacation", "flight", "hotel", "destination"],
+            "todo": ["todo", "reminder", "task", "action", "need to", "must", "should"],
+            "notes": ["note", "remember", "important", "key point", "highlight"],
+            "urgent": ["urgent", "asap", "immediately", "critical", "priority"]
+        ]
+
+        // Check for category matches
+        for (tag, keywords) in tagCategories {
+            if keywords.contains(where: { content.contains($0) }) {
+                suggestedTags.append(tag)
+            }
+        }
+
+        // Extract potential proper nouns (capitalized words from original text)
+        let originalContent = [recording.summary, recording.transcript]
+            .compactMap { $0 }
+            .joined(separator: " ")
+
+        let words = originalContent.components(separatedBy: .whitespacesAndNewlines)
+        let properNouns = words
+            .filter { word in
+                guard let first = word.first else { return false }
+                return first.isUppercase && word.count > 3 && !["The", "This", "That", "With", "From"].contains(word)
+            }
+            .prefix(3)
+            .map { $0.trimmingCharacters(in: CharacterSet.punctuationCharacters) }
+
+        suggestedTags.append(contentsOf: properNouns)
+
+        // Remove duplicates and limit to 5 tags
+        let uniqueTags = Array(Set(suggestedTags))
+            .filter { !$0.isEmpty }
+            .prefix(5)
+            .map { String($0) }
+
+        // Add tags to recording
+        for tag in uniqueTags {
+            recordingsManager.addTagToRecording(recordingId: recordingId, tag: tag)
+        }
+
+        // Show toast
+        if !uniqueTags.isEmpty {
+            toastMessage = "Added \(uniqueTags.count) tag\(uniqueTags.count == 1 ? "" : "s")"
+            showingToast = true
+
+            // Haptic feedback
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
         }
     }
 }

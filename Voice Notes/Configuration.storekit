@@ -1,0 +1,151 @@
+{
+  "identifier" : "8BAA4E62",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21485300",
+      "localizations" : [
+
+      ],
+      "name" : "Echo Subscriptions",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6670384668",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Perfect for casual users",
+              "displayName" : "Echo Standard",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.kinder.echo.standard.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Echo Standard",
+          "subscriptionGroupID" : "21485300",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "6670384669",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "For power users",
+              "displayName" : "Echo Premium",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.kinder.echo.premium.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Echo Premium",
+          "subscriptionGroupID" : "21485300",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "14.99",
+          "familyShareable" : false,
+          "groupNumber" : 3,
+          "internalID" : "6670384670",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Bring your own API key",
+              "displayName" : "Echo Own Key",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.kinder.echo.ownkey.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Echo Own Key",
+          "subscriptionGroupID" : "21485300",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

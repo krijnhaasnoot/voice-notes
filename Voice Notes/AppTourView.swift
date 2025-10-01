@@ -5,7 +5,7 @@ import AVFoundation
 struct AppTourView: View {
     let onComplete: () -> Void
     @State private var currentPage = 0
-    private let totalPages = 6
+    private let totalPages = 5
     
     var body: some View {
         ZStack {
@@ -66,15 +66,6 @@ struct AppTourView: View {
                     // Page 5: Permissions
                     PermissionsTourPage(onComplete: onComplete)
                     .tag(4)
-                    
-                    // Page 6: Search
-                    TourPage(
-                        systemImage: "magnifyingglass",
-                        title: "Find Anything Fast",
-                        description: "Search through all your recordings and documents instantly. Never lose an important thought again.",
-                        gradient: LinearGradient(colors: [.purple.opacity(0.8), .purple], startPoint: .top, endPoint: .bottom)
-                    )
-                    .tag(5)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.3), value: currentPage)
