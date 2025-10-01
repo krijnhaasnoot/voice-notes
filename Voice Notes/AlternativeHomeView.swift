@@ -7,6 +7,7 @@ struct AlternativeHomeView: View {
     @ObservedObject var recordingsManager: RecordingsManager
     @EnvironmentObject var appRouter: AppRouter
     @ObservedObject private var usageVM = UsageViewModel.shared
+    @ObservedObject private var minutesTracker = MinutesTracker.shared
     @AppStorage("hasCompletedTour") private var hasCompletedTour = false
 
     @State private var showingPermissionAlert = false
@@ -159,8 +160,8 @@ struct AlternativeHomeView: View {
                         .contentShape(Circle())
                         .scaleEffect(recordingButtonScale)
                         .animation(.easeInOut(duration: 0.2), value: recordingButtonScale)
-                        .disabled(!audioRecorder.isRecording && (usageVM.isOverLimit || usageVM.isLoading))
-                        .opacity(!audioRecorder.isRecording && (usageVM.isOverLimit || usageVM.isLoading) ? 0.5 : 1.0)
+                        .disabled(!audioRecorder.isRecording && !minutesTracker.canRecord)
+                        .opacity(!audioRecorder.isRecording && !minutesTracker.canRecord ? 0.5 : 1.0)
                         .accessibilityLabel(audioRecorder.isRecording ? "Stop recording" : "Start recording")
                         .applyIf(isLiquidGlassAvailable) { view in
                             view.glassEffect(.regular.interactive())
@@ -187,9 +188,9 @@ struct AlternativeHomeView: View {
 
                     // Usage quota display
                     if !audioRecorder.isRecording {
-                        Text(usageVM.isLoading ? "Checking quota…" : "Minutes left: \(usageVM.minutesLeft)")
+                        Text("Minutes left: \(minutesTracker.formattedMinutesRemaining)")
                             .font(.caption)
-                            .foregroundStyle(usageVM.isOverLimit ? .red : .secondary)
+                            .foregroundStyle(minutesTracker.isAtLimit ? .red : .secondary)
                             .padding(.top, 8)
                     }
 
