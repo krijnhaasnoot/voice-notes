@@ -288,22 +288,24 @@ private struct PrivacyTourPoint: View {
     let icon: String
     let text: String
     let color: Color
-    
+
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(color)
                 .frame(width: 24, height: 24)
-            
+                .padding(.top, 2)
+
             Text(text)
-                .font(.poppins.medium(size: 14))
+                .font(.poppins.medium(size: 13))
                 .foregroundColor(.primary)
                 .multilineTextAlignment(.leading)
-            
-            Spacer()
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
         .padding(.vertical, 12)
         .background(color.opacity(0.1))
         .cornerRadius(12)
