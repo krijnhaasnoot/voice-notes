@@ -240,7 +240,9 @@ struct AlternativeHomeView: View {
             }
             appDidBecomeActive = true
             Task {
+                // Fetch from backend and sync to local tracker
                 await usageVM.refresh()
+                syncBackendToLocal()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
@@ -375,6 +377,15 @@ private struct ExpandedRecordingSheet: View {
     private func startRecording() async {
         isPaused = false
 
+        // Check backend quota before allowing recording
+        await usageVM.refresh()
+        syncBackendToLocal()
+
+        if usageVM.isOverLimit {
+            print("⚠️ AlternativeHomeView: Backend quota exceeded, blocking recording")
+            return
+        }
+
         // Generate a filename up front for our own tracking/UI purposes
         let fileName = generateFileName()
         currentRecordingFileName = fileName
@@ -484,7 +495,21 @@ private struct ExpandedRecordingSheet: View {
         
         return hasIndicators || (hasMultipleLineBreaks && hasQuestionMarks && hasBackAndForth) || hasDialogue
     }
-    
+
+    // MARK: - Backend Sync
+
+    private func syncBackendToLocal() {
+        // Sync backend usage to local tracker to ensure consistency
+        // Backend is source of truth
+        let backendMinutesUsed = Double(usageVM.secondsUsed) / 60.0
+        let localMinutesUsed = minutesTracker.minutesUsed
+
+        // If there's a significant difference, sync from backend
+        if abs(backendMinutesUsed - localMinutesUsed) > 0.1 {
+            print("📊 Syncing from backend: \(backendMinutesUsed) min (backend) vs \(localMinutesUsed) min (local)")
+            minutesTracker.syncFromBackend(backendMinutesUsed: backendMinutesUsed)
+        }
+    }
 }
 
 // MARK: - Compact Recording Card Component (Bottom of Screen)

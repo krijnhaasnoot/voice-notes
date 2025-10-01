@@ -148,6 +148,15 @@ class MinutesTracker: ObservableObject {
         resetPeriod()
     }
 
+    // MARK: - Backend Sync
+
+    func syncFromBackend(backendMinutesUsed: Double) {
+        print("📊 MinutesTracker: Syncing from backend - \(backendMinutesUsed) min")
+        minutesUsed = backendMinutesUsed
+        saveData()
+        updateLimits()
+    }
+
     // MARK: - Computed Properties
 
     var usagePercentage: Double {
