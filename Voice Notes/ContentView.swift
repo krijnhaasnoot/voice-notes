@@ -11,8 +11,8 @@ import Speech
 struct ContentView: View {
     @StateObject private var audioRecorder = AudioRecorder.shared
     @StateObject private var recordingsManager = RecordingsManager.shared
-    @StateObject private var minutesTracker = MinutesTracker.shared
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @ObservedObject private var minutesTracker = MinutesTracker.shared
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @State private var showingPermissionAlert = false
     @State private var permissionGranted = false
     @State private var selectedRecording: Recording?
@@ -238,12 +238,16 @@ struct ContentView: View {
                 }
 
                 print("🎙️ ContentView: Recording stopped. Duration: \(result.duration) seconds")
+                print("🎙️ ContentView: Current minutes before tracking: \(minutesTracker.minutesUsed)")
 
                 // Track minutes used
                 await MainActor.run {
                     print("🎙️ ContentView: About to track usage...")
+                    print("🎙️ ContentView: MinutesTracker instance ID: \(ObjectIdentifier(minutesTracker))")
+                    print("🎙️ ContentView: MinutesTracker.shared instance ID: \(ObjectIdentifier(MinutesTracker.shared))")
                     minutesTracker.addUsage(seconds: result.duration)
                     print("🎙️ ContentView: Usage tracked!")
+                    print("🎙️ ContentView: Current minutes after tracking: \(minutesTracker.minutesUsed)")
                 }
 
                 if let fileName = currentRecordingFileName {

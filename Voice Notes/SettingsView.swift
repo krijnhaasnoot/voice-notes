@@ -38,8 +38,8 @@ struct SettingsView: View {
 
     @Binding var showingAlternativeView: Bool
     @ObservedObject var recordingsManager: RecordingsManager
-    @StateObject private var minutesTracker = MinutesTracker.shared
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @ObservedObject private var minutesTracker = MinutesTracker.shared
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showingTour = false
     @State private var showingPaywall = false

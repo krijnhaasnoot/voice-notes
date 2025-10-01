@@ -6,7 +6,8 @@ struct AlternativeHomeView: View {
     @ObservedObject var audioRecorder: AudioRecorder
     @ObservedObject var recordingsManager: RecordingsManager
     @EnvironmentObject var appRouter: AppRouter
-    
+    @ObservedObject private var usageVM = UsageViewModel.shared
+
     @State private var showingPermissionAlert = false
     @State private var permissionGranted = false
     @State private var selectedRecording: Recording?
@@ -157,6 +158,8 @@ struct AlternativeHomeView: View {
                         .contentShape(Circle())
                         .scaleEffect(recordingButtonScale)
                         .animation(.easeInOut(duration: 0.2), value: recordingButtonScale)
+                        .disabled(!audioRecorder.isRecording && (usageVM.isOverLimit || usageVM.isLoading))
+                        .opacity(!audioRecorder.isRecording && (usageVM.isOverLimit || usageVM.isLoading) ? 0.5 : 1.0)
                         .accessibilityLabel(audioRecorder.isRecording ? "Stop recording" : "Start recording")
                         .applyIf(isLiquidGlassAvailable) { view in
                             view.glassEffect(.regular.interactive())
@@ -180,7 +183,15 @@ struct AlternativeHomeView: View {
                         }
                     }
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: audioRecorder.isRecording)
-                    
+
+                    // Usage quota display
+                    if !audioRecorder.isRecording {
+                        Text(usageVM.isLoading ? "Checking quota…" : "Minutes left: \(usageVM.minutesLeft)")
+                            .font(.caption)
+                            .foregroundStyle(usageVM.isOverLimit ? .red : .secondary)
+                            .padding(.top, 8)
+                    }
+
                     // Multi-person conversation indicator
                     if audioRecorder.isRecording, let transcript = getCurrentTranscript(), containsMultipleSpeakers(transcript) {
                         HStack(spacing: 8) {
@@ -220,9 +231,12 @@ struct AlternativeHomeView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { 
+        .onAppear {
             requestPermissions()
             appDidBecomeActive = true
+            Task {
+                await usageVM.refresh()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             // Clear session recordings when app becomes inactive
@@ -367,6 +381,15 @@ private struct ExpandedRecordingSheet: View {
     private func stopRecording() {
         isPaused = false
         let result = audioRecorder.stopRecording()
+
+        // Track minutes usage (local + backend)
+        print("🎙️ AlternativeHomeView: Recording stopped. Duration: \(result.duration) seconds")
+        MinutesTracker.shared.addUsage(seconds: result.duration)
+
+        // Book usage to backend
+        Task {
+            await UsageViewModel.shared.book(seconds: Int(ceil(result.duration)), recordedAt: Date())
+        }
 
         // Get the actual filename from the AudioRecorder's file URL
         if let fileURL = result.fileURL {

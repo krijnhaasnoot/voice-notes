@@ -15,7 +15,8 @@ import WatchConnectivity
 @main
 struct Voice_NotesApp: App {
     @StateObject private var documentStore = DocumentStore()
-    
+    @StateObject private var usageViewModel = UsageViewModel.shared
+
     init() {
         // Initialize singletons immediately
         let recorder = AudioRecorder.shared
@@ -60,6 +61,7 @@ struct Voice_NotesApp: App {
                 .environmentObject(documentStore)
                 .environmentObject(AudioRecorder.shared)
                 .environmentObject(RecordingsManager.shared)
+                .environmentObject(usageViewModel)
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
                     handleAppDidBecomeActive()
                 }
@@ -86,6 +88,11 @@ struct Voice_NotesApp: App {
         let currentSessionId = SessionManager.shared.getCurrentSessionId()
         Analytics.track("app_open")
         print("📊 Analytics: App became active, session: \(currentSessionId)")
+
+        // Refresh usage quota
+        Task { @MainActor in
+            await usageViewModel.refresh()
+        }
     }
     
     private func handleAppDidEnterBackground() {

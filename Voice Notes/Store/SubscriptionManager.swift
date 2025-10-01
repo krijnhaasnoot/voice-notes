@@ -45,24 +45,39 @@ class SubscriptionManager: ObservableObject {
     // MARK: - Subscription Status
 
     func updateSubscriptionStatus() async {
+        print("🔐 SubscriptionManager: Checking subscription status...")
         var activeProductID: EchoProductID?
+        var foundTransactions = 0
 
         for await result in Transaction.currentEntitlements {
+            foundTransactions += 1
             do {
                 let transaction = try checkVerified(result)
+                print("🔐 Found transaction #\(foundTransactions): \(transaction.productID)")
 
                 // Check if this is one of our subscription products and it's not expired
                 if let productID = EchoProductID(rawValue: transaction.productID),
                    transaction.revocationDate == nil {
+                    print("🔐 ✅ Active subscription found: \(productID.displayName)")
                     activeProductID = productID
                     break
                 }
             } catch {
-                print("Failed to verify transaction: \(error)")
+                print("🔐 Failed to verify transaction: \(error)")
             }
         }
 
+        print("🔐 Total transactions found: \(foundTransactions)")
+
+        if let active = activeProductID {
+            print("🔐 Setting active subscription to: \(active.displayName) (\(active.monthlyMinutes) min)")
+        } else {
+            print("🔐 No active subscription - using free tier")
+        }
+
+        // Update on main actor since class is @MainActor
         activeSubscription = activeProductID
+        print("🔐 Active subscription property updated, current value: \(activeSubscription?.displayName ?? "nil")")
     }
 
     var isSubscribed: Bool {
@@ -99,6 +114,7 @@ class SubscriptionManager: ObservableObject {
     // MARK: - Purchase
 
     func purchase(_ product: Product) async throws {
+        print("🛒 SubscriptionManager: Starting purchase for \(product.displayName)")
         isLoading = true
         purchaseError = nil
         defer { isLoading = false }
@@ -107,18 +123,25 @@ class SubscriptionManager: ObservableObject {
 
         switch result {
         case .success(let verification):
+            print("🛒 Purchase successful, verifying...")
             let transaction = try checkVerified(verification)
+            print("🛒 Transaction verified: \(transaction.productID)")
             await transaction.finish()
+            print("🛒 Transaction finished, updating subscription status...")
             await updateSubscriptionStatus()
+            print("🛒 Purchase complete!")
 
         case .userCancelled:
+            print("🛒 User cancelled purchase")
             // User cancelled, no error
             break
 
         case .pending:
+            print("🛒 Purchase pending approval")
             purchaseError = "Purchase is pending approval"
 
         @unknown default:
+            print("🛒 Unknown purchase result")
             purchaseError = "Unknown purchase result"
         }
     }

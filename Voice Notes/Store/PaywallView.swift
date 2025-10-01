@@ -2,8 +2,9 @@ import SwiftUI
 import StoreKit
 
 struct PaywallView: View {
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
-    @StateObject private var minutesTracker = MinutesTracker.shared
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    @ObservedObject private var minutesTracker = MinutesTracker.shared
+    @ObservedObject private var usageVM = UsageViewModel.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedProduct: EchoProductID = .premium
@@ -42,7 +43,7 @@ struct PaywallView: View {
                                     HStack(spacing: 6) {
                                         Image(systemName: "gift.fill")
                                             .foregroundColor(.green)
-                                        Text("60-minute trial started")
+                                        Text("30-minute trial started")
                                             .fontWeight(.semibold)
                                     }
                                     .font(.subheadline)
@@ -57,6 +58,23 @@ struct PaywallView: View {
                                 .background(Color.green.opacity(0.1))
                                 .cornerRadius(10)
                                 .transition(.opacity.combined(with: .scale))
+                            }
+
+                            // Current month usage
+                            if !showTrialBanner {
+                                VStack(spacing: 4) {
+                                    Text("Your current month")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("Used \(usageVM.minutesUsedDisplay) min • Left \(usageVM.minutesLeft) min")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.primary)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(10)
                             }
 
                             Text("Choose the plan that fits your needs")
@@ -167,6 +185,7 @@ struct PaywallView: View {
         Task {
             do {
                 try await subscriptionManager.purchase(product)
+                await usageVM.refresh()
                 dismiss()
                 onComplete?()
             } catch {
@@ -180,6 +199,7 @@ struct PaywallView: View {
         Task {
             do {
                 try await subscriptionManager.restorePurchases()
+                await usageVM.refresh()
                 isRestoring = false
                 if subscriptionManager.isSubscribed {
                     dismiss()

@@ -17,7 +17,7 @@ public enum EchoProductID: String, CaseIterable {
         switch self {
         case .standard: return 120
         case .premium: return 600
-        case .ownKey: return 2000
+        case .ownKey: return 10000
         }
     }
 
@@ -62,6 +62,6 @@ public enum EchoProductID: String, CaseIterable {
 
 // Free tier constants
 public struct FreeTier {
-    public static let monthlyMinutes: Int = 60
+    public static let monthlyMinutes: Int = 30
     public static let displayName: String = "Free Trial"
 }

@@ -1,18 +1,21 @@
 import SwiftUI
 
 struct MinutesMeterView: View {
-    @StateObject private var minutesTracker = MinutesTracker.shared
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @ObservedObject private var minutesTracker = MinutesTracker.shared
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @State private var showingPaywall = false
 
     var compact: Bool = false
 
     var body: some View {
-        if compact {
-            compactView
-        } else {
-            fullView
+        Group {
+            if compact {
+                compactView
+            } else {
+                fullView
+            }
         }
+        .id(minutesTracker.minutesUsed) // Force re-render when minutes change
     }
 
     private var compactView: some View {
@@ -23,12 +26,12 @@ struct MinutesMeterView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 if minutesTracker.isFreeTier {
-                    Text("\(minutesTracker.formattedMinutesRemaining) min trial")
+                    Text("\(minutesTracker.formattedMinutesRemaining) trial")
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(meterColor)
                 } else {
-                    Text("\(minutesTracker.formattedMinutesRemaining) min left")
+                    Text("\(minutesTracker.formattedMinutesRemaining) left")
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(meterColor)
@@ -99,7 +102,7 @@ struct MinutesMeterView: View {
                     Spacer()
 
                     if minutesTracker.isFreeTier {
-                        Text("\(minutesTracker.formattedMinutesRemaining) min remaining")
+                        Text("\(minutesTracker.formattedMinutesRemaining) remaining")
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundColor(meterColor)
@@ -138,7 +141,7 @@ struct MinutesMeterView: View {
                             .font(.caption)
                             .foregroundColor(.orange)
                     } else {
-                        Text("\(minutesTracker.formattedMinutesRemaining) minutes remaining")
+                        Text("\(minutesTracker.formattedMinutesRemaining) remaining")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

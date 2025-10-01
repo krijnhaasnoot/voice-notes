@@ -5,8 +5,9 @@ struct RecordingDetailView: View {
     let recordingId: UUID
     @ObservedObject var recordingsManager: RecordingsManager
     @EnvironmentObject var documentStore: DocumentStore
-    @StateObject private var minutesTracker = MinutesTracker.shared
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @ObservedObject private var minutesTracker = MinutesTracker.shared
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    @ObservedObject private var usageVM = UsageViewModel.shared
     @State private var audioPlayer: AVAudioPlayer?
     @State private var isPlaying = false
     @State private var showingDeleteAlert = false
@@ -364,15 +365,15 @@ struct RecordingDetailView: View {
                         .foregroundColor(.blue)
                 } else if case .failed = recording.status, recording.transcript == nil {
                     Button("Retry") {
-                        if !minutesTracker.canRecord {
+                        if usageVM.isOverLimit {
                             showingMinutesExhaustedAlert = true
                         } else {
                             recordingsManager.retryTranscription(for: recording)
                         }
                     }
                     .font(.poppins.body)
-                    .disabled(!minutesTracker.canRecord)
-                    .opacity(minutesTracker.canRecord ? 1.0 : 0.5)
+                    .disabled(usageVM.isOverLimit || usageVM.isLoading)
+                    .opacity((usageVM.isOverLimit || usageVM.isLoading) ? 0.5 : 1.0)
                     .foregroundColor(.blue)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -1090,15 +1091,15 @@ struct RecordingDetailView: View {
             }
             
             Button("Retry") {
-                if !minutesTracker.canRecord {
+                if usageVM.isOverLimit {
                     showingMinutesExhaustedAlert = true
                 } else {
                     retryWithSettings(for: recording)
                 }
             }
             .font(.poppins.body)
-            .disabled(!minutesTracker.canRecord)
-            .opacity(minutesTracker.canRecord ? 1.0 : 0.5)
+            .disabled(usageVM.isOverLimit || usageVM.isLoading)
+            .opacity((usageVM.isOverLimit || usageVM.isLoading) ? 0.5 : 1.0)
             .foregroundColor(.blue)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

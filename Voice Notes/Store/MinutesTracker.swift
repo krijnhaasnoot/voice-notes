@@ -27,25 +27,38 @@ class MinutesTracker: ObservableObject {
     // MARK: - Storage
 
     private func loadStoredData() {
+        print("📊 MinutesTracker: Loading stored data...")
+
         // Check if we need to reset for new month
         if let storedPeriodStart = userDefaults.object(forKey: periodStartKey) as? Date {
             currentPeriodStart = storedPeriodStart
+            let daysSince = Calendar.current.dateComponents([.day], from: storedPeriodStart, to: Date()).day ?? 0
+
+            print("📊 Period started: \(storedPeriodStart), days since: \(daysSince)")
 
             // If more than 30 days have passed, reset the period
-            if Calendar.current.dateComponents([.day], from: storedPeriodStart, to: Date()).day ?? 0 >= 30 {
+            if daysSince >= 30 {
+                print("📊 Period expired, resetting...")
                 resetPeriod()
             } else {
-                minutesUsed = userDefaults.double(forKey: minutesUsedKey)
+                let storedMinutes = userDefaults.double(forKey: minutesUsedKey)
+                minutesUsed = storedMinutes
+                print("📊 Loaded \(String(format: "%.2f", storedMinutes)) minutes from storage")
             }
         } else {
             // First launch
+            print("📊 First launch - initializing period")
             resetPeriod()
         }
+
+        print("📊 Initial state: \(String(format: "%.2f", minutesUsed)) min used")
     }
 
     private func saveData() {
         userDefaults.set(minutesUsed, forKey: minutesUsedKey)
         userDefaults.set(currentPeriodStart, forKey: periodStartKey)
+        userDefaults.synchronize() // Force immediate write
+        print("📊 Saved \(String(format: "%.2f", minutesUsed)) minutes to UserDefaults")
     }
 
     private func resetPeriod() {
@@ -86,31 +99,39 @@ class MinutesTracker: ObservableObject {
 
     func addUsage(seconds: Double) {
         let minutes = seconds / 60.0
-        print("📊 MinutesTracker: Adding \(minutes) minutes (from \(seconds) seconds)")
-        print("📊 Before: \(minutesUsed) min used, \(minutesRemaining) min remaining")
+        print("📊 MinutesTracker: Adding \(String(format: "%.2f", minutes)) minutes (from \(String(format: "%.1f", seconds)) seconds)")
+        print("📊 Before: \(String(format: "%.2f", minutesUsed)) min used, \(String(format: "%.2f", minutesRemaining)) min remaining, limit: \(monthlyLimit)")
 
-        minutesUsed += minutes
+        // Update the value
+        let newUsed = minutesUsed + minutes
+        minutesUsed = newUsed
+
+        // Save to UserDefaults
         saveData()
+
+        // Recalculate limits and remaining
         updateLimits()
 
-        print("📊 After: \(minutesUsed) min used, \(minutesRemaining) min remaining")
-
-        // Force UI update
-        objectWillChange.send()
+        print("📊 After: \(String(format: "%.2f", minutesUsed)) min used, \(String(format: "%.2f", minutesRemaining)) min remaining")
+        print("📊 Published properties updated - triggering UI refresh")
     }
 
     func addUsage(minutes: Double) {
-        print("📊 MinutesTracker: Adding \(minutes) minutes directly")
-        print("📊 Before: \(minutesUsed) min used, \(minutesRemaining) min remaining")
+        print("📊 MinutesTracker: Adding \(String(format: "%.2f", minutes)) minutes directly")
+        print("📊 Before: \(String(format: "%.2f", minutesUsed)) min used, \(String(format: "%.2f", minutesRemaining)) min remaining, limit: \(monthlyLimit)")
 
-        minutesUsed += minutes
+        // Update the value
+        let newUsed = minutesUsed + minutes
+        minutesUsed = newUsed
+
+        // Save to UserDefaults
         saveData()
+
+        // Recalculate limits and remaining
         updateLimits()
 
-        print("📊 After: \(minutesUsed) min used, \(minutesRemaining) min remaining")
-
-        // Force UI update
-        objectWillChange.send()
+        print("📊 After: \(String(format: "%.2f", minutesUsed)) min used, \(String(format: "%.2f", minutesRemaining)) min remaining")
+        print("📊 Published properties updated - triggering UI refresh")
     }
 
     // MARK: - Check Availability
@@ -146,7 +167,10 @@ class MinutesTracker: ObservableObject {
     }
 
     var formattedMinutesRemaining: String {
-        String(format: "%.1f", max(0, minutesRemaining))
+        let totalSeconds = max(0, minutesRemaining * 60)
+        let minutes = Int(totalSeconds) / 60
+        let seconds = Int(totalSeconds) % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 
     var nextResetDate: Date {
