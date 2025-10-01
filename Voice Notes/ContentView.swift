@@ -561,7 +561,7 @@ struct RecordingListRow: View, Equatable {
             
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
-                    .font(.poppins.title3)
+                    .font(.poppins.body)
                     .fontWeight(.semibold)
                     .lineLimit(2)
                     .foregroundColor(.primary)

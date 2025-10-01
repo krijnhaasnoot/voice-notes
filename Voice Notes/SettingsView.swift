@@ -45,10 +45,6 @@ struct SettingsView: View {
     @AppStorage("analyticsPIN") private var analyticsPIN: String = ""
     @State private var showAnalytics = false
     @State private var showPinSheet = false
-    @State private var pinEntry: String = ""
-    @State private var newPin: String = ""
-    @State private var confirmPin: String = ""
-    @State private var pinError: String?
     @State private var showResetPinConfirm = false
     
     private var selectedMode: SummaryMode {
@@ -393,12 +389,12 @@ struct SettingsView: View {
                     }
                     .padding(.vertical, 4)
                     .contentShape(Rectangle())
-                    .onLongPressGesture(minimumDuration: 1.0) {
-                        // Present PIN gate first
-                        pinEntry = ""
-                        newPin = ""
-                        confirmPin = ""
-                        pinError = nil
+                    .onLongPressGesture(minimumDuration: 0.5) {
+                        // Instant haptic feedback
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+
+                        // Show PIN sheet immediately
                         showPinSheet = true
                     }
                 }
@@ -411,100 +407,52 @@ struct SettingsView: View {
             })
         }
         .sheet(isPresented: $showPinSheet) {
-            NavigationStack {
-                VStack(spacing: 16) {
-                    if analyticsPIN.isEmpty {
-                        // Set a new PIN flow
-                        Text("Set Analytics PIN")
-                            .font(.poppins.headline)
-                        Text("Create a 4–8 digit code to protect the analytics dashboard.")
-                            .font(.poppins.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                        SecureField("New PIN", text: $newPin)
-                            .textContentType(.oneTimeCode)
-                            .keyboardType(.numberPad)
-                            .padding(12)
-                            .background(Color(.secondarySystemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        SecureField("Confirm PIN", text: $confirmPin)
-                            .textContentType(.oneTimeCode)
-                            .keyboardType(.numberPad)
-                            .padding(12)
-                            .background(Color(.secondarySystemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        if let pinError {
-                            Text(pinError)
-                                .font(.poppins.caption)
-                                .foregroundColor(.red)
-                        }
-                        Button {
-                            pinError = nil
-                            let trimmed = newPin.trimmingCharacters(in: .whitespaces)
-                            guard trimmed.count >= 4, trimmed.count <= 8, trimmed.allSatisfy({ $0.isNumber }) else {
-                                pinError = "PIN must be 4–8 digits"
-                                return
-                            }
-                            guard trimmed == confirmPin.trimmingCharacters(in: .whitespaces) else {
-                                pinError = "PINs do not match"
-                                return
-                            }
-                            analyticsPIN = trimmed
-                            showPinSheet = false
-                            showAnalytics = true
-                        } label: {
-                            Text("Save PIN & Open Analytics")
-                                .font(.poppins.headline)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .padding(.top, 8)
-                    } else {
-                        // Enter existing PIN flow
-                        Text("Enter Analytics PIN")
-                            .font(.poppins.headline)
-                        SecureField("PIN", text: $pinEntry)
-                            .textContentType(.oneTimeCode)
-                            .keyboardType(.numberPad)
-                            .padding(12)
-                            .background(Color(.secondarySystemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        if let pinError {
-                            Text(pinError)
-                                .font(.poppins.caption)
-                                .foregroundColor(.red)
-                        }
-                        HStack(spacing: 12) {
-                            Button("Cancel") {
-                                showPinSheet = false
-                            }
-                            .buttonStyle(.bordered)
-                            Button("Unlock") {
-                                pinError = nil
-                                if pinEntry == analyticsPIN {
-                                    showPinSheet = false
-                                    showAnalytics = true
-                                } else {
-                                    pinError = "Incorrect PIN"
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
+            if analyticsPIN.isEmpty {
+                // Create new PIN
+                ModernPINEntryView(
+                    mode: .create,
+                    existingPIN: "",
+                    onSuccess: { newPIN in
+                        analyticsPIN = newPIN
+                        showPinSheet = false
+                        showAnalytics = true
+                    },
+                    onCancel: {
+                        showPinSheet = false
                     }
-                    Spacer(minLength: 0)
-                }
-                .padding()
-                .navigationTitle("Protected")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") { showPinSheet = false }
+                )
+            } else {
+                // Verify existing PIN
+                ModernPINEntryView(
+                    mode: .verify,
+                    existingPIN: analyticsPIN,
+                    onSuccess: { _ in
+                        showPinSheet = false
+                        showAnalytics = true
+                    },
+                    onCancel: {
+                        showPinSheet = false
                     }
-                }
+                )
             }
         }
         .sheet(isPresented: $showAnalytics) {
-            TelemetryView(recordingsManager: recordingsManager)
+            NavigationStack {
+                TelemetryView(recordingsManager: recordingsManager)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button {
+                                showAnalytics = false
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 17, weight: .semibold))
+                                }
+                                .foregroundColor(.blue)
+                            }
+                        }
+                    }
+            }
         }
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)

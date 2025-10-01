@@ -6,22 +6,22 @@ struct AggregatedMetrics: Codable {
     let totalUsers: Int
     let activeUsers: Int           // Active in last 30 days
     let totalRecordings: Int
-    let totalDurationHours: Double
-    let averageSessionLength: Double
-    let totalSessions: Int
-    let retentionRate: Double      // Users active in last 7 days vs last 30 days
+    let totalDurationHours: Double?
+    let averageSessionLength: Double?
+    let totalSessions: Int?
+    let retentionRate: Double?      // Users active in last 7 days vs last 30 days
     let timestamp: Date
-    
+
     // Usage patterns
     let topSummaryModes: [String: Int]
     let recordingLengthDistribution: [String: Int]
     let peakUsageHours: [Int: Int] // Hour of day -> usage count
     let platformDistribution: [String: Int]
-    
+
     // Feature adoption
     let summaryFeedbackRate: Double
-    let documentListUsage: Int
-    let tagUsage: Int
+    let documentListUsage: Int?
+    let tagUsage: Int?
 }
 
 struct UserSegment: Codable {
@@ -37,29 +37,40 @@ struct UserSegment: Codable {
 @MainActor
 class AggregatedAnalyticsService: ObservableObject {
     static let shared = AggregatedAnalyticsService()
-    
+
     @Published var aggregatedMetrics: AggregatedMetrics?
     @Published var userSegments: [UserSegment] = []
     @Published var isLoading: Bool = false
     @Published var lastUpdated: Date?
-    
-    private let mockDataEnabled = true // Enable for development/demo
-    
+    @Published var isUsingFallback: Bool = false
+
+    private let mockDataEnabled = false // Disabled - use real data
+    private let supabaseClient = SupabaseAnalyticsClient()
+
+    // Store additional backend data
+    var topEvents: [SupabaseAnalyticsClient.GroupCount] = []
+    var dailySeries: [SupabaseAnalyticsClient.DailyPoint] = []
+
     private init() {}
     
     // MARK: - Public API
     
-    func fetchAggregatedMetrics() async {
+    func fetchAggregatedMetrics(force: Bool = false) async {
+        // Skip if data is fresh (less than 5 minutes old) and not forced
+        if !force,
+           let lastUpdated = lastUpdated,
+           Date().timeIntervalSince(lastUpdated) < 300 {
+            return
+        }
+
         isLoading = true
-        defer { isLoading = false }
-        
+        defer { isLoading = false; lastUpdated = Date() }
+
         if mockDataEnabled {
             await loadMockData()
         } else {
             await fetchFromBackend()
         }
-        
-        lastUpdated = Date()
     }
     
     func getUserSegments() async {
@@ -159,44 +170,213 @@ class AggregatedAnalyticsService: ObservableObject {
         ]
     }
     
-    // MARK: - Backend Integration (Future Implementation)
-    
+    // MARK: - Real Data Implementation
+
     private func fetchFromBackend() async {
-        // TODO: Replace with actual API calls when backend is ready
-        // Example implementation:
-        
-        /*
-        guard let url = URL(string: "https://api.voicenotes.app/admin/aggregated-metrics") else {
-            return
-        }
-        
+        isUsingFallback = false
+
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let metrics = try JSONDecoder().decode(AggregatedMetrics.self, from: data)
-            
-            await MainActor.run {
-                self.aggregatedMetrics = metrics
+            // Fetch from Supabase
+            let now = Date()
+            guard let since30d = Calendar.current.date(byAdding: .day, value: -30, to: now) else {
+                throw NSError(domain: "DateError", code: -1, userInfo: nil)
             }
+
+            // Parallel fetch all metrics
+            async let totalEvents = supabaseClient.totalEvents(since: since30d)
+            async let distinctUsers = supabaseClient.distinctUsers(since: since30d)
+            async let topEventsList = supabaseClient.topEvents(since: since30d, limit: 5)
+            async let platformDist = supabaseClient.platformDistribution(since: since30d)
+            async let dailyData = supabaseClient.dailySeries(since: 14)
+            async let feedbackData = supabaseClient.feedbackSplit(since: since30d)
+
+            // Await all results
+            let (te, du, events, platforms, series, feedback) = try await (
+                totalEvents,
+                distinctUsers,
+                topEventsList,
+                platformDist,
+                dailyData,
+                feedbackData
+            )
+
+            // Store for UI access
+            self.topEvents = events
+            self.dailySeries = series
+
+            // Map events to summary modes (if event names match pattern)
+            var summaryModes: [String: Int] = [:]
+            for event in events {
+                // Extract summary mode from event names like "summary_generated_personal"
+                if event.key.hasPrefix("summary_generated_") {
+                    let mode = event.key.replacingOccurrences(of: "summary_generated_", with: "")
+                    summaryModes[mode] = event.count
+                }
+            }
+
+            // Build platform distribution
+            let platformDict = Dictionary(uniqueKeysWithValues: platforms.map { ($0.key, $0.count) })
+
+            // Calculate feedback rate
+            let totalFeedback = feedback.thumbsUp + feedback.thumbsDown
+            let feedbackRate = te > 0 ? Double(totalFeedback) / Double(te) : 0.0
+
+            // Create aggregated metrics from backend data
+            self.aggregatedMetrics = AggregatedMetrics(
+                totalUsers: du,
+                activeUsers: max(1, du), // Users active in last 30d
+                totalRecordings: te,
+                totalDurationHours: nil, // Not tracked in current schema
+                averageSessionLength: nil, // Not tracked in current schema
+                totalSessions: nil, // Not tracked in current schema
+                retentionRate: nil, // Would require 7d vs 30d comparison
+                timestamp: Date(),
+                topSummaryModes: summaryModes,
+                recordingLengthDistribution: [:], // Not tracked in current schema
+                peakUsageHours: [:], // Could be computed from daily series if needed
+                platformDistribution: platformDict,
+                summaryFeedbackRate: feedbackRate,
+                documentListUsage: nil, // Not tracked in current schema
+                tagUsage: nil // Not tracked in current schema
+            )
+
+            print("✅ Successfully fetched global analytics from Supabase:")
+            print("   Total events: \(te), Users: \(du), Platforms: \(platforms.count)")
+
         } catch {
-            print("❌ Failed to fetch aggregated metrics: \(error)")
+            print("❌ Backend analytics failed: \(error.localizedDescription)")
+            print("   Falling back to local data...")
+            isUsingFallback = true
+            await loadRealLocalData()
         }
-        */
+    }
+    
+    private func loadRealLocalData() async {
+        // Get real data from local services
+        let recordingsManager = RecordingsManager.shared
+        let telemetryService = EnhancedTelemetryService.shared
+        let feedbackService = SummaryFeedbackService.shared
         
-        // For now, use mock data
-        await loadMockData()
+        // Simulate brief loading for UX
+        try? await Task.sleep(for: .milliseconds(300))
+        
+        // Calculate real metrics
+        let recordings = recordingsManager.recordings
+        let totalRecordings = recordings.count
+        let totalDurationHours = recordings.reduce(0) { $0 + $1.duration } / 3600.0
+        
+        // Calculate summary mode distribution
+        var summaryModeCount: [String: Int] = [:]
+        for recording in recordings {
+            if let mode = recording.detectedMode {
+                summaryModeCount[mode, default: 0] += 1
+            } else {
+                summaryModeCount["personal", default: 0] += 1
+            }
+        }
+        
+        // Calculate recording length distribution
+        var lengthDistribution: [String: Int] = [:]
+        for recording in recordings {
+            let bucket = RecordingBucket.bucket(for: recording.duration)
+            lengthDistribution[bucket.rawValue, default: 0] += 1
+        }
+        
+        // Calculate peak usage hours (simplified - based on recording creation times)
+        var peakHours: [Int: Int] = [:]
+        for recording in recordings {
+            let hour = Calendar.current.component(.hour, from: recording.date)
+            peakHours[hour, default: 0] += 1
+        }
+        
+        // Get feedback stats
+        let feedbackStats = await feedbackService.getFeedbackStats()
+        let feedbackRate = totalRecordings > 0 ? Double(feedbackStats.totalFeedback) / Double(totalRecordings) : 0.0
+        
+        // Document usage - simplified without direct DocumentStore access
+        let documentCount = 0 // Would need to be passed in or accessed differently
+        let totalDocumentItems = 0
+        
+        // Calculate session metrics (simplified)
+        let averageSessionLength = totalRecordings > 0 ? (totalDurationHours * 60) / Double(totalRecordings) : 0.0
+        let totalSessions = max(totalRecordings, 1) // Simplified - assume 1 session per recording minimum
+        
+        // Since this is local data, we only have 1 "user" (the current user)
+        // But we can provide meaningful local statistics
+        aggregatedMetrics = AggregatedMetrics(
+            totalUsers: 1, // Local user only
+            activeUsers: totalRecordings > 0 ? 1 : 0, // Active if has recordings
+            totalRecordings: totalRecordings,
+            totalDurationHours: totalDurationHours,
+            averageSessionLength: averageSessionLength,
+            totalSessions: totalSessions,
+            retentionRate: totalRecordings > 0 ? 1.0 : 0.0, // 100% retention for single user
+            timestamp: Date(),
+            topSummaryModes: summaryModeCount,
+            recordingLengthDistribution: lengthDistribution,
+            peakUsageHours: peakHours,
+            platformDistribution: ["iPhone": totalRecordings], // Assume iPhone for simplicity
+            summaryFeedbackRate: feedbackRate,
+            documentListUsage: documentCount,
+            tagUsage: recordingsManager.recordings.reduce(0) { $0 + $1.tags.count }
+        )
+
+        print("ℹ️ Using local fallback analytics: \(totalRecordings) recordings")
     }
     
     private func fetchUserSegmentsFromBackend() async {
-        // TODO: Replace with actual API calls when backend is ready
-        await loadMockUserSegments()
+        await loadRealUserSegments()
+    }
+    
+    private func loadRealUserSegments() async {
+        // For local data, create a single user segment based on actual usage
+        let recordingsManager = RecordingsManager.shared
+        let recordings = recordingsManager.recordings
+        let totalRecordings = recordings.count
+        let totalDurationHours = recordings.reduce(0) { $0 + $1.duration } / 3600.0
+        
+        // Determine user segment based on usage patterns
+        let segment: String
+        let churnRate: Double
+        
+        if totalRecordings == 0 {
+            segment = "New User"
+            churnRate = 1.0 // No usage yet
+        } else if totalRecordings >= 50 {
+            segment = "Power User"
+            churnRate = 0.1 // Very engaged
+        } else if totalRecordings >= 10 {
+            segment = "Regular User"
+            churnRate = 0.2 // Active user
+        } else {
+            segment = "Casual User"
+            churnRate = 0.4 // Light usage
+        }
+        
+        userSegments = [
+            UserSegment(
+                segment: segment,
+                userCount: 1, // Single local user
+                averageRecordings: Double(totalRecordings),
+                averageDuration: totalDurationHours,
+                churnRate: churnRate
+            )
+        ]
     }
     
     // MARK: - Helper Methods
     
     func getActiveUserGrowthRate() -> Double {
+        // For single user, calculate based on recent activity
         guard let metrics = aggregatedMetrics else { return 0.0 }
-        // Mock calculation - in real implementation, compare with previous period
-        return 0.23 // 23% growth
+        
+        // Check if user has been active recently (recordings in last 7 days)
+        let recordingsManager = RecordingsManager.shared
+        let recentRecordings = recordingsManager.recordings.filter {
+            Calendar.current.dateInterval(of: .weekOfYear, for: Date())?.contains($0.date) == true
+        }
+        
+        return recentRecordings.count > 0 ? 1.0 : 0.0 // 100% if active, 0% if not
     }
     
     func getChurnRate() -> Double {

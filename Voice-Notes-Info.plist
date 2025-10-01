@@ -10,6 +10,8 @@
 	<dict/>
 	<key>OpenAIAPIKey</key>
 	<string>$(OPENAI_API_KEY)</string>
+	<key>SUPABASE_ANON_KEY</key>
+	<string>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJoZmhhdGV5cWRpeXNnb29pcXRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3NDkxNjEsImV4cCI6MjA3NDMyNTE2MX0.wQXG_26AYWe-euRqtpCuU1BpJJ1jqQQkAAkZtAXZiL0</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Poppins-Regular.ttf</string>

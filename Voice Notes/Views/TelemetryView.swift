@@ -9,6 +9,9 @@ struct TelemetryView: View {
     @State private var selectedRange: AnalysisRange = AnalysisRange(days: 30)
     @State private var showingExportSheet = false
     @State private var exportData: Data?
+    @State private var showingClearConfirmation = false
+    @State private var hasLoadedOnce = false
+    @Environment(\.dismiss) private var dismiss
     
     private let rangeOptions = [1, 7, 30]
     
@@ -16,8 +19,8 @@ struct TelemetryView: View {
         List {
             overallStatsSection
             
-            // Global Insights
-            Section("📈 Global Insights") {
+            // Personal Insights
+            Section("📈 Personal Insights") {
                 globalInsightsSection
             }
             .headerProminence(.increased)
@@ -53,27 +56,66 @@ struct TelemetryView: View {
             dataManagementSection
         }
         .navigationTitle("Usage Analytics")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingExportSheet) {
             if let data = exportData {
                 ShareSheet(items: [data])
             }
         }
         .task {
-            await loadAggregatedData()
+            // Only load on first appearance to avoid blocking UI
+            if !hasLoadedOnce {
+                hasLoadedOnce = true
+                // Load in background without blocking the view
+                Task.detached(priority: .userInitiated) {
+                    await loadAggregatedDataInBackground()
+                }
+            }
+        }
+        .onAppear {
+            // If data is stale (last updated > 5 minutes ago), refresh in background
+            if let lastUpdated = aggregatedService.lastUpdated,
+               Date().timeIntervalSince(lastUpdated) > 300 {
+                Task.detached(priority: .background) {
+                    await loadAggregatedDataInBackground()
+                }
+            }
         }
         .refreshable {
-            await loadAggregatedData()
+            // Force refresh when user manually pulls to refresh
+            await aggregatedService.fetchAggregatedMetrics(force: true)
+            await aggregatedService.getUserSegments()
+        }
+        .alert("Clear Analytics Data?", isPresented: $showingClearConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Clear All Data", role: .destructive) {
+                clearAnalyticsData()
+            }
+        } message: {
+            Text("This will permanently delete all local analytics data including sessions, events, and usage statistics. This cannot be undone.")
         }
     }
     
     // MARK: - Helper Functions
-    
+
     private func loadAggregatedData() async {
         await aggregatedService.fetchAggregatedMetrics()
         await aggregatedService.getUserSegments()
+    }
+
+    @MainActor
+    private func loadAggregatedDataInBackground() async {
+        await aggregatedService.fetchAggregatedMetrics()
+        await aggregatedService.getUserSegments()
+    }
+
+    private func clearAnalyticsData() {
+        telemetryService.clearAllData()
+
+        // Force UI refresh by reloading aggregated data
+        Task {
+            await loadAggregatedData()
+        }
     }
     
     private func formatLargeNumber(_ number: Int) -> String {
@@ -102,6 +144,14 @@ struct TelemetryView: View {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
     
+    private var daysSinceFirstRecording: String {
+        guard let firstRecording = recordingsManager.recordings.min(by: { $0.date < $1.date }) else {
+            return "0"
+        }
+        let days = Calendar.current.dateComponents([.day], from: firstRecording.date, to: Date()).day ?? 0
+        return "\(days)"
+    }
+    
     // MARK: - Overall Stats Tiles
     
     private var overallStatsSection: some View {
@@ -110,16 +160,16 @@ struct TelemetryView: View {
                 // Header for admin context
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("🌍 Global Analytics")
+                        Text(aggregatedService.isUsingFallback ? "📊 Personal Analytics" : "🌍 Global Analytics")
                             .font(.poppins.headline)
                             .fontWeight(.bold)
-                        Text("Aggregated data from all users")
+                        Text(aggregatedService.isUsingFallback ? "Local data only (offline)" : "Aggregated data from all users")
                             .font(.poppins.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(aggregatedService.isUsingFallback ? .orange : .secondary)
                     }
-                    
+
                     Spacer()
-                    
+
                     if aggregatedService.isLoading {
                         ProgressView()
                             .scaleEffect(0.8)
@@ -134,15 +184,15 @@ struct TelemetryView: View {
                 // Top row - User & Usage stats
                 HStack(spacing: 16) {
                     StatCard(
-                        icon: "person.3.fill",
-                        value: "\(aggregatedService.aggregatedMetrics?.totalUsers ?? 0)",
-                        label: "Total Users"
+                        icon: "person.circle.fill",
+                        value: aggregatedService.aggregatedMetrics?.activeUsers ?? 0 > 0 ? "Active" : "Inactive",
+                        label: "User Status"
                     )
                     
                     StatCard(
-                        icon: "person.2.wave.2.fill",
-                        value: "\(aggregatedService.aggregatedMetrics?.activeUsers ?? 0)",
-                        label: "Active Users"
+                        icon: "calendar.circle.fill",
+                        value: daysSinceFirstRecording,
+                        label: "Days Using"
                     )
                 }
                 
@@ -154,26 +204,50 @@ struct TelemetryView: View {
                         label: "Total Recordings"
                     )
                     
-                    StatCard(
-                        icon: "clock.fill",
-                        value: formatDurationHours(aggregatedService.aggregatedMetrics?.totalDurationHours ?? 0),
-                        label: "Recording Time"
-                    )
+                    if let totalDuration = aggregatedService.aggregatedMetrics?.totalDurationHours {
+                        StatCard(
+                            icon: "clock.fill",
+                            value: formatDurationHours(totalDuration),
+                            label: "Recording Time"
+                        )
+                    } else {
+                        StatCard(
+                            icon: "clock.fill",
+                            value: "N/A",
+                            label: "Recording Time"
+                        )
+                    }
                 }
                 
                 // Third row - Performance metrics
                 HStack(spacing: 16) {
-                    StatCard(
-                        icon: "chart.line.uptrend.xyaxis",
-                        value: String(format: "%.1f%%", (aggregatedService.aggregatedMetrics?.retentionRate ?? 0) * 100),
-                        label: "Retention Rate"
-                    )
-                    
-                    StatCard(
-                        icon: "timer",
-                        value: String(format: "%.1f min", aggregatedService.aggregatedMetrics?.averageSessionLength ?? 0),
-                        label: "Avg Session"
-                    )
+                    if let retentionRate = aggregatedService.aggregatedMetrics?.retentionRate {
+                        StatCard(
+                            icon: "chart.line.uptrend.xyaxis",
+                            value: String(format: "%.1f%%", retentionRate * 100),
+                            label: "Retention Rate"
+                        )
+                    } else {
+                        StatCard(
+                            icon: "chart.line.uptrend.xyaxis",
+                            value: "N/A",
+                            label: "Retention Rate"
+                        )
+                    }
+
+                    if let avgSession = aggregatedService.aggregatedMetrics?.averageSessionLength {
+                        StatCard(
+                            icon: "timer",
+                            value: String(format: "%.1f min", avgSession),
+                            label: "Avg Session"
+                        )
+                    } else {
+                        StatCard(
+                            icon: "timer",
+                            value: "N/A",
+                            label: "Avg Session"
+                        )
+                    }
                 }
             }
             .padding(.vertical, 8)
@@ -256,14 +330,16 @@ struct TelemetryView: View {
                         
                         Spacer()
                         
-                        VStack(alignment: .trailing) {
-                            Text("Retention Rate")
-                                .font(.poppins.caption)
-                                .foregroundColor(.secondary)
-                            Text(String(format: "%.1f%%", metrics.retentionRate * 100))
-                                .font(.poppins.body)
-                                .fontWeight(.medium)
-                                .foregroundColor(metrics.retentionRate > 0.6 ? .green : metrics.retentionRate > 0.4 ? .orange : .red)
+                        if let retentionRate = metrics.retentionRate {
+                            VStack(alignment: .trailing) {
+                                Text("Retention Rate")
+                                    .font(.poppins.caption)
+                                    .foregroundColor(.secondary)
+                                Text(String(format: "%.1f%%", retentionRate * 100))
+                                    .font(.poppins.body)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(retentionRate > 0.6 ? .green : retentionRate > 0.4 ? .orange : .red)
+                            }
                         }
                     }
                 }
@@ -294,14 +370,6 @@ struct TelemetryView: View {
         }
     }
     
-    private var daysSinceFirstRecording: String {
-        guard let firstRecording = recordingsManager.recordings.min(by: { $0.date < $1.date }) else {
-            return "0"
-        }
-        let days = Date().timeIntervalSince(firstRecording.date)
-        let dayCount = max(1, Int(days / 86400)) // 86400 seconds in a day
-        return "\(dayCount)"
-    }
     
     private var averageRecordingsPerWeek: String {
         guard !recordingsManager.recordings.isEmpty,
@@ -606,7 +674,7 @@ struct TelemetryView: View {
             #endif
             
             Button("Clear All Analytics Data", role: .destructive) {
-                telemetryService.clearAllData()
+                showingClearConfirmation = true
             }
         }
     }

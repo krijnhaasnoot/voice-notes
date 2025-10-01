@@ -14,7 +14,7 @@ struct RecordingRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(displayTitle)
-                        .font(.headline)
+                        .font(.body)
                         .fontWeight(.medium)
                         .lineLimit(1)
                     
