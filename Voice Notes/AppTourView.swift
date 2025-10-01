@@ -181,7 +181,7 @@ private struct PermissionsTourPage: View {
 
                 PermissionPoint(
                     icon: "hand.raised.fill",
-                    text: "No background recording or listening",
+                    text: "Only records when you press the button",
                     color: .orange
                 )
             }
