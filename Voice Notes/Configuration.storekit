@@ -4,7 +4,21 @@
 
   ],
   "products" : [
-
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "6670384671",
+      "localizations" : [
+        {
+          "description" : "Add 3 hours of recording time",
+          "displayName" : "3 Hours Recording Time",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.kinder.echo.3hours",
+      "referenceName" : "3 Hours Top-Up",
+      "type" : "Consumable"
+    }
   ],
   "settings" : {
     "_failTransactionsEnabled" : false,

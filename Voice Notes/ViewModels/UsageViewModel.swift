@@ -6,47 +6,122 @@ final class UsageViewModel: ObservableObject {
     static let shared = UsageViewModel()
     private init() {}
 
-    @Published var plan: AppPlan = .free
-    @Published var secondsUsed: Int = 0
-    @Published var minutesLeft: Int = 0
-    @Published var isOverLimit: Bool = false
+    // MARK: - Published Properties (Backend Authoritative)
+
     @Published var isLoading: Bool = false
+    @Published var lastRefreshAt: Date?
+    @Published var secondsUsed: Int = 0
+    @Published var limitSeconds: Int = 0
+    @Published var currentPlan: String = "standard"  // safe default
 
-    func refresh() async {
-        isLoading = true
+    // MARK: - Computed Properties
 
-        // Get current plan
-        plan = await SubscriptionPlanResolver.shared.currentPlan()
-
-        // Fetch usage from backend
-        if let snapshot = try? await UsageQuotaClient.shared.fetchUsage() {
-            secondsUsed = snapshot.seconds_used
-            minutesLeft = UsageQuotaClient.shared.minutesLeft(plan: snapshot.plan, secondsUsed: snapshot.seconds_used)
-        } else {
-            // Fallback: use plan-based calculation
-            minutesLeft = UsageQuotaClient.shared.minutesLeft(plan: plan.rawValue, secondsUsed: secondsUsed)
-        }
-
-        isOverLimit = (minutesLeft <= 0)
-        isLoading = false
-
-        print("📊 UsageViewModel: plan=\(plan.rawValue), used=\(secondsUsed)s, left=\(minutesLeft)min, overLimit=\(isOverLimit)")
+    var isStale: Bool {
+        guard let lastRefresh = lastRefreshAt else { return true }
+        return Date().timeIntervalSince(lastRefresh) > 120  // 2 minutes
     }
 
-    func book(seconds: Int, recordedAt: Date?) async {
-        let planString = plan.rawValue
-        await UsageQuotaClient.shared.bookSeconds(seconds, plan: planString, recordedAt: recordedAt)
-        await refresh()
+    var minutesLeftText: String {
+        let secondsLeft = max(limitSeconds - secondsUsed, 0)
+        let minutes = secondsLeft / 60
+        let seconds = secondsLeft % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    var isOverLimit: Bool {
+        secondsUsed >= limitSeconds
     }
 
     var minutesUsedDisplay: Int {
         Int(ceil(Double(secondsUsed) / 60.0))
     }
 
-    var formattedMinutesLeft: String {
-        let totalSeconds = minutesLeft * 60
-        let minutes = totalSeconds / 60
-        let seconds = totalSeconds % 60
-        return String(format: "%d:%02d", minutes, seconds)
+    var minutesLeftDisplay: Int {
+        max((limitSeconds - secondsUsed) / 60, 0)
+    }
+
+    // MARK: - Fallback Limits (when server doesn't return limit_seconds)
+
+    private let fallbackLimits: [String: Int] = [
+        "free": 30 * 60,
+        "standard": 120 * 60,
+        "premium": 600 * 60,
+        "own_key": 10000 * 60  // Client safety cap
+    ]
+
+    // MARK: - Refresh (Fetch from Backend)
+
+    func refresh() async {
+        isLoading = true
+
+        do {
+            // Resolve user key via StoreKit
+            let userKey = await StoreKitManager.shared.resolveUserKey()
+            print("📊 UsageViewModel: Resolved userKey: \(userKey.value) (source: \(userKey.source))")
+
+            // Get current plan from StoreKit
+            let plan = await StoreKitManager.shared.currentPlanIdentifier() ?? "standard"
+            currentPlan = plan
+            print("📊 UsageViewModel: Current plan: \(plan)")
+
+            // Determine current period in UTC
+            let periodYM = currentPeriodYM()
+            print("📊 UsageViewModel: Period: \(periodYM)")
+
+            // Fetch usage from backend
+            let response = try await UsageQuotaClient.shared.fetchUsage(
+                userKey: userKey.value,
+                periodYM: periodYM
+            )
+
+            // Update state with backend data
+            secondsUsed = response.seconds_used
+            limitSeconds = response.limit_seconds ?? fallbackLimits[response.plan] ?? fallbackLimits["standard"]!
+            currentPlan = response.plan
+            lastRefreshAt = Date()
+
+            print("✅ UsageViewModel: Refreshed - used: \(secondsUsed)s, limit: \(limitSeconds)s, plan: \(currentPlan)")
+
+        } catch {
+            print("❌ UsageViewModel: Refresh failed - \(error)")
+            // Don't update lastRefreshAt on error - keeps isStale = true
+            // Keep previous values to avoid showing 0/0
+        }
+
+        isLoading = false
+    }
+
+    // MARK: - Book Usage (Post to Backend)
+
+    func book(seconds: Int, recordedAt: Date) async {
+        do {
+            // Resolve user key
+            let userKey = await StoreKitManager.shared.resolveUserKey()
+
+            print("📊 UsageViewModel: Booking \(seconds)s for user \(userKey.value), plan: \(currentPlan)")
+
+            // Book to backend
+            try await UsageQuotaClient.shared.bookUsage(
+                userKey: userKey.value,
+                seconds: seconds,
+                plan: currentPlan,
+                recordedAt: recordedAt
+            )
+
+            // Refresh to get updated usage from server
+            await refresh()
+
+        } catch {
+            print("❌ UsageViewModel: Booking failed - \(error)")
+        }
+    }
+
+    // MARK: - Helper
+
+    private func currentPeriodYM() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter.string(from: Date())
     }
 }

@@ -5,7 +5,7 @@
 	<key>ANALYTICS_ENDPOINT</key>
 	<string>https://rhfhateyqdiysgooiqtd.functions.supabase.co/ingest</string>
 	<key>ANALYTICS_TOKEN</key>
-	<string>REPLACE_ME_FOR_TESTFLIGHT</string>
+	<string>92942cbd38ee5c9c58663e2b7329cc6beb6e23063a79913529abf8b6a5c676b1</string>
 	<key>LSEnvironment</key>
 	<dict/>
 	<key>OpenAIAPIKey</key>

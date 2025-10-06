@@ -5,7 +5,6 @@ struct RecordingDetailView: View {
     let recordingId: UUID
     @ObservedObject var recordingsManager: RecordingsManager
     @EnvironmentObject var documentStore: DocumentStore
-    @ObservedObject private var minutesTracker = MinutesTracker.shared
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @ObservedObject private var usageVM = UsageViewModel.shared
     @State private var audioPlayer: AVAudioPlayer?
@@ -29,6 +28,9 @@ struct RecordingDetailView: View {
     @State private var showingAddTagSheet = false
     @State private var showingPaywall = false
     @State private var showingMinutesExhaustedAlert = false
+    @State private var showingListItemConfirmation = false
+    @State private var detectedListItems: DetectionResult?
+    @State private var lastProcessedSummary: String?
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
@@ -138,7 +140,43 @@ struct RecordingDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("You've used all \(minutesTracker.monthlyLimit) minutes for this month. Upgrade to continue recording.")
+            Text("You've used all your minutes for this month. Upgrade to continue recording.")
+        }
+        .sheet(isPresented: $showingListItemConfirmation) {
+            if let detectedItems = detectedListItems {
+                ListItemConfirmationSheet(
+                    detectionResult: detectedItems,
+                    onConfirm: { confirmedItems in
+                        handleConfirmedListItems(confirmedItems)
+                        showingListItemConfirmation = false
+                    },
+                    onDismiss: {
+                        showingListItemConfirmation = false
+                    }
+                )
+            }
+        }
+        .onChange(of: recordingsManager.recordings.count) { _ in
+            // Check if summary was just completed
+            if let recording = recordingsManager.recordings.first(where: { $0.id == recordingId }),
+               let summary = recording.summary,
+               !summary.isEmpty,
+               summary != lastProcessedSummary {
+
+                lastProcessedSummary = summary
+
+                // Detect list items from summary and transcript
+                let textToAnalyze = [summary, recording.transcript ?? ""].joined(separator: "\n\n")
+
+                if let detection = ListItemDetector.shared.detectListItems(from: textToAnalyze) {
+                    detectedListItems = detection
+
+                    // Show confirmation sheet after a brief delay (allows UI to settle)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        showingListItemConfirmation = true
+                    }
+                }
+            }
         }
         .overlay(alignment: .bottom) {
             if showingToast {
@@ -372,8 +410,8 @@ struct RecordingDetailView: View {
                         }
                     }
                     .font(.poppins.body)
-                    .disabled(usageVM.isOverLimit || usageVM.isLoading)
-                    .opacity((usageVM.isOverLimit || usageVM.isLoading) ? 0.5 : 1.0)
+                    .disabled(usageVM.isOverLimit || usageVM.isLoading || usageVM.isStale)
+                    .opacity((usageVM.isOverLimit || usageVM.isLoading || usageVM.isStale) ? 0.5 : 1.0)
                     .foregroundColor(.blue)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -1098,8 +1136,8 @@ struct RecordingDetailView: View {
                 }
             }
             .font(.poppins.body)
-            .disabled(usageVM.isOverLimit || usageVM.isLoading)
-            .opacity((usageVM.isOverLimit || usageVM.isLoading) ? 0.5 : 1.0)
+            .disabled(usageVM.isOverLimit || usageVM.isLoading || usageVM.isStale)
+            .opacity((usageVM.isOverLimit || usageVM.isLoading || usageVM.isStale) ? 0.5 : 1.0)
             .foregroundColor(.blue)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -1944,5 +1982,67 @@ extension RecordingDetailView {
             let impact = UIImpactFeedbackGenerator(style: .medium)
             impact.impactOccurred()
         }
+    }
+}
+
+// MARK: - List Item Detection Extension
+extension RecordingDetailView {
+    private func handleConfirmedListItems(_ items: [DetectedListItem]) {
+        guard !items.isEmpty else { return }
+
+        // Group items by list type if there are multiple types
+        let listType = items.first?.listType ?? .general
+
+        // Create or find the appropriate document
+        let documentType: DocumentType = {
+            switch listType {
+            case .todo: return .todo
+            case .shopping: return .shopping
+            case .action: return .todo
+            case .ideas: return .ideas
+            case .general: return .todo
+            }
+        }()
+
+        let documentTitle = listType.rawValue
+
+        // Check if a document with this title already exists
+        if let existingDoc = documentStore.documents.first(where: { $0.title == documentTitle }) {
+            // Add items to existing document
+            let itemTexts = items.map { $0.text }
+            documentStore.addItems(to: existingDoc.id, items: itemTexts)
+
+            toastMessage = "Added \(items.count) item\(items.count == 1 ? "" : "s") to \(documentTitle)"
+            showingToast = true
+
+            // Auto-hide after 5 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                showingToast = false
+            }
+        } else {
+            // Create new document
+            let newDoc = Document(
+                title: documentTitle,
+                type: documentType,
+                items: items.map { DocItem(text: $0.text) }
+            )
+
+            documentStore.documents.append(newDoc)
+
+            toastMessage = "Created \(documentTitle) with \(items.count) item\(items.count == 1 ? "" : "s")"
+            showingToast = true
+
+            // Auto-hide after 5 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                showingToast = false
+            }
+        }
+
+        // Haptic feedback
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+
+        // Optionally add a tag to the recording
+        recordingsManager.addTagToRecording(recordingId: recordingId, tag: listType.rawValue.lowercased())
     }
 }

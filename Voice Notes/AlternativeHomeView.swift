@@ -6,8 +6,8 @@ struct AlternativeHomeView: View {
     @ObservedObject var audioRecorder: AudioRecorder
     @ObservedObject var recordingsManager: RecordingsManager
     @EnvironmentObject var appRouter: AppRouter
+    @EnvironmentObject var documentStore: DocumentStore
     @ObservedObject private var usageVM = UsageViewModel.shared
-    @ObservedObject private var minutesTracker = MinutesTracker.shared
     @AppStorage("hasCompletedTour") private var hasCompletedTour = false
 
     @State private var showingPermissionAlert = false
@@ -20,6 +20,7 @@ struct AlternativeHomeView: View {
     @State private var showExpandedControls = false
     @State private var sessionRecordingIds: Set<UUID> = []
     @State private var appDidBecomeActive = false
+    @State private var showingResetConfirmation = false
     
     // Computed properties for stable UI state
     private var recordingButtonGradient: LinearGradient {
@@ -55,8 +56,16 @@ struct AlternativeHomeView: View {
             VStack(spacing: 0) {
                 // Clean header with minimal controls
                 HStack {
+                    // Hidden reset button (long press top-left corner)
+                    Color.clear
+                        .frame(width: 60, height: 60)
+                        .contentShape(Rectangle())
+                        .onLongPressGesture(minimumDuration: 3.0) {
+                            showingResetConfirmation = true
+                        }
+
                     Spacer()
-                    
+
                     Button(action: { showingSettings = true }) {
                         Image(systemName: "gearshape.fill")
                             .font(.title3)
@@ -160,8 +169,8 @@ struct AlternativeHomeView: View {
                         .contentShape(Circle())
                         .scaleEffect(recordingButtonScale)
                         .animation(.easeInOut(duration: 0.2), value: recordingButtonScale)
-                        .disabled(!audioRecorder.isRecording && !minutesTracker.canRecord)
-                        .opacity(!audioRecorder.isRecording && !minutesTracker.canRecord ? 0.5 : 1.0)
+                        .disabled(!audioRecorder.isRecording && (usageVM.isOverLimit || usageVM.isLoading))
+                        .opacity(!audioRecorder.isRecording && (usageVM.isOverLimit || usageVM.isLoading) ? 0.5 : 1.0)
                         .accessibilityLabel(audioRecorder.isRecording ? "Stop recording" : "Start recording")
                         .applyIf(isLiquidGlassAvailable) { view in
                             view.glassEffect(.regular.interactive())
@@ -188,10 +197,51 @@ struct AlternativeHomeView: View {
 
                     // Usage quota display
                     if !audioRecorder.isRecording {
-                        Text("Minutes left: \(minutesTracker.formattedMinutesRemaining)")
-                            .font(.caption)
-                            .foregroundStyle(minutesTracker.isAtLimit ? .red : .secondary)
-                            .padding(.top, 8)
+                        HStack(spacing: 4) {
+                            if usageVM.isLoading {
+                                Text("Checking quota…")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else if usageVM.isStale && usageVM.limitSeconds == 0 {
+                                // Never synced or completely failed
+                                HStack(spacing: 4) {
+                                    Image(systemName: "wifi.exclamationmark")
+                                        .font(.caption2)
+                                        .foregroundStyle(.orange)
+                                    Text("Offline mode - usage tracking unavailable")
+                                        .font(.caption)
+                                        .foregroundStyle(.orange)
+                                    Button {
+                                        Task { await usageVM.refresh() }
+                                    } label: {
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.caption2)
+                                            .foregroundStyle(.orange)
+                                    }
+                                }
+                            } else {
+                                Text("Minutes left: \(usageVM.minutesLeftText)")
+                                    .font(.caption)
+                                    .foregroundStyle(usageVM.isOverLimit ? .red : .secondary)
+
+                                // Sync button
+                                Button {
+                                    Task { await usageVM.refresh() }
+                                } label: {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                // Stale indicator - less alarming
+                                if usageVM.isStale {
+                                    Text("(may be outdated)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.orange)
+                                }
+                            }
+                        }
+                        .padding(.top, 8)
                     }
 
                     // Multi-person conversation indicator
@@ -240,9 +290,7 @@ struct AlternativeHomeView: View {
             }
             appDidBecomeActive = true
             Task {
-                // Fetch from backend and sync to local tracker
                 await usageVM.refresh()
-                syncBackendToLocal()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
@@ -265,6 +313,14 @@ struct AlternativeHomeView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Voice Notes needs microphone and speech recognition permissions to function.")
+        }
+        .alert("Reset App", isPresented: $showingResetConfirmation) {
+            Button("Reset Everything", role: .destructive) {
+                resetApp()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete ALL recordings, documents, settings, and usage data. This action cannot be undone.")
         }
         .sheet(item: $selectedRecording) { recording in
             RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
@@ -379,11 +435,16 @@ private struct ExpandedRecordingSheet: View {
 
         // Check backend quota before allowing recording
         await usageVM.refresh()
-        syncBackendToLocal()
 
-        if usageVM.isOverLimit {
+        // Only block if truly over limit - allow recording if sync failed (graceful degradation)
+        if usageVM.isOverLimit && !usageVM.isStale {
             print("⚠️ AlternativeHomeView: Backend quota exceeded, blocking recording")
             return
+        }
+
+        // If stale but not confirmed over limit, allow recording (offline-friendly)
+        if usageVM.isStale && usageVM.limitSeconds > 0 {
+            print("⚠️ AlternativeHomeView: Usage data is stale, but allowing recording (offline mode)")
         }
 
         // Generate a filename up front for our own tracking/UI purposes
@@ -398,13 +459,11 @@ private struct ExpandedRecordingSheet: View {
         isPaused = false
         let result = audioRecorder.stopRecording()
 
-        // Track minutes usage (local + backend)
         print("🎙️ AlternativeHomeView: Recording stopped. Duration: \(result.duration) seconds")
-        MinutesTracker.shared.addUsage(seconds: result.duration)
 
-        // Book usage to backend
+        // Book usage to backend (which will refresh from server)
         Task {
-            await UsageViewModel.shared.book(seconds: Int(ceil(result.duration)), recordedAt: Date())
+            await usageVM.book(seconds: Int(ceil(result.duration)), recordedAt: Date())
         }
 
         // Get the actual filename from the AudioRecorder's file URL
@@ -459,8 +518,39 @@ private struct ExpandedRecordingSheet: View {
         let seconds = Int(duration) % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
-    
-    
+
+    private func resetApp() {
+        // Delete all recordings and their files
+        let allRecordings = recordingsManager.recordings
+        for recording in allRecordings {
+            recordingsManager.deleteRecording(recording)
+        }
+
+        // Clear all documents
+        documentStore.documents.removeAll()
+
+        // Clear UserDefaults
+        if let bundleID = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleID)
+            UserDefaults.standard.synchronize()
+        }
+
+        // Reset usage tracking
+        Task { @MainActor in
+            await usageVM.refresh()
+        }
+
+        // Clear all tags
+        TagStore.shared.clearAllTags()
+
+        // Haptic feedback
+        let notification = UINotificationFeedbackGenerator()
+        notification.notificationOccurred(.success)
+
+        print("🔄 App reset completed - all data cleared")
+    }
+
+
     private func getCurrentTranscript() -> String? {
         // Get the most recent recording's transcript if available
         if let mostRecent = recordingsManager.recordings.first,
@@ -494,21 +584,6 @@ private struct ExpandedRecordingSheet: View {
         }.count > 2
         
         return hasIndicators || (hasMultipleLineBreaks && hasQuestionMarks && hasBackAndForth) || hasDialogue
-    }
-
-    // MARK: - Backend Sync
-
-    private func syncBackendToLocal() {
-        // Sync backend usage to local tracker to ensure consistency
-        // Backend is source of truth
-        let backendMinutesUsed = Double(usageVM.secondsUsed) / 60.0
-        let localMinutesUsed = minutesTracker.minutesUsed
-
-        // If there's a significant difference, sync from backend
-        if abs(backendMinutesUsed - localMinutesUsed) > 0.1 {
-            print("📊 Syncing from backend: \(backendMinutesUsed) min (backend) vs \(localMinutesUsed) min (local)")
-            minutesTracker.syncFromBackend(backendMinutesUsed: backendMinutesUsed)
-        }
     }
 }
 

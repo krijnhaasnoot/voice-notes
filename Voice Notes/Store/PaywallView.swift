@@ -66,7 +66,7 @@ struct PaywallView: View {
                                     Text("Your current month")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
-                                    Text("Used \(usageVM.minutesUsedDisplay) min • Left \(usageVM.minutesLeft) min")
+                                    Text("Used \(usageVM.minutesUsedDisplay) min • Left \(usageVM.minutesLeftText)")
                                         .font(.subheadline)
                                         .fontWeight(.medium)
                                         .foregroundColor(.primary)

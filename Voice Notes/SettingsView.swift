@@ -38,11 +38,13 @@ struct SettingsView: View {
 
     @Binding var showingAlternativeView: Bool
     @ObservedObject var recordingsManager: RecordingsManager
-    @ObservedObject private var minutesTracker = MinutesTracker.shared
+    @ObservedObject private var usageVM = UsageViewModel.shared
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showingTour = false
     @State private var showingPaywall = false
+    @State private var showingToast = false
+    @State private var toastMessage = ""
 
     // MARK: - Analytics PIN & Sheet State
     @AppStorage("analyticsPIN") private var analyticsPIN: String = ""
@@ -67,9 +69,187 @@ struct SettingsView: View {
             Form {
                 // Subscription & Minutes Section
                 Section(header: Text("Subscription")) {
-                    MinutesMeterView(compact: false)
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
+                    // Backend-authoritative usage display
+                    VStack(spacing: 16) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(subscriptionManager.activeSubscription?.displayName ?? "Free Trial")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+
+                                Text("\(subscriptionManager.currentMonthlyMinutes) minutes per month")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            if subscriptionManager.activeSubscription == nil {
+                                Button(action: { showingPaywall = true }) {
+                                    Text("Upgrade")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(Color.blue)
+                                        .cornerRadius(8)
+                                }
+                            }
+                        }
+
+                        VStack(spacing: 8) {
+                            HStack {
+                                Text("Usage this month")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+
+                                Spacer()
+
+                                if usageVM.isLoading {
+                                    ProgressView()
+                                } else if usageVM.isStale && usageVM.limitSeconds == 0 {
+                                    // Never synced or sync failed - show friendly message
+                                    Text("Checking...")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.orange)
+                                } else {
+                                    Text("\(usageVM.minutesUsedDisplay) / \(usageVM.limitSeconds / 60) min")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(usageVM.isOverLimit ? .red : .primary)
+                                }
+                            }
+
+                            // Progress bar or friendly sync message
+                            if usageVM.isStale && usageVM.limitSeconds == 0 && !usageVM.isLoading {
+                                VStack(spacing: 8) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "wifi.exclamationmark")
+                                            .foregroundColor(.orange)
+                                        Text("Unable to check usage. You can still record!")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+
+                                    Button {
+                                        Task { await usageVM.refresh() }
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "arrow.clockwise")
+                                            Text("Try Again")
+                                        }
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color.blue)
+                                        .cornerRadius(6)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            } else {
+                                // Normal progress bar
+                                GeometryReader { geometry in
+                                    ZStack(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.gray.opacity(0.2))
+                                            .frame(height: 12)
+
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(usageVM.isOverLimit ? Color.red : Color.green)
+                                            .frame(width: geometry.size.width * min(Double(usageVM.secondsUsed) / Double(max(usageVM.limitSeconds, 1)), 1.0), height: 12)
+                                    }
+                                }
+                                .frame(height: 12)
+
+                                HStack {
+                                    Text("\(usageVM.minutesLeftText) remaining")
+                                        .font(.caption)
+                                        .foregroundColor(usageVM.isOverLimit ? .red : .secondary)
+
+                                    Spacer()
+
+                                    if usageVM.isStale {
+                                        Text("(may be outdated)")
+                                            .font(.caption2)
+                                            .foregroundColor(.orange)
+                                    }
+
+                                    Button {
+                                        Task { await usageVM.refresh() }
+                                    } label: {
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.caption)
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Buy 3 Hours button (dynamic based on App Store Connect configuration)
+                        Button {
+                            Task {
+                                do {
+                                    try await TopUpManager.shared.purchase3Hours()
+                                    // Show success toast
+                                    let duration = formatDuration(TopUpManager.shared.secondsGranted)
+                                    showToast(message: "\(duration) added — happy recording!")
+                                } catch {
+                                    print("❌ Failed to purchase: \(error)")
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "clock.badge.plus.fill")
+                                    .foregroundColor(.white)
+                                    .font(.body)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(TopUpManager.shared.displayName)
+                                        .font(.poppins.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.white)
+
+                                    Text(TopUpManager.shared.displayDescription)
+                                        .font(.poppins.caption)
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+
+                                Spacer()
+
+                                if TopUpManager.shared.isLoading {
+                                    ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Text(TopUpManager.shared.displayPrice)
+                                        .font(.poppins.body)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            .padding()
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [.blue, .purple]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(12)
+                        }
+                        .disabled(TopUpManager.shared.isLoading)
+                    }
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .onAppear {
+                        Task { await usageVM.refresh() }
+                    }
 
                     Button(action: { showingPaywall = true }) {
                         HStack {
@@ -304,7 +484,44 @@ struct SettingsView: View {
                     }
                     .padding(.vertical, 4)
                 }
-                
+
+                Section(header: Text("Language")) {
+                    Button(action: {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "globe")
+                                .font(.poppins.regular(size: 20))
+                                .foregroundColor(.blue)
+                                .frame(width: 28, height: 28)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("App Language")
+                                    .font(.poppins.headline)
+                                    .foregroundColor(.primary)
+
+                                Text(currentLanguageDisplayName())
+                                    .font(.poppins.caption)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "arrow.up.forward.app")
+                                .font(.poppins.regular(size: 14))
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+
+                    Text("Summaries will be generated in the selected app language. Change language in iOS Settings.")
+                        .font(.poppins.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                }
+
                 Section(header: Text("Getting Started")) {
                     Button(action: { showingTour = true }) {
                         HStack(spacing: 12) {
@@ -501,6 +718,21 @@ struct SettingsView: View {
         .sheet(isPresented: $showingPaywall) {
             PaywallView(canDismiss: true)
         }
+        .overlay(alignment: .bottom) {
+            if showingToast {
+                Text(toastMessage)
+                    .font(.poppins.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(Color.green)
+                    .cornerRadius(12)
+                    .padding(.bottom, 20)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showingToast)
+            }
+        }
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .alert("Reset Analytics PIN?", isPresented: $showResetPinConfirm) {
@@ -620,6 +852,51 @@ struct SettingsInfoRow: View {
             
             Spacer()
         }
+    }
+}
+
+// MARK: - SettingsView Extension
+
+extension SettingsView {
+    private func showToast(message: String) {
+        toastMessage = message
+        showingToast = true
+
+        // Auto-hide after 3 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            showingToast = false
+        }
+
+        // Haptic feedback
+        let notification = UINotificationFeedbackGenerator()
+        notification.notificationOccurred(.success)
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+
+        if hours > 0 && minutes > 0 {
+            return "\(hours) hour\(hours == 1 ? "" : "s") \(minutes) min"
+        } else if hours > 0 {
+            return "\(hours) hour\(hours == 1 ? "" : "s")"
+        } else {
+            return "\(minutes) minute\(minutes == 1 ? "" : "s")"
+        }
+    }
+
+    private func currentLanguageDisplayName() -> String {
+        let preferredLanguage = Locale.preferredLanguages.first ?? "en"
+        let locale = Locale(identifier: preferredLanguage)
+        let languageCode = locale.language.languageCode?.identifier ?? "en"
+
+        // Get localized display name
+        let displayLocale = Locale.current
+        if let displayName = displayLocale.localizedString(forLanguageCode: languageCode) {
+            return displayName.capitalized
+        }
+
+        return languageCode.uppercased()
     }
 }
 

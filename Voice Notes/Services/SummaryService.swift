@@ -83,7 +83,20 @@ enum SummaryMode: String, CaseIterable, Identifiable {
     }
     
     func template(length: SummaryLength = .standard) -> String {
-        let baseFormatting = "Output must be plain text. No markdown headings (#). Put bold labels with double asterisks on their own line, then one blank line. One blank line between sections. Use bullets '• '. Omit empty sections. Keep the transcript's language. Do not invent facts, owners, or deadlines."
+        // Detect app language
+        let preferredLanguage = Locale.preferredLanguages.first ?? "en"
+        let languageCode = Locale(identifier: preferredLanguage).language.languageCode?.identifier ?? "en"
+
+        let languageInstruction: String
+        if languageCode == "nl" {
+            languageInstruction = "Generate the summary in Dutch (Nederlands). All section headers, bullet points, and content must be in Dutch."
+        } else if languageCode == "en" {
+            languageInstruction = "Generate the summary in English."
+        } else {
+            languageInstruction = "Generate the summary in the same language as the app interface (\(languageCode))."
+        }
+
+        let baseFormatting = "Output must be plain text. No markdown headings (#). Put bold labels with double asterisks on their own line, then one blank line. One blank line between sections. Use bullets '• '. Omit empty sections. Do not invent facts, owners, or deadlines. \(languageInstruction)"
         let lengthInstruction = length.lengthModifier
         
         switch self {

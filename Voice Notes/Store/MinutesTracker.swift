@@ -1,6 +1,10 @@
 import Foundation
 import Combine
 
+// DEPRECATED: Backend is authoritative for quota. MinutesTracker is not used for display/gating.
+// UsageViewModel (backed by Supabase Edge Functions) is now the single source of truth.
+// This class remains for internal accounting only.
+
 @MainActor
 class MinutesTracker: ObservableObject {
     static let shared = MinutesTracker()

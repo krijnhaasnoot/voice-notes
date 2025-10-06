@@ -91,13 +91,13 @@ class TagStore: ObservableObject {
     func merge(from: String, into: String) {
         let cleanedInto = cleanTag(into)
         guard !cleanedInto.isEmpty else { return }
-        
+
         // Add the target tag if it doesn't exist
         add(cleanedInto)
-        
+
         // Remove the source tag
         remove(from)
-        
+
         // Notify for external updates
         NotificationCenter.default.post(
             name: .tagMerged,
@@ -105,7 +105,12 @@ class TagStore: ObservableObject {
             userInfo: ["from": from, "into": cleanedInto]
         )
     }
-    
+
+    func clearAllTags() {
+        allTags.removeAll()
+        saveTags()
+    }
+
     // MARK: - Private Helpers
     
     private func cleanTag(_ tag: String) -> String {

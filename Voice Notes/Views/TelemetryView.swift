@@ -672,15 +672,10 @@ struct TelemetryView: View {
             }
             .disabled(aggregator.generateAnalytics(for: selectedRange).totalSessions > 50)
 
-            Button("Test Usage Quota (90s)") {
+            Button("+90 sec (server)") {
                 Task {
-                    try? await Task.sleep(for: .seconds(1))
-                    let plan = await SubscriptionPlanResolver.shared.currentPlan()
-                    await UsageQuotaClient.shared.bookSeconds(90, plan: plan.rawValue, recordedAt: Date())
-
-                    if let snap = try? await UsageQuotaClient.shared.fetchUsage() {
-                        print("📊 USAGE SNAPSHOT => plan=\(snap.plan) seconds=\(snap.seconds_used)")
-                    }
+                    await UsageViewModel.shared.book(seconds: 90, recordedAt: Date())
+                    print("✅ Test: Booked 90 seconds to backend")
                 }
             }
             #endif

@@ -1,9 +1,9 @@
 import Foundation
 
 public enum EchoProductID: String, CaseIterable {
+    case ownKey   = "com.kinder.echo.ownkey.monthly"
     case standard = "com.kinder.echo.standard.monthly"
     case premium  = "com.kinder.echo.premium.monthly"
-    case ownKey   = "com.kinder.echo.ownkey.monthly"
 
     var displayName: String {
         switch self {
