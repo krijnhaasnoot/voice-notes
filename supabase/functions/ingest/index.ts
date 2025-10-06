@@ -48,6 +48,16 @@ function getCurrentPeriod(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
+// Helper: Get previous period (YYYY-MM)
+function getPreviousPeriod(currentPeriod: string): string {
+  const [year, month] = currentPeriod.split("-").map(Number);
+  const date = new Date(year, month - 1, 1); // month is 0-indexed
+  date.setMonth(date.getMonth() - 1); // Go back one month
+  const prevYear = date.getFullYear();
+  const prevMonth = String(date.getMonth() + 1).padStart(2, "0");
+  return `${prevYear}-${prevMonth}`;
+}
+
 // Route handlers
 async function handleUsageCheck(body: any) {
   const { user_key } = body;
@@ -103,7 +113,7 @@ async function handleUsageBook(body: any) {
     .select("*")
     .eq("user_key", user_key)
     .eq("period_ym", currentPeriod)
-    .single();
+    .maybeSingle();
 
   let secondsUsed = 0;
   let topupAvailable = 0;
@@ -115,6 +125,22 @@ async function handleUsageBook(body: any) {
     topupAvailable = usage.topup_seconds_available || 0;
     subscriptionLimit = usage.subscription_seconds_limit || 1800;
     userPlan = usage.plan;
+  } else {
+    // No record for current period - check previous month for carried-over top-up
+    const previousPeriod = getPreviousPeriod(currentPeriod);
+    const { data: previousUsage } = await supabase
+      .from("user_usage")
+      .select("topup_seconds_available, plan, subscription_seconds_limit")
+      .eq("user_key", user_key)
+      .eq("period_ym", previousPeriod)
+      .maybeSingle();
+
+    if (previousUsage) {
+      userPlan = previousUsage.plan || userPlan;
+      subscriptionLimit = previousUsage.subscription_seconds_limit || subscriptionLimit;
+      topupAvailable = previousUsage.topup_seconds_available || 0;
+      console.log(`📊 handleUsageBook: Carrying over ${topupAvailable}s top-up from ${previousPeriod}`);
+    }
   }
 
   // ⭐ KEY: Deduct from top-up first, then subscription
@@ -186,7 +212,7 @@ async function handleUsageBook(body: any) {
 }
 
 async function handleUsageFetch(body: any) {
-  const { user_key } = body;
+  const { user_key, plan: clientPlan } = body;
   if (!user_key) {
     return { status: 400, data: { error: "user_key required" } };
   }
@@ -205,18 +231,63 @@ async function handleUsageFetch(body: any) {
     return { status: 500, data: { error: "database_error" } };
   }
 
+  // Plan limits (in seconds)
+  const planLimits: Record<string, number> = {
+    free: 1800, // 30 min
+    standard: 7200, // 120 min
+    premium: 36000, // 600 min
+    own_key: 600000, // 10,000 min (safety cap)
+  };
+
   if (!usage) {
-    // New user - return default free tier
+    // No record yet - check previous month for carried-over top-up balance
+    const previousPeriod = getPreviousPeriod(currentPeriod);
+    const { data: previousUsage } = await supabase
+      .from("user_usage")
+      .select("topup_seconds_available, plan")
+      .eq("user_key", user_key)
+      .eq("period_ym", previousPeriod)
+      .maybeSingle();
+
+    const effectivePlan = clientPlan || previousUsage?.plan || "free";
+    const subscriptionLimit = planLimits[effectivePlan] || planLimits.free;
+    const carriedOverTopup = previousUsage?.topup_seconds_available || 0;
+
+    console.log(
+      `📊 New period for ${user_key}, plan: ${effectivePlan}, limit: ${subscriptionLimit}s, carried-over topup: ${carriedOverTopup}s`,
+    );
+
+    // Create new record with carried-over top-up balance
+    const insertData = {
+      user_key,
+      period_ym: currentPeriod,
+      month_year: currentPeriod, // Legacy column (same as period_ym)
+      plan: effectivePlan,
+      seconds_used: 0,
+      subscription_seconds_limit: subscriptionLimit,
+      topup_seconds_available: carriedOverTopup,
+    };
+    console.log("📊 Inserting new user_usage record:", insertData);
+
+    const { error: insertError } = await supabase
+      .from("user_usage")
+      .insert(insertData);
+
+    if (insertError) {
+      console.error("❌ Insert error:", insertError);
+      return { status: 500, data: { error: "db_insert_failed", details: insertError.message } };
+    }
+
     return {
       status: 200,
       data: {
         user_key,
         period_ym: currentPeriod,
         seconds_used: 0,
-        limit_seconds: 1800, // Combined limit for iOS
-        subscription_seconds_limit: 1800,
-        topup_seconds_available: 0,
-        plan: "free",
+        limit_seconds: subscriptionLimit + carriedOverTopup,
+        subscription_seconds_limit: subscriptionLimit,
+        topup_seconds_available: carriedOverTopup,
+        plan: effectivePlan,
       },
     };
   }

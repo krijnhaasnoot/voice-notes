@@ -3,6 +3,7 @@
 /* Tab Bar Items */
 "tab.home" = "Home";
 "tab.recordings" = "Opnames";
+"tab.search" = "Zoeken";
 "tab.documents" = "Lijsten";
 "tab.settings" = "Instellingen";
 
@@ -139,6 +140,14 @@
 /* Progress and Status */
 "progress.transcribing" = "Transcriberen... %d%%";
 "progress.summarizing" = "Samenvatten... %d%%";
+"progress.creating_summary" = "Samenvatting maken...";
+"progress.processing_large_transcript" = "Groot transcript verwerken (geschat %d min opname)...";
+"progress.processing_long_transcript" = "Lang transcript verwerken (geschat %d min opname)...";
+"progress.large_transcript_warning" = "Groot transcript gedetecteerd — dit kan enkele minuten duren";
+"progress.large_transcript_status" = "Groot transcript (%d min)";
+"progress.chunking_transcript" = "Verwerken in delen (deel %d/%d)...";
+"progress.combining_chunks" = "Samenvattingen van %d delen combineren...";
+"progress.very_long_recording" = "Zeer lange opname — verwerken in meerdere delen";
 "status.processing" = "Verwerken...";
 "status.completed" = "Voltooid";
 "status.failed" = "Mislukt";

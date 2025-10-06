@@ -89,6 +89,7 @@ struct PaywallView: View {
                                 SubscriptionCard(
                                     productID: productID,
                                     isSelected: selectedProduct == productID,
+                                    isActive: subscriptionManager.activeSubscription == productID,
                                     price: subscriptionManager.displayPrice(for: productID)
                                 ) {
                                     selectedProduct = productID
@@ -217,6 +218,7 @@ struct PaywallView: View {
 struct SubscriptionCard: View {
     let productID: EchoProductID
     let isSelected: Bool
+    let isActive: Bool
     let price: String
     let onTap: () -> Void
 
@@ -225,10 +227,23 @@ struct SubscriptionCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(productID.displayName)
-                            .font(.headline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
+                        HStack(spacing: 8) {
+                            Text(productID.displayName)
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .foregroundColor(isActive ? .secondary : .primary)
+
+                            if isActive {
+                                Text("ACTIVE")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.green)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.green.opacity(0.15))
+                                    .cornerRadius(4)
+                            }
+                        }
 
                         Text(productID.description)
                             .font(.subheadline)
@@ -241,7 +256,7 @@ struct SubscriptionCard: View {
                         Text(price)
                             .font(.title3)
                             .fontWeight(.bold)
-                            .foregroundColor(.primary)
+                            .foregroundColor(isActive ? .secondary : .primary)
 
                         Text("per month")
                             .font(.caption)
@@ -256,10 +271,10 @@ struct SubscriptionCard: View {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark")
                                 .font(.caption)
-                                .foregroundColor(.green)
+                                .foregroundColor(isActive ? .secondary : .green)
                             Text(feature)
                                 .font(.subheadline)
-                                .foregroundColor(.primary)
+                                .foregroundColor(isActive ? .secondary : .primary)
                         }
                     }
                 }
@@ -279,14 +294,15 @@ struct SubscriptionCard: View {
                 }
             }
             .padding()
-            .background(isSelected ? Color.blue.opacity(0.1) : Color(.systemBackground))
+            .background(isActive ? Color.gray.opacity(0.1) : (isSelected ? Color.blue.opacity(0.1) : Color(.systemBackground)))
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.blue : Color.gray.opacity(0.3), lineWidth: isSelected ? 2 : 1)
+                    .stroke(isActive ? Color.gray.opacity(0.5) : (isSelected ? Color.blue : Color.gray.opacity(0.3)), lineWidth: isActive ? 1.5 : (isSelected ? 2 : 1))
             )
         }
         .buttonStyle(.plain)
+        .disabled(isActive)
     }
 }
 

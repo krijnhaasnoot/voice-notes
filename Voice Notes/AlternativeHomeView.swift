@@ -195,8 +195,38 @@ struct AlternativeHomeView: View {
                     }
                     .animation(.spring(response: 0.4, dampingFraction: 0.8), value: audioRecorder.isRecording)
 
+                    // Out of minutes banner (only show when 15 minutes or less remaining)
+                    if !audioRecorder.isRecording && usageVM.minutesLeftDisplay <= 15 && !usageVM.isLoading {
+                        VStack(spacing: 12) {
+                            HStack(spacing: 8) {
+                                Image(systemName: usageVM.isOverLimit ? "clock.badge.exclamationmark" : "clock")
+                                    .foregroundStyle(usageVM.isOverLimit ? .red : .orange)
+                                Text(usageVM.isOverLimit ? "Out of recording minutes" : "Running low on minutes")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(usageVM.isOverLimit ? .red : .orange)
+                            }
+
+                            Button(action: { showingSettings = true }) {
+                                Text("Get More Minutes")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 10)
+                                    .background(usageVM.isOverLimit ? Color.red : Color.orange)
+                                    .cornerRadius(8)
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .background((usageVM.isOverLimit ? Color.red : Color.orange).opacity(0.1))
+                        .cornerRadius(12)
+                        .padding(.top, 8)
+                    }
+
                     // Usage quota display
-                    if !audioRecorder.isRecording {
+                    if !audioRecorder.isRecording && !usageVM.isOverLimit {
                         HStack(spacing: 4) {
                             if usageVM.isLoading {
                                 Text("Checking quota…")
@@ -222,7 +252,7 @@ struct AlternativeHomeView: View {
                             } else {
                                 Text("Minutes left: \(usageVM.minutesLeftText)")
                                     .font(.caption)
-                                    .foregroundStyle(usageVM.isOverLimit ? .red : .secondary)
+                                    .foregroundStyle(.secondary)
 
                                 // Sync button
                                 Button {
@@ -774,15 +804,20 @@ struct CompactRecordingCard: View {
     private var statusText: String {
         switch recording.status {
         case .transcribing:
-            return "Transcribing"
+            return NSLocalizedString("recording.transcribing", comment: "Transcribing")
         case .summarizing:
-            return "Summarizing"
+            // Check if large transcript
+            if let transcript = recording.transcript, transcript.count > 50000 {
+                let estimatedMinutes = transcript.count / 150
+                return String(format: NSLocalizedString("progress.large_transcript_status", comment: "Large transcript status"), estimatedMinutes)
+            }
+            return NSLocalizedString("recording.summarizing", comment: "Summarizing")
         case .failed:
-            return "Failed"
+            return NSLocalizedString("recording.failed", comment: "Failed")
         case .done:
-            return "Done"
+            return NSLocalizedString("recording.done", comment: "Done")
         case .idle:
-            return "Processing"
+            return NSLocalizedString("status.processing", comment: "Processing")
         }
     }
 }

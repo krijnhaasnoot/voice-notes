@@ -3,6 +3,7 @@
 /* Tab Bar Items */
 "tab.home" = "Home";
 "tab.recordings" = "Recordings";
+"tab.search" = "Search";
 "tab.documents" = "Lists";
 "tab.settings" = "Settings";
 
@@ -139,6 +140,14 @@
 /* Progress and Status */
 "progress.transcribing" = "Transcribing... %d%%";
 "progress.summarizing" = "Summarizing... %d%%";
+"progress.creating_summary" = "Creating summary...";
+"progress.processing_large_transcript" = "Processing large transcript (est. %d min recording)...";
+"progress.processing_long_transcript" = "Processing long transcript (est. %d min recording)...";
+"progress.large_transcript_warning" = "Large transcript detected — this may take a few minutes";
+"progress.large_transcript_status" = "Large transcript (%d min)";
+"progress.chunking_transcript" = "Processing in chunks (chunk %d/%d)...";
+"progress.combining_chunks" = "Combining summaries from %d chunks...";
+"progress.very_long_recording" = "Very long recording — processing in multiple parts";
 "status.processing" = "Processing...";
 "status.completed" = "Completed";
 "status.failed" = "Failed";

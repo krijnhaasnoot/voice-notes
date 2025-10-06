@@ -37,16 +37,21 @@ final class UsageQuotaClient {
 
     // MARK: - Fetch Usage
 
-    func fetchUsage(userKey: String, periodYM: String) async throws -> UsageResponse {
+    func fetchUsage(userKey: String, periodYM: String, plan: String? = nil) async throws -> UsageResponse {
         let endpoint = "\(baseURL)/ingest/usage/fetch"
         guard let url = URL(string: endpoint) else {
             throw UsageQuotaError.invalidURL
         }
 
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "user_key": userKey,
             "period_ym": periodYM
         ]
+
+        // Include plan if provided (helps backend determine correct limits for new users)
+        if let plan = plan {
+            payload["plan"] = plan
+        }
 
         guard let jsonData = try? JSONSerialization.data(withJSONObject: payload) else {
             throw UsageQuotaError.invalidResponse(statusCode: 0, body: "Failed to serialize request")

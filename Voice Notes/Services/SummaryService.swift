@@ -379,6 +379,7 @@ actor SummaryService {
     }
 
     /// Summarize a transcript into strict plain text with bold labels and bullets.
+    /// For transcripts > 60 min (90,000 chars), automatically chunks and combines summaries.
     func summarize(
         transcript: String,
         mode: SummaryMode = .personal,
@@ -388,6 +389,39 @@ actor SummaryService {
     ) async throws -> (clean: String, raw: String) {
         let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw SummarizationError.emptyText }
+        if cancelToken.isCancelled { throw SummarizationError.cancelled }
+
+        // Check if transcript needs chunking (>90,000 chars = ~60+ min recording)
+        let chunkThreshold = 90000
+        if trimmed.count > chunkThreshold {
+            print("📊 SummaryService: Large transcript (\(trimmed.count) chars), using chunking strategy")
+            return try await summarizeWithChunking(
+                transcript: trimmed,
+                mode: mode,
+                length: length,
+                progress: progress,
+                cancelToken: cancelToken
+            )
+        }
+
+        // Standard single-pass summarization for smaller transcripts
+        return try await summarizeSinglePass(
+            transcript: trimmed,
+            mode: mode,
+            length: length,
+            progress: progress,
+            cancelToken: cancelToken
+        )
+    }
+
+    /// Single-pass summarization (original logic)
+    private func summarizeSinglePass(
+        transcript: String,
+        mode: SummaryMode,
+        length: SummaryLength,
+        progress: @escaping @Sendable (Double) -> Void,
+        cancelToken: CancellationToken
+    ) async throws -> (clean: String, raw: String) {
         if cancelToken.isCancelled { throw SummarizationError.cancelled }
 
         // Load API key
@@ -406,7 +440,7 @@ actor SummaryService {
         Summarize the following transcript using the format specified above.
 
         Transcript:
-        \"\"\"\(trimmed)\"\"\"
+        \"\"\"\(transcript)\"\"\"
         """
 
         // Minimal request/response models
@@ -458,6 +492,202 @@ actor SummaryService {
                 throw SummarizationError.networkError(NSError(domain: "OpenAI", code: 401, userInfo: [NSLocalizedDescriptionKey: "Unauthorized. \(body)"]))
             case 413:
                 throw SummarizationError.networkError(NSError(domain: "OpenAI", code: 413, userInfo: [NSLocalizedDescriptionKey: "Payload too large (transcript too long)."]))
+            case 429:
+                throw SummarizationError.networkError(NSError(domain: "OpenAI", code: 429, userInfo: [NSLocalizedDescriptionKey: "Rate limited. Please retry shortly."]))
+            default:
+                let body = String(data: data, encoding: .utf8) ?? ""
+                throw SummarizationError.networkError(NSError(domain: "OpenAI", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode): \(body)"]))
+            }
+        } catch {
+            if cancelToken.isCancelled { throw SummarizationError.cancelled }
+            if error is SummarizationError { throw error }
+            throw SummarizationError.networkError(error)
+        }
+    }
+
+    // MARK: - Chunking for Large Transcripts
+
+    /// Split and summarize large transcripts in chunks, then combine
+    private func summarizeWithChunking(
+        transcript: String,
+        mode: SummaryMode,
+        length: SummaryLength,
+        progress: @escaping @Sendable (Double) -> Void,
+        cancelToken: CancellationToken
+    ) async throws -> (clean: String, raw: String) {
+        // Split transcript into ~40,000 char chunks (overlap for context)
+        let chunkSize = 40000
+        let overlapSize = 2000  // Keep 2000 chars overlap between chunks for context
+
+        let chunks = splitIntoChunks(transcript, chunkSize: chunkSize, overlap: overlapSize)
+        print("📊 SummaryService: Split into \(chunks.count) chunks")
+
+        var chunkSummaries: [String] = []
+        let totalChunks = Double(chunks.count)
+
+        // Summarize each chunk
+        for (index, chunk) in chunks.enumerated() {
+            if cancelToken.isCancelled { throw SummarizationError.cancelled }
+
+            let chunkProgress = Double(index) / totalChunks
+            let chunkProgressEnd = Double(index + 1) / totalChunks
+
+            print("📊 SummaryService: Processing chunk \(index + 1)/\(chunks.count)")
+
+            // Use brief length for chunks to keep individual summaries concise
+            let chunkResult = try await summarizeSinglePass(
+                transcript: chunk,
+                mode: mode,
+                length: .brief,
+                progress: { subProgress in
+                    // Scale sub-progress to this chunk's portion of total progress
+                    let scaledProgress = chunkProgress + (subProgress * (chunkProgressEnd - chunkProgress) * 0.8)  // 80% of progress for chunks
+                    progress(scaledProgress)
+                },
+                cancelToken: cancelToken
+            )
+
+            chunkSummaries.append(chunkResult.clean)
+        }
+
+        // Combine chunk summaries into final summary
+        print("📊 SummaryService: Combining \(chunkSummaries.count) chunk summaries")
+        progress(0.85)
+
+        let combinedSummary = try await combineSummaries(
+            chunkSummaries: chunkSummaries,
+            mode: mode,
+            length: length,
+            progress: { subProgress in
+                // Final 15% of progress for combination
+                progress(0.85 + (subProgress * 0.15))
+            },
+            cancelToken: cancelToken
+        )
+
+        progress(1.0)
+        return (clean: combinedSummary, raw: combinedSummary)
+    }
+
+    /// Split transcript into overlapping chunks
+    private func splitIntoChunks(_ text: String, chunkSize: Int, overlap: Int) -> [String] {
+        var chunks: [String] = []
+        var startIndex = text.startIndex
+
+        while startIndex < text.endIndex {
+            let endIndex = text.index(startIndex, offsetBy: chunkSize, limitedBy: text.endIndex) ?? text.endIndex
+            let chunk = String(text[startIndex..<endIndex])
+            chunks.append(chunk)
+
+            // Move start index forward by (chunkSize - overlap)
+            if endIndex == text.endIndex { break }
+            startIndex = text.index(startIndex, offsetBy: chunkSize - overlap, limitedBy: text.endIndex) ?? text.endIndex
+        }
+
+        return chunks
+    }
+
+    /// Combine multiple chunk summaries into a coherent final summary
+    private func combineSummaries(
+        chunkSummaries: [String],
+        mode: SummaryMode,
+        length: SummaryLength,
+        progress: @escaping @Sendable (Double) -> Void,
+        cancelToken: CancellationToken
+    ) async throws -> String {
+        if cancelToken.isCancelled { throw SummarizationError.cancelled }
+
+        // Load API key
+        let apiKey = (Bundle.main.object(forInfoDictionaryKey: "OpenAIAPIKey") as? String ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !apiKey.isEmpty, !apiKey.hasPrefix("$(") else {
+            throw SummarizationError.networkError(NSError(domain: "SummaryService", code: 401, userInfo: [NSLocalizedDescriptionKey: "OpenAI API key missing."]))
+        }
+
+        progress(0.1)
+
+        // Detect app language for final summary
+        let preferredLanguage = Locale.preferredLanguages.first ?? "en"
+        let languageCode = Locale(identifier: preferredLanguage).language.languageCode?.identifier ?? "en"
+        let languageInstruction: String
+        if languageCode == "nl" {
+            languageInstruction = "Generate the summary in Dutch (Nederlands)."
+        } else {
+            languageInstruction = "Generate the summary in English."
+        }
+
+        let systemPrompt = """
+        You are combining multiple partial summaries of a long recording into one coherent final summary.
+
+        The recording was split into chunks, and each chunk was summarized separately. Your task is to:
+        1. Merge the information from all chunk summaries
+        2. Remove any duplicate information across chunks
+        3. Organize the content following this format: \(mode.template(length: length))
+        4. Maintain chronological flow when relevant
+        5. Ensure all key points from the chunk summaries are preserved
+
+        \(languageInstruction)
+        Output plain text with bold labels (**Label**) and bullets (• ).
+        """
+
+        let combinedInput = chunkSummaries.enumerated().map { (index, summary) in
+            "--- Chunk \(index + 1) Summary ---\n\(summary)"
+        }.joined(separator: "\n\n")
+
+        let userPrompt = """
+        Combine these chunk summaries into one coherent final summary:
+
+        \(combinedInput)
+        """
+
+        struct Msg: Codable { let role: String; let content: String }
+        struct Req: Codable { let model: String; let messages: [Msg]; let temperature: Double }
+        struct Choice: Codable { struct M: Codable { let role: String; let content: String }; let index: Int?; let message: M }
+        struct Res: Codable { let choices: [Choice] }
+
+        let payload = Req(
+            model: model,
+            messages: [
+                .init(role: "system", content: systemPrompt),
+                .init(role: "user", content: userPrompt)
+            ],
+            temperature: 0.2
+        )
+
+        var req = URLRequest(url: endpoint)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.httpBody = try JSONEncoder().encode(payload)
+
+        if cancelToken.isCancelled { throw SummarizationError.cancelled }
+        progress(0.5)
+
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else {
+                throw SummarizationError.invalidResponse
+            }
+
+            switch http.statusCode {
+            case 200:
+                let decoded = try JSONDecoder().decode(Res.self, from: data)
+                let raw = decoded.choices.first?.message.content ?? ""
+                if raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    throw SummarizationError.invalidResponse
+                }
+
+                let clean = prettifySummaryPlain(raw)
+                progress(1.0)
+
+                return clean
+
+            case 401:
+                let body = String(data: data, encoding: .utf8) ?? ""
+                throw SummarizationError.networkError(NSError(domain: "OpenAI", code: 401, userInfo: [NSLocalizedDescriptionKey: "Unauthorized. \(body)"]))
+            case 413:
+                throw SummarizationError.networkError(NSError(domain: "OpenAI", code: 413, userInfo: [NSLocalizedDescriptionKey: "Payload too large."]))
             case 429:
                 throw SummarizationError.networkError(NSError(domain: "OpenAI", code: 429, userInfo: [NSLocalizedDescriptionKey: "Rate limited. Please retry shortly."]))
             default:

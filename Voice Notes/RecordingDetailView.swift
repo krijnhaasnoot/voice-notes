@@ -549,10 +549,20 @@ struct RecordingDetailView: View {
                     .padding(.horizontal, 4)
                 }
             } else if case .summarizing = recording.status {
-                HStack {
-                    ProgressView()
-                    Text("Creating summary...")
-                        .foregroundColor(.secondary)
+                VStack(spacing: 8) {
+                    HStack {
+                        ProgressView()
+                        Text(summarizingMessage(for: recording))
+                            .foregroundColor(.secondary)
+                    }
+
+                    // Show extra info for large transcripts
+                    if let transcript = recording.transcript, transcript.count > 50000 {
+                        Text(NSLocalizedString("progress.large_transcript_warning", comment: "Large transcript warning"))
+                            .font(.poppins.caption)
+                            .foregroundColor(.orange)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 .padding()
             } else if case .failed(let reason) = recording.status, recording.transcript != nil {
@@ -1040,6 +1050,23 @@ struct RecordingDetailView: View {
         if b > 1_000_000 { return String(format: "%.1f MB", b/1_000_000) }
         if b > 1_000 { return String(format: "%.1f KB", b/1_000) }
         return "\(bytes) B"
+    }
+
+    private func summarizingMessage(for recording: Recording) -> String {
+        guard let transcript = recording.transcript else {
+            return NSLocalizedString("progress.creating_summary", comment: "Creating summary")
+        }
+
+        let charCount = transcript.count
+        let estimatedMinutes = charCount / 150  // ~150 chars per minute of speech
+
+        if charCount > 75000 {
+            return String(format: NSLocalizedString("progress.processing_large_transcript", comment: "Processing large transcript"), estimatedMinutes)
+        } else if charCount > 50000 {
+            return String(format: NSLocalizedString("progress.processing_long_transcript", comment: "Processing long transcript"), estimatedMinutes)
+        } else {
+            return NSLocalizedString("progress.creating_summary", comment: "Creating summary")
+        }
     }
     
     // MARK: - Add to List Intent Handling

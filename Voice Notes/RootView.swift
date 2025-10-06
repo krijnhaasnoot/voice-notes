@@ -7,7 +7,7 @@ enum Tab: String, CaseIterable {
     case recordings = "recordings"
     case documents = "documents"
     case settings = "settings"
-    
+
     var title: String {
         switch self {
         case .home: return L10n.Tab.home.localized
@@ -16,7 +16,7 @@ enum Tab: String, CaseIterable {
         case .settings: return L10n.Tab.settings.localized
         }
     }
-    
+
     var systemImage: String {
         switch self {
         case .home: return "house"
@@ -70,7 +70,7 @@ struct RootView: View {
             }
             .tag(Tab.recordings)
             .badge(watchBridge.hasNewFromWatch ? "●" : nil)
-            
+
             // Lists Tab
             NavigationStack {
                 DocumentsView(
@@ -129,13 +129,44 @@ struct DocumentsView: View {
     @EnvironmentObject var documentStore: DocumentStore
     @State private var selectedDocument: Document?
     @State private var showingCreateSheet = false
+    @State private var showingSearch = false
     
     var body: some View {
-        Group {
-            if documentStore.documents.isEmpty {
-                emptyStateView
-            } else {
-                documentsListView
+        ZStack {
+            Group {
+                if documentStore.documents.isEmpty {
+                    emptyStateView
+                } else {
+                    documentsListView
+                }
+            }
+
+            // Floating search button
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: { showingSearch = true }) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 56, height: 56)
+                            .background(
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.blue, .blue.opacity(0.8)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            )
+                            .shadow(color: .blue.opacity(0.4), radius: 12, y: 6)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 20)
+                }
             }
         }
         .navigationTitle(L10n.Lists.title.localized)
@@ -157,6 +188,20 @@ struct DocumentsView: View {
         }
         .sheet(isPresented: $showingCreateSheet) {
             CreateDocumentSheet()
+        }
+        .sheet(isPresented: $showingSearch) {
+            NavigationStack {
+                SearchView(recordingsManager: recordingsManager)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Done") {
+                                showingSearch = false
+                            }
+                            .font(.poppins.body)
+                            .fontWeight(.semibold)
+                        }
+                    }
+            }
         }
         .overlay(alignment: .bottom) {
             if documentStore.recentlyDeletedDocument != nil {
@@ -282,12 +327,11 @@ struct SearchView: View {
     @State private var selectedTab: SearchTab = .recordings
     @State private var selectedTagFilters: Set<String> = []
     @State private var showingTagFilterSheet = false
-    @Environment(\.dismiss) private var dismiss
-    
+
     enum SearchTab: String, CaseIterable {
         case recordings = "Recordings"
         case documents = "Lists"
-        
+
         var systemImage: String {
             switch self {
             case .recordings: return "waveform"
@@ -295,66 +339,22 @@ struct SearchView: View {
             }
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Search")
-                    .font(.poppins.title2)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-                
-                Button("Done") {
-                    dismiss()
-                }
-                .font(.poppins.medium(size: 16))
-                .foregroundStyle(.blue)
-                .frame(width: 64, height: 32)
-                .background {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(.regularMaterial)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(.quaternary.opacity(0.6), lineWidth: 1)
-                        }
-                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-                }
-                .buttonStyle(.plain)
-                .if(isLiquidGlassAvailable) { view in
-                    view.glassEffect(.regular)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .background(.ultraThinMaterial)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(.quaternary.opacity(0.3))
-                    .frame(height: 1)
-            }
-            
-            // Tab Picker
-            Picker("Search Type", selection: $selectedTab) {
-                ForEach(SearchTab.allCases, id: \.self) { tab in
-                    Label(tab.rawValue, systemImage: tab.systemImage)
-                        .tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 16)
-            .background(.ultraThinMaterial)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(.quaternary.opacity(0.2))
-                    .frame(height: 1)
-            }
-            
             // Search content
             VStack {
                 VStack(spacing: 12) {
+                    // Tab Picker
+                    Picker("Search Type", selection: $selectedTab) {
+                        ForEach(SearchTab.allCases, id: \.self) { tab in
+                            Label(tab.rawValue, systemImage: tab.systemImage)
+                                .tag(tab)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.top, 8)
+
                     LiquidGlassSearchBar(
                         text: $searchText,
                         placeholder: selectedTab == .recordings ? "Search recordings..." : "Search lists..."
@@ -414,6 +414,10 @@ struct SearchView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .navigationTitle("Search")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .dismissKeyboardOnTap()
         .sheet(item: $selectedRecording) { recording in
             RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
@@ -426,6 +430,10 @@ struct SearchView: View {
         }
         .sheet(isPresented: $showingTagFilterSheet) {
             TagFilterSheet(isPresented: $showingTagFilterSheet, selectedTags: $selectedTagFilters)
+        }
+        .onAppear {
+            EnhancedTelemetryService.shared.logScreenView(screen: "search")
+            Analytics.track("search_opened")
         }
     }
     

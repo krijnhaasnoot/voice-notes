@@ -71,7 +71,8 @@ final class UsageViewModel: ObservableObject {
             // Fetch usage from backend
             let response = try await UsageQuotaClient.shared.fetchUsage(
                 userKey: userKey.value,
-                periodYM: periodYM
+                periodYM: periodYM,
+                plan: plan
             )
 
             // Update state with backend data

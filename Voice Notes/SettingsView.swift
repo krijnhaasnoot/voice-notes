@@ -189,58 +189,60 @@ struct SettingsView: View {
                             }
                         }
 
-                        // Buy 3 Hours button (dynamic based on App Store Connect configuration)
-                        Button {
-                            Task {
-                                do {
-                                    try await TopUpManager.shared.purchase3Hours()
-                                    // Show success toast
-                                    let duration = formatDuration(TopUpManager.shared.secondsGranted)
-                                    showToast(message: "\(duration) added — happy recording!")
-                                } catch {
-                                    print("❌ Failed to purchase: \(error)")
+                        // Buy 3 Hours button (only show when 15 minutes or less remaining)
+                        if usageVM.minutesLeftDisplay <= 15 {
+                            Button {
+                                Task {
+                                    do {
+                                        try await TopUpManager.shared.purchase3Hours()
+                                        // Show success toast
+                                        let duration = formatDuration(TopUpManager.shared.secondsGranted)
+                                        showToast(message: "\(duration) added — happy recording!")
+                                    } catch {
+                                        print("❌ Failed to purchase: \(error)")
+                                    }
                                 }
-                            }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "clock.badge.plus.fill")
-                                    .foregroundColor(.white)
-                                    .font(.body)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(TopUpManager.shared.displayName)
-                                        .font(.poppins.subheadline)
-                                        .fontWeight(.semibold)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "clock.badge.plus.fill")
                                         .foregroundColor(.white)
+                                        .font(.body)
 
-                                    Text(TopUpManager.shared.displayDescription)
-                                        .font(.poppins.caption)
-                                        .foregroundColor(.white.opacity(0.8))
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(TopUpManager.shared.displayName)
+                                            .font(.poppins.subheadline)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.white)
+
+                                        Text(TopUpManager.shared.displayDescription)
+                                            .font(.poppins.caption)
+                                            .foregroundColor(.white.opacity(0.8))
+                                    }
+
+                                    Spacer()
+
+                                    if TopUpManager.shared.isLoading {
+                                        ProgressView()
+                                            .tint(.white)
+                                    } else {
+                                        Text(TopUpManager.shared.displayPrice)
+                                            .font(.poppins.body)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.white)
+                                    }
                                 }
-
-                                Spacer()
-
-                                if TopUpManager.shared.isLoading {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    Text(TopUpManager.shared.displayPrice)
-                                        .font(.poppins.body)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.white)
-                                }
-                            }
-                            .padding()
-                            .background(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [.blue, .purple]),
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                                .padding()
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [.blue, .purple]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
                             )
                             .cornerRadius(12)
+                            }
+                            .disabled(TopUpManager.shared.isLoading)
                         }
-                        .disabled(TopUpManager.shared.isLoading)
                     }
                     .padding()
                     .background(Color(.secondarySystemBackground))

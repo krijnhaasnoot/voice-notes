@@ -5,12 +5,13 @@ struct RecordingsView: View {
     @ObservedObject var audioRecorder: AudioRecorder
     @ObservedObject var recordingsManager: RecordingsManager
     @EnvironmentObject var appRouter: AppRouter
-    
+
     @State private var selectedRecording: Recording?
     @State private var selectedCalendarDate: Date?
     @State private var showingCalendar = false
     @State private var isSharePresented = false
     @State private var shareItems: [Any] = []
+    @State private var showingSearch = false
     
     private var filteredRecordings: [Recording] {
         var recordings = recordingsManager.recordings
@@ -38,7 +39,7 @@ struct RecordingsView: View {
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-            
+
             VStack(spacing: 0) {
                 // Calendar (when shown)
                 if showingCalendar {
@@ -51,7 +52,7 @@ struct RecordingsView: View {
                             removal: .push(from: .bottom).combined(with: .opacity)
                         ))
                 }
-                
+
                 // Main recordings list
                 Group {
                     if filteredRecordings.isEmpty {
@@ -59,6 +60,34 @@ struct RecordingsView: View {
                     } else {
                         recordingsListView
                     }
+                }
+            }
+
+            // Floating search button
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: { showingSearch = true }) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 56, height: 56)
+                            .background(
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.blue, .blue.opacity(0.8)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            )
+                            .shadow(color: .blue.opacity(0.4), radius: 12, y: 6)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 20)
                 }
             }
         }
@@ -88,6 +117,20 @@ struct RecordingsView: View {
         }
         .sheet(isPresented: $isSharePresented) {
             ShareSheet(items: shareItems)
+        }
+        .sheet(isPresented: $showingSearch) {
+            NavigationStack {
+                SearchView(recordingsManager: recordingsManager)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Done") {
+                                showingSearch = false
+                            }
+                            .font(.poppins.body)
+                            .fontWeight(.semibold)
+                        }
+                    }
+            }
         }
     }
     
