@@ -9,11 +9,14 @@ class OpenAISummaryProvider: SummaryProvider {
     private let urlSession: URLSession
     
     init() {
-        // Create custom URLSession with extended timeouts
+        // Create custom URLSession with extended timeouts for long recordings
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 120.0
-        config.timeoutIntervalForResource = 600.0
+        config.timeoutIntervalForRequest = 180.0  // 3 minutes per request
+        config.timeoutIntervalForResource = 900.0  // 15 minutes total
+        config.waitsForConnectivity = true
+        config.timeoutIntervalForRequest = 180.0
         self.urlSession = URLSession(configuration: config)
+        print("📡 OpenAISummaryProvider initialized with 15min timeout for long recordings")
     }
     
     func validateApiKey(_ apiKey: String) async throws -> Bool {
@@ -53,17 +56,29 @@ class OpenAISummaryProvider: SummaryProvider {
     ) async throws -> SummaryResult {
         
         guard let apiKey = try KeyStore.shared.retrieve(for: .openai) else {
+            print("❌ OpenAISummaryProvider: API key missing")
             throw SummarizationError.apiKeyMissing
         }
-        
+
+        // Log transcript length for debugging long recordings
+        let charCount = transcript.count
+        let wordCount = transcript.split(separator: " ").count
+        print("📝 OpenAISummaryProvider: Processing \(charCount) chars (~\(wordCount) words), length: \(length.rawValue)")
+
+        // Check if transcript is too long
+        if charCount > 100000 {
+            print("❌ OpenAISummaryProvider: Transcript too long (\(charCount) chars)")
+            throw SummarizationError.textTooLong
+        }
+
         let prompt = buildPrompt(for: length)
-        
+
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         let requestBody: [String: Any] = [
             "model": "gpt-4o-mini",
             "messages": [
@@ -72,24 +87,29 @@ class OpenAISummaryProvider: SummaryProvider {
                     "content": prompt
                 ],
                 [
-                    "role": "user", 
+                    "role": "user",
                     "content": transcript
                 ]
             ],
             "max_tokens": length.maxTokens,
             "temperature": 0.3
         ]
-        
+
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-        
+
         progress(0.1)
-        
+        print("📤 OpenAISummaryProvider: Sending request to OpenAI...")
+
         if cancelToken.isCancelled {
             throw SummarizationError.cancelled
         }
-        
+
+        let startTime = Date()
+
         do {
             let (data, response) = try await urlSession.data(for: request)
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("📥 OpenAISummaryProvider: Response received in \(String(format: "%.1f", elapsed))s")
             
             progress(0.8)
             
@@ -115,23 +135,43 @@ class OpenAISummaryProvider: SummaryProvider {
                 return SummaryResult(clean: content.trimmingCharacters(in: .whitespacesAndNewlines))
                 
             case 401:
+                print("❌ OpenAISummaryProvider: Unauthorized (401)")
                 throw SummarizationError.apiKeyMissing
             case 429:
+                print("❌ OpenAISummaryProvider: Rate limited (429)")
                 throw SummarizationError.quotaExceeded
+            case 413:
+                print("❌ OpenAISummaryProvider: Payload too large (413)")
+                throw SummarizationError.textTooLong
             default:
                 let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+                print("❌ OpenAISummaryProvider: HTTP \(httpResponse.statusCode): \(errorBody)")
                 throw SummarizationError.networkError(NSError(
                     domain: "OpenAI",
                     code: httpResponse.statusCode,
                     userInfo: [NSLocalizedDescriptionKey: "HTTP \(httpResponse.statusCode): \(errorBody)"]
                 ))
             }
-            
+
         } catch {
             if cancelToken.isCancelled {
+                print("ℹ️ OpenAISummaryProvider: Cancelled by user")
                 throw SummarizationError.cancelled
             }
-            
+
+            // Check for timeout errors
+            if let urlError = error as? URLError {
+                if urlError.code == .timedOut {
+                    print("❌ OpenAISummaryProvider: Request timed out after \(Date().timeIntervalSince(startTime))s")
+                    throw SummarizationError.networkError(NSError(
+                        domain: "OpenAI",
+                        code: -1001,
+                        userInfo: [NSLocalizedDescriptionKey: "Request timed out. Try a shorter recording or retry."]
+                    ))
+                }
+                print("❌ OpenAISummaryProvider: Network error - \(urlError.localizedDescription)")
+            }
+
             if error is SummarizationError {
                 throw error
             }

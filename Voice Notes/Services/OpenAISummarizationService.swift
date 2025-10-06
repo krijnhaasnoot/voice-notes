@@ -28,9 +28,14 @@ actor OpenAISummarizationService: SummarizationService {
             throw SummarizationError.apiKeyMissing
         }
         
-        if text.count > 50000 {
+        // Increased limit for longer recordings (26 min ~= 40,000 chars)
+        if text.count > 100000 {
+            print("⚠️ Transcript too long: \(text.count) characters (limit: 100,000)")
             throw SummarizationError.textTooLong
         }
+
+        // Log transcript length for debugging
+        print("📝 Processing transcript: \(text.count) characters (~\(text.count / 150) words)")
         
         let prompt = """
         Please provide a concise summary of the following transcript from a voice recording. Focus on the key points, decisions, and action items. Keep it under 200 words.
