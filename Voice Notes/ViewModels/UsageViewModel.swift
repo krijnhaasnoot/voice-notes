@@ -13,6 +13,7 @@ final class UsageViewModel: ObservableObject {
     @Published var secondsUsed: Int = 0
     @Published var limitSeconds: Int = 0
     @Published var currentPlan: String = "standard"  // safe default
+    @Published var isDebugOverrideActive: Bool = false
 
     // MARK: - Computed Properties
 
@@ -52,6 +53,12 @@ final class UsageViewModel: ObservableObject {
     // MARK: - Refresh (Fetch from Backend)
 
     func refresh() async {
+        // Skip refresh if debug override is active
+        if isDebugOverrideActive {
+            print("📊 UsageViewModel: Skipping refresh - debug override active")
+            return
+        }
+
         isLoading = true
 
         do {
@@ -60,7 +67,7 @@ final class UsageViewModel: ObservableObject {
             print("📊 UsageViewModel: Resolved userKey: \(userKey.value) (source: \(userKey.source))")
 
             // Get current plan from StoreKit
-            let plan = await StoreKitManager.shared.currentPlanIdentifier() ?? "standard"
+            let plan = await StoreKitManager.shared.currentPlanIdentifier() ?? "free"
             currentPlan = plan
             print("📊 UsageViewModel: Current plan: \(plan)")
 

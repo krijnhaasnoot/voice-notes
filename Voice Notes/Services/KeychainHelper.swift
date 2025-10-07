@@ -20,7 +20,10 @@ final class KeychainHelper {
     }
 
     private func store(key: String, value: String) {
-        guard let data = value.data(using: .utf8) else { return }
+        guard let data = value.data(using: .utf8) else {
+            print("⚠️ KeychainHelper: Failed to convert value to data")
+            return
+        }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -30,10 +33,18 @@ final class KeychainHelper {
         ]
 
         // Delete any existing item
-        SecItemDelete(query as CFDictionary)
+        let deleteStatus = SecItemDelete(query as CFDictionary)
+        if deleteStatus != errSecSuccess && deleteStatus != errSecItemNotFound {
+            print("⚠️ KeychainHelper: Failed to delete existing item for '\(key)': \(deleteStatus)")
+        }
 
         // Add new item
-        SecItemAdd(query as CFDictionary, nil)
+        let addStatus = SecItemAdd(query as CFDictionary, nil)
+        if addStatus != errSecSuccess {
+            print("❌ KeychainHelper: Failed to add item for '\(key)': \(addStatus)")
+        } else {
+            print("✅ KeychainHelper: Successfully stored '\(key)'")
+        }
     }
 
     private func retrieve(key: String) -> String? {

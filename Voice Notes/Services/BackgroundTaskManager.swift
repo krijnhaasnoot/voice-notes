@@ -23,16 +23,22 @@ class BackgroundTaskManager: ObservableObject {
     }
     
     func beginBackgroundTask(name: String = "Processing") -> UIBackgroundTaskIdentifier {
+        // End any existing task first to prevent leaks
+        if processingTaskIdentifier != .invalid {
+            print("⚠️ BackgroundTaskManager: Ending previous background task before starting new one")
+            endBackgroundTask()
+        }
+
         let taskId = UIApplication.shared.beginBackgroundTask(withName: name) {
             // Called when time is about to expire
             self.endBackgroundTask()
         }
-        
+
         if taskId != .invalid {
             print("📱 BackgroundTaskManager: Started background task \(taskId) for \(name)")
             processingTaskIdentifier = taskId
         }
-        
+
         return taskId
     }
     
@@ -46,12 +52,12 @@ class BackgroundTaskManager: ObservableObject {
     
     func processPendingRecordings() async {
         print("📱 BackgroundTaskManager: Processing pending recordings in background")
-        
+
         let recordingsManager = RecordingsManager.shared
         let processingManager = ProcessingManager()
-        
+
         // Find recordings that need processing
-        let pendingRecordings = await recordingsManager.recordings.filter { recording in
+        let pendingRecordings = recordingsManager.recordings.filter { recording in
             // Need transcription
             if recording.transcript == nil || recording.transcript?.isEmpty == true {
                 return true
@@ -63,22 +69,37 @@ class BackgroundTaskManager: ObservableObject {
             }
             return false
         }
-        
+
         print("📱 BackgroundTaskManager: Found \(pendingRecordings.count) recordings needing processing")
-        
+
         // Process up to 3 recordings to avoid taking too much background time
-        for recording in pendingRecordings.prefix(3) {
-            if recording.transcript == nil || recording.transcript?.isEmpty == true {
-                // Start transcription using resolved file URL
-                let _ = processingManager.startTranscription(for: recording.id, audioURL: recording.resolvedFileURL)
-                print("📱 BackgroundTaskManager: Started transcription for recording \(recording.id)")
-            } else if recording.summary == nil || recording.summary?.isEmpty == true,
-                      let transcript = recording.transcript, !transcript.isEmpty {
-                // Start summarization
-                let _ = processingManager.startSummarization(for: recording.id, transcript: transcript)
-                print("📱 BackgroundTaskManager: Started summarization for recording \(recording.id)")
+        let maxProcessingCount = 3
+        for recording in pendingRecordings.prefix(maxProcessingCount) {
+            // Check if task is cancelled
+            if Task.isCancelled {
+                print("📱 BackgroundTaskManager: Task cancelled, stopping processing")
+                break
             }
-            
+
+            do {
+                if recording.transcript == nil || recording.transcript?.isEmpty == true {
+                    // Start transcription - safely unwrap file URL
+                    guard let fileURL = recording.resolvedFileURL else {
+                        print("📱 BackgroundTaskManager: ⚠️ Failed to resolve file URL for recording \(recording.id)")
+                        continue
+                    }
+                    try await processingManager.startTranscription(for: recording.id, audioURL: fileURL)
+                    print("📱 BackgroundTaskManager: ✅ Started transcription for recording \(recording.id)")
+                } else if recording.summary == nil || recording.summary?.isEmpty == true,
+                          let transcript = recording.transcript, !transcript.isEmpty {
+                    // Start summarization
+                    try await processingManager.startSummarization(for: recording.id, transcript: transcript)
+                    print("📱 BackgroundTaskManager: ✅ Started summarization for recording \(recording.id)")
+                }
+            } catch {
+                print("📱 BackgroundTaskManager: ❌ Failed to process recording \(recording.id): \(error)")
+            }
+
             // Add small delay between processing requests
             try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         }

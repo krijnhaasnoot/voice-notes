@@ -34,13 +34,20 @@ class TagStore: ObservableObject {
         return allTags.sorted { $0.lowercased() < $1.lowercased() }
     }
     
+    private let maxTags = 500  // Reasonable limit for tag collection
+
     func add(_ tag: String) {
         let cleaned = cleanTag(tag)
         guard !cleaned.isEmpty && cleaned.count <= 32 else { return }
-        
+
         // Check if tag exists case-insensitively
         let lowercased = cleaned.lowercased()
         if !allTags.contains(where: { $0.lowercased() == lowercased }) {
+            // Check limit
+            if allTags.count >= maxTags {
+                print("⚠️ TagStore: Maximum tag limit reached (\(maxTags)). Remove unused tags.")
+                return
+            }
             allTags.append(cleaned)
             saveTags()
         }
@@ -92,6 +99,12 @@ class TagStore: ObservableObject {
         let cleanedInto = cleanTag(into)
         guard !cleanedInto.isEmpty else { return }
 
+        // Validate source tag exists
+        guard allTags.contains(where: { $0.lowercased() == from.lowercased() }) else {
+            print("⚠️ TagStore: Source tag '\(from)' does not exist, cannot merge")
+            return
+        }
+
         // Add the target tag if it doesn't exist
         add(cleanedInto)
 
@@ -125,16 +138,20 @@ class TagStore: ObservableObject {
     }
     
     private func saveTags() {
-        if let data = try? JSONEncoder().encode(allTags) {
+        do {
+            let data = try JSONEncoder().encode(allTags)
             userDefaults.set(data, forKey: tagsKey)
+        } catch {
+            print("❌ TagStore: Failed to encode tags: \(error)")
         }
     }
     
-    // For testing tag colors
+    // Stable color generation for tags
     func colorForTag(_ tag: String) -> Color {
         let colors: [Color] = [.blue, .green, .orange, .purple, .red, .pink]
-        let hash = tag.lowercased().hash
-        let index = abs(hash) % colors.count
+        // Use stable hash based on UTF-8 characters
+        let stableHash = tag.lowercased().utf8.reduce(0) { $0 &+ Int($1) }
+        let index = abs(stableHash) % colors.count
         return colors[index]
     }
 }
@@ -151,24 +168,16 @@ extension Notification.Name {
 
 extension Array where Element == String {
     func normalized() -> [String] {
+        var seen = Set<String>()
         return self.compactMap { tag in
             let cleaned = tag.trimmingCharacters(in: .whitespacesAndNewlines)
-            return cleaned.isEmpty ? nil : cleaned
-        }.uniqueCaseInsensitive()
-    }
-    
-    func uniqueCaseInsensitive() -> [String] {
-        var seen = Set<String>()
-        var result: [String] = []
-        
-        for item in self {
-            let lowercased = item.lowercased()
-            if !seen.contains(lowercased) {
-                seen.insert(lowercased)
-                result.append(item)
-            }
+            guard !cleaned.isEmpty else { return nil }
+
+            let lowercased = cleaned.lowercased()
+            guard !seen.contains(lowercased) else { return nil }
+
+            seen.insert(lowercased)
+            return cleaned
         }
-        
-        return result
     }
 }

@@ -292,13 +292,44 @@ async function handleUsageFetch(body: any) {
     };
   }
 
+  // If client plan differs from stored plan, update it
+  const effectivePlan = clientPlan || usage.plan || "free";
+  let subscriptionLimit = usage.subscription_seconds_limit;
+
+  if (clientPlan && clientPlan !== usage.plan) {
+    // Plan changed - update the record with new plan and limit
+    subscriptionLimit = planLimits[clientPlan] || planLimits.free;
+
+    console.log(
+      `📊 Plan changed for ${user_key}: ${usage.plan} -> ${clientPlan}, updating limit: ${usage.subscription_seconds_limit}s -> ${subscriptionLimit}s`,
+    );
+
+    const { error: updateError } = await supabase
+      .from("user_usage")
+      .update({
+        plan: clientPlan,
+        subscription_seconds_limit: subscriptionLimit,
+      })
+      .eq("user_key", user_key)
+      .eq("period_ym", currentPeriod);
+
+    if (updateError) {
+      console.error("❌ Error updating plan:", updateError);
+    }
+  }
+
   // Return combined limit_seconds for iOS app compatibility
   return {
     status: 200,
     data: {
-      ...usage,
+      user_key: usage.user_key,
+      period_ym: usage.period_ym,
+      seconds_used: usage.seconds_used,
+      subscription_seconds_limit: subscriptionLimit,
+      topup_seconds_available: usage.topup_seconds_available || 0,
+      plan: effectivePlan,
       limit_seconds:
-        usage.subscription_seconds_limit + (usage.topup_seconds_available || 0),
+        subscriptionLimit + (usage.topup_seconds_available || 0),
     },
   };
 }
