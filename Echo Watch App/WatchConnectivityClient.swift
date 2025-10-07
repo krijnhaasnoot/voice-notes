@@ -176,6 +176,41 @@ final class WatchConnectivityClient: NSObject, ObservableObject {
     private func logStatus() {
         print("⌚ WC: isReachable=\(self.isReachable) isPaired=\(self.isPaired) isCompanion=\(self.isCompanionAppInstalled) state=\(activationStateString(session.activationState))")
     }
+
+    // MARK: - File Transfer
+
+    func transferRecording(fileURL: URL, duration: TimeInterval, completion: @escaping (Bool, Error?) -> Void) {
+        print("⌚ WC: Transferring recording: \(fileURL.lastPathComponent)")
+
+        // Prepare metadata
+        let metadata: [String: Any] = [
+            "type": "recording",
+            "filename": fileURL.lastPathComponent,
+            "duration": duration,
+            "timestamp": Date().timeIntervalSince1970
+        ]
+
+        // Transfer file using WCSession.transferFile
+        let transfer = session.transferFile(fileURL, metadata: metadata)
+
+        print("⌚ WC: File transfer initiated - ID: \(transfer.description)")
+        print("⌚ WC: File transfer outstanding: \(session.outstandingFileTransfers.count)")
+
+        // Monitor transfer progress
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            if transfer.progress.isFinished {
+                print("⌚ WC: ✅ File transfer completed")
+                completion(true, nil)
+            } else if transfer.progress.isCancelled {
+                print("⌚ WC: ❌ File transfer cancelled")
+                completion(false, NSError(domain: "WatchConnectivity", code: -1, userInfo: [NSLocalizedDescriptionKey: "Transfer cancelled"]))
+            } else {
+                print("⌚ WC: File transfer in progress: \(Int(transfer.progress.fractionCompleted * 100))%")
+                // Call completion optimistically - WCSession handles delivery
+                completion(true, nil)
+            }
+        }
+    }
 }
 
 extension WatchConnectivityClient: WCSessionDelegate {

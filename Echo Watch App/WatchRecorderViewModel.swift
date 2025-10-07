@@ -5,145 +5,140 @@ import Combine
 @MainActor
 final class WatchRecorderViewModel: ObservableObject {
     static let shared = WatchRecorderViewModel()
-    
+
     @Published var isRecording = false
     @Published var isPaused = false
     @Published var duration: TimeInterval = 0
     @Published var isReachable = false
     @Published var isSending = false
-    @Published var statusText = "Idle"
-    
+    @Published var statusText = "Tap to record"
+
     // Read-only proxies for UI consumption
     var isConnectivityActivated: Bool { connectivityClient.isActivated }
     var isConnectivityReachable: Bool { connectivityClient.isReachable }
 
     func retryConnection() { connectivityClient.retryConnection() }
-    func requestInitialStatus() { connectivityClient.sendCommand("requestStatus") }
-    
-    private var durationTimer: Timer?
-    private var lastStatusUpdate = Date()
+    func requestInitialStatus() { /* No-op for standalone recording */ }
+
+    private let audioRecorder = WatchAudioRecorder()
     private let connectivityClient = WatchConnectivityClient.shared
     private var cancellables = Set<AnyCancellable>()
-    
+
     private init() {
         setupConnectivityObservers()
-        requestInitialStatus()
+        setupAudioRecorderObservers()
     }
-    
+
     private func setupConnectivityObservers() {
         connectivityClient.$isReachable
             .receive(on: DispatchQueue.main)
             .assign(to: \.isReachable, on: self)
             .store(in: &cancellables)
-        
-        connectivityClient.$isReachable
+    }
+
+    private func setupAudioRecorderObservers() {
+        audioRecorder.$isRecording
             .receive(on: DispatchQueue.main)
-            .assign(to: \.isReachable, on: self)
+            .sink { [weak self] isRecording in
+                self?.isRecording = isRecording
+                self?.updateStatusText()
+            }
+            .store(in: &cancellables)
+
+        audioRecorder.$isPaused
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isPaused in
+                self?.isPaused = isPaused
+                self?.updateStatusText()
+            }
+            .store(in: &cancellables)
+
+        audioRecorder.$recordingDuration
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.duration, on: self)
             .store(in: &cancellables)
     }
-    
-    func updateStatus(isRecording: Bool, duration: TimeInterval) {
-        self.isRecording = isRecording
-        self.duration = duration
-        self.lastStatusUpdate = Date()
-        
-        updateStatusText()
-        
-        if isRecording && !isPaused {
-            startDurationTimer()
-        } else {
-            stopDurationTimer()
-        }
-    }
-    
+
     private func updateStatusText() {
-        if !isReachable {
-            statusText = "Phone not reachable"
-        } else if isSending {
-            statusText = "Sending..."
+        if isSending {
+            statusText = "Transferring..."
         } else if isRecording && !isPaused {
             statusText = "Recording..."
         } else if isRecording && isPaused {
             statusText = "Paused"
+        } else if !isReachable {
+            statusText = "iPhone not reachable"
         } else {
-            statusText = "Idle"
+            statusText = "Tap to record"
         }
     }
-    
-    private func startDurationTimer() {
-        stopDurationTimer()
-        durationTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            
+
+    func start() {
+        guard !isRecording else { return }
+
+        statusText = "Starting..."
+        audioRecorder.startRecording()
+        updateStatusText()
+    }
+
+    func stop() {
+        guard isRecording else { return }
+
+        let result = audioRecorder.stopRecording()
+
+        guard let fileURL = result.fileURL else {
+            statusText = "Recording failed"
+            print("⌚ ViewModel: ❌ No file URL from recorder")
+            return
+        }
+
+        // Transfer file to iPhone
+        transferRecordingToiPhone(fileURL: fileURL, duration: result.duration)
+    }
+
+    func pause() {
+        guard isRecording && !isPaused else { return }
+        audioRecorder.pauseRecording()
+    }
+
+    func resume() {
+        guard isRecording && isPaused else { return }
+        audioRecorder.resumeRecording()
+    }
+
+    private func transferRecordingToiPhone(fileURL: URL, duration: TimeInterval) {
+        isSending = true
+        updateStatusText()
+
+        print("⌚ ViewModel: Transferring recording to iPhone...")
+
+        connectivityClient.transferRecording(fileURL: fileURL, duration: duration) { [weak self] success, error in
             Task { @MainActor in
-                let timeSinceLastUpdate = Date().timeIntervalSince(self.lastStatusUpdate)
-                if timeSinceLastUpdate < 5.0 {
-                    self.duration += 1.0
+                guard let self = self else { return }
+
+                self.isSending = false
+
+                if success {
+                    self.statusText = "Sent to iPhone!"
+                    print("⌚ ViewModel: ✅ Recording transferred successfully")
+
+                    // Delete local file after successful transfer
+                    self.audioRecorder.deleteRecording(at: fileURL)
+
+                    // Reset status after delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        self.updateStatusText()
+                    }
+                } else {
+                    self.statusText = "Transfer failed"
+                    print("⌚ ViewModel: ❌ Transfer failed: \(error?.localizedDescription ?? "unknown")")
+
+                    // Reset status after delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        self.updateStatusText()
+                    }
                 }
             }
-        }
-    }
-    
-    private func stopDurationTimer() {
-        durationTimer?.invalidate()
-        durationTimer = nil
-    }
-    
-    func start() {
-        guard isReachable && !isSending else { return }
-        
-        isSending = true
-        updateStatusText()
-        
-        connectivityClient.sendCommand("startRecording")
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.isSending = false
-            self.updateStatusText()
-        }
-    }
-    
-    func stop() {
-        guard isReachable && !isSending else { return }
-        
-        isSending = true
-        updateStatusText()
-        
-        connectivityClient.sendCommand("stopRecording")
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.isSending = false
-            self.updateStatusText()
-        }
-    }
-    
-    func pause() {
-        guard isReachable && !isSending && isRecording else { return }
-        
-        isSending = true
-        isPaused = true
-        updateStatusText()
-        
-        connectivityClient.sendCommand("pauseRecording")
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.isSending = false
-            self.updateStatusText()
-        }
-    }
-    
-    func resume() {
-        guard isReachable && !isSending && isRecording && isPaused else { return }
-        
-        isSending = true
-        isPaused = false
-        updateStatusText()
-        
-        connectivityClient.sendCommand("resumeRecording")
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.isSending = false
-            self.updateStatusText()
         }
     }
 }

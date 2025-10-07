@@ -261,7 +261,63 @@ extension WatchConnectivityManager: WCSessionDelegate {
             let _ = self.handleIncomingMessage(applicationContext, source: "updateApplicationContext")
         }
     }
-    
+
+    func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        DispatchQueue.main.async {
+            print("📱 WC: didReceiveFile: \(file.fileURL.lastPathComponent)")
+            print("📱 WC: Metadata: \(file.metadata ?? [:])")
+
+            self.handleReceivedFile(file)
+        }
+    }
+
+    private func handleReceivedFile(_ file: WCSessionFile) {
+        guard let metadata = file.metadata,
+              let type = metadata["type"] as? String,
+              type == "recording" else {
+            print("📱 WC: ❌ Received file with invalid metadata")
+            return
+        }
+
+        let duration = metadata["duration"] as? TimeInterval ?? 0
+        let originalFilename = metadata["filename"] as? String ?? file.fileURL.lastPathComponent
+
+        // Move file to app's documents directory
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let destinationURL = documentsPath.appendingPathComponent(originalFilename)
+
+        do {
+            // Remove existing file if it exists
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+
+            // Move the received file
+            try FileManager.default.moveItem(at: file.fileURL, to: destinationURL)
+
+            print("📱 WC: ✅ File saved to: \(destinationURL.lastPathComponent)")
+
+            // Create recording object
+            let recording = Recording(
+                fileName: originalFilename,
+                date: Date(),
+                duration: duration,
+                title: ""
+            )
+
+            // Add to recordings manager
+            self.recordingsManager?.addRecording(recording)
+            self.hasNewFromWatch = true
+
+            // Post notification
+            NotificationCenter.default.post(name: Notification.Name("newRecordingFromWatch"), object: nil)
+
+            print("📱 WC: ✅ Recording added to library")
+        } catch {
+            print("📱 WC: ❌ Failed to save received file: \(error)")
+        }
+    }
+
     // MARK: - Helper Methods
     
     private func activationStateString(_ state: WCSessionActivationState) -> String {

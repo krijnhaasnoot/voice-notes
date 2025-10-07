@@ -4,18 +4,14 @@
 //
 //  Created by Krijn Haasnoot on 21/09/2025.
 //
+//  This file is kept for compatibility but the main view is WatchMainView.
+//  See EchoApp.swift for the app entry point.
 
 import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+        WatchMainView()
     }
 }
 
