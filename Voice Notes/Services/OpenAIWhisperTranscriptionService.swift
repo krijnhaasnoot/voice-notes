@@ -15,8 +15,8 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
         
         // Create custom URLSession with extended timeouts for long audio processing
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 300.0 // 5 minutes for request timeout
-        config.timeoutIntervalForResource = 1800.0 // 30 minutes for resource timeout (long audio processing)
+        config.timeoutIntervalForRequest = 900.0 // 15 minutes for request timeout (for very long recordings)
+        config.timeoutIntervalForResource = 3600.0 // 60 minutes for resource timeout (long audio processing)
         self.urlSession = URLSession(configuration: config)
     }
     
@@ -25,9 +25,14 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
         languageHint: String?,
         onDevicePreferred: Bool,
         progress: @escaping @Sendable (Double) -> Void,
-        cancelToken: CancellationToken
+        cancelToken: CancellationToken,
+        retryCount: Int = 0
     ) async throws -> String {
-        
+
+        if retryCount > 0 {
+            print("🔤 Retry attempt \(retryCount)")
+        }
+
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw TranscriptionError.fileNotFound
         }
@@ -136,17 +141,40 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
                 throw TranscriptionError.apiKeyMissing
             case 429:
                 let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
-                print("OpenAI API Error 429: \(errorBody)")
-                // Simple retry for rate limiting
-                try await Task.sleep(nanoseconds: 2_000_000_000) // 2 second delay
-                if !cancelToken.isCancelled {
-                    return try await transcribe(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken)
+                print("🔤 ⚠️ Rate limited (429): \(errorBody)")
+
+                // Exponential backoff with max 5 retries
+                let maxRetries = 5
+                if retryCount < maxRetries && !cancelToken.isCancelled {
+                    let backoffSeconds = min(pow(2.0, Double(retryCount)), 30.0) // Max 30 seconds
+                    print("🔤 Retrying after \(Int(backoffSeconds))s (attempt \(retryCount + 1)/\(maxRetries))...")
+                    try await Task.sleep(nanoseconds: UInt64(backoffSeconds * 1_000_000_000))
+                    if !cancelToken.isCancelled {
+                        return try await transcribe(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: retryCount + 1)
+                    }
                 }
                 throw TranscriptionError.quotaExceeded
+            case 500...599:
+                // Server errors - retry with exponential backoff
+                let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+                print("🔤 ⚠️ Server error (\(httpResponse.statusCode)): \(errorBody)")
+
+                let maxRetries = 3
+                if retryCount < maxRetries && !cancelToken.isCancelled {
+                    let backoffSeconds = min(pow(2.0, Double(retryCount + 1)), 20.0) // Max 20 seconds
+                    print("🔤 Retrying after \(Int(backoffSeconds))s (attempt \(retryCount + 1)/\(maxRetries))...")
+                    try await Task.sleep(nanoseconds: UInt64(backoffSeconds * 1_000_000_000))
+                    if !cancelToken.isCancelled {
+                        return try await transcribe(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: retryCount + 1)
+                    }
+                }
+
+                throw TranscriptionError.networkError(NSError(domain: "OpenAI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error (\(httpResponse.statusCode)). Please try again later."]))
+
             default:
                 let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
                 print("OpenAI API Error \(httpResponse.statusCode): \(errorBody)")
-                
+
                 if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let error = errorData["error"] as? [String: Any],
                    let message = error["message"] as? String {
@@ -162,15 +190,33 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
                 try? FileManager.default.removeItem(at: processedURL)
                 print("🔤 🧹 Cleaned up compressed file after error")
             }
-            
+
             if cancelToken.isCancelled {
                 throw TranscriptionError.cancelled
             }
-            
+
             if error is TranscriptionError {
                 throw error
             }
-            
+
+            // Check if it's a timeout error and retry
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain && (nsError.code == NSURLErrorTimedOut || nsError.code == NSURLErrorNetworkConnectionLost) {
+                print("🔤 ⚠️ Network timeout/connection lost: \(error)")
+
+                let maxRetries = 3
+                if retryCount < maxRetries && !cancelToken.isCancelled {
+                    let backoffSeconds = min(pow(2.0, Double(retryCount + 1)), 20.0)
+                    print("🔤 Retrying after \(Int(backoffSeconds))s (attempt \(retryCount + 1)/\(maxRetries))...")
+                    try await Task.sleep(nanoseconds: UInt64(backoffSeconds * 1_000_000_000))
+                    if !cancelToken.isCancelled {
+                        return try await transcribe(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: retryCount + 1)
+                    }
+                }
+
+                throw TranscriptionError.networkError(NSError(domain: "TranscriptionService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Transcription timed out. This recording may be too long. Try splitting it into shorter segments."]))
+            }
+
             throw TranscriptionError.networkError(error)
         }
     }
