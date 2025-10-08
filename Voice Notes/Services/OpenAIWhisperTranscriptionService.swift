@@ -25,8 +25,18 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
         languageHint: String?,
         onDevicePreferred: Bool,
         progress: @escaping @Sendable (Double) -> Void,
+        cancelToken: CancellationToken
+    ) async throws -> String {
+        return try await transcribeWithRetry(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: 0)
+    }
+
+    private func transcribeWithRetry(
+        url: URL,
+        languageHint: String?,
+        onDevicePreferred: Bool,
+        progress: @escaping @Sendable (Double) -> Void,
         cancelToken: CancellationToken,
-        retryCount: Int = 0
+        retryCount: Int
     ) async throws -> String {
 
         if retryCount > 0 {
@@ -150,7 +160,7 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
                     print("🔤 Retrying after \(Int(backoffSeconds))s (attempt \(retryCount + 1)/\(maxRetries))...")
                     try await Task.sleep(nanoseconds: UInt64(backoffSeconds * 1_000_000_000))
                     if !cancelToken.isCancelled {
-                        return try await transcribe(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: retryCount + 1)
+                        return try await transcribeWithRetry(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: retryCount + 1)
                     }
                 }
                 throw TranscriptionError.quotaExceeded
@@ -165,7 +175,7 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
                     print("🔤 Retrying after \(Int(backoffSeconds))s (attempt \(retryCount + 1)/\(maxRetries))...")
                     try await Task.sleep(nanoseconds: UInt64(backoffSeconds * 1_000_000_000))
                     if !cancelToken.isCancelled {
-                        return try await transcribe(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: retryCount + 1)
+                        return try await transcribeWithRetry(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: retryCount + 1)
                     }
                 }
 
@@ -210,7 +220,7 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
                     print("🔤 Retrying after \(Int(backoffSeconds))s (attempt \(retryCount + 1)/\(maxRetries))...")
                     try await Task.sleep(nanoseconds: UInt64(backoffSeconds * 1_000_000_000))
                     if !cancelToken.isCancelled {
-                        return try await transcribe(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: retryCount + 1)
+                        return try await transcribeWithRetry(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: retryCount + 1)
                     }
                 }
 
