@@ -646,6 +646,28 @@ struct RecordingDetailView: View {
                         .cornerRadius(8)
                 }
                 
+                // Share Audio File
+                Button(action: {
+                    shareAudioFile(recording)
+                }) {
+                    HStack {
+                        Image(systemName: "waveform")
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Share Audio File")
+                                .font(.poppins.body)
+                                .fontWeight(.medium)
+                            Text("Share original recording as audio file")
+                                .font(.poppins.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                }
+
                 // Share as PDF (recommended for long content)
                 Button(action: {
                     sharePDFRecording(recording)
@@ -667,7 +689,7 @@ struct RecordingDetailView: View {
                     .background(Color.purple.opacity(0.1))
                     .cornerRadius(8)
                 }
-                
+
                 HStack(spacing: 8) {
                     Button(action: {
                         shareRecording(recording)
@@ -979,21 +1001,83 @@ struct RecordingDetailView: View {
         isSharePresented = true
     }
     
+    private func shareAudioFile(_ recording: Recording) {
+        Analytics.track("share_audio_file")
+
+        guard let audioURL = recording.resolvedFileURL else {
+            print("❌ No audio file URL available for recording")
+            shareItems = ["Audio file not available"]
+            isSharePresented = true
+            return
+        }
+
+        // Check if file exists
+        guard FileManager.default.fileExists(atPath: audioURL.path) else {
+            print("❌ Audio file does not exist at path: \(audioURL.path)")
+            shareItems = ["Audio file not found"]
+            isSharePresented = true
+            return
+        }
+
+        // Get file info
+        do {
+            let fileAttributes = try FileManager.default.attributesOfItem(atPath: audioURL.path)
+            let fileSize = fileAttributes[.size] as? Int64 ?? 0
+            let fileSizeMB = Double(fileSize) / 1024.0 / 1024.0
+
+            print("✅ Sharing audio file: \(audioURL.lastPathComponent)")
+            print("📊 File size: \(String(format: "%.2f", fileSizeMB)) MB")
+
+            // Create a better filename for sharing
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd HH-mm"
+            let dateString = dateFormatter.string(from: recording.date)
+
+            let shareFileName: String
+            if !recording.title.isEmpty {
+                shareFileName = "\(recording.title) - \(dateString).m4a"
+            } else {
+                shareFileName = "Voice Recording - \(dateString).m4a"
+            }
+
+            // Create temporary file with better name for sharing
+            let tempDir = FileManager.default.temporaryDirectory
+            let tempURL = tempDir.appendingPathComponent(shareFileName)
+
+            // Remove existing temp file if it exists
+            if FileManager.default.fileExists(atPath: tempURL.path) {
+                try? FileManager.default.removeItem(at: tempURL)
+            }
+
+            // Copy file to temp location with new name
+            try FileManager.default.copyItem(at: audioURL, to: tempURL)
+
+            shareItems = [tempURL]
+            isSharePresented = true
+
+            print("✅ Audio file ready for sharing")
+        } catch {
+            print("❌ Error preparing audio file for sharing: \(error)")
+            shareItems = ["Error: \(error.localizedDescription)"]
+            isSharePresented = true
+        }
+    }
+
     private func sharePDFRecording(_ recording: Recording) {
         shareItems = ["Generating PDF…"]
         isSharePresented = true
         Analytics.track("share_pdf")
-        
+
         Task {
             // Generate PDF in background
             if let pdfData = PDFGenerator.generatePDF(for: recording, includeTranscript: true) {
                 // Create temporary file
                 let tempDir = FileManager.default.temporaryDirectory
                 let pdfURL = tempDir.appendingPathComponent("\(recording.title.isEmpty ? recording.fileName : recording.title).pdf")
-                
+
                 do {
                     try pdfData.write(to: pdfURL)
-                    
+
                     await MainActor.run {
                         shareItems = [pdfURL]
                     }
@@ -1009,7 +1093,7 @@ struct RecordingDetailView: View {
             }
         }
     }
-    
+
     private func copyRecording(_ recording: Recording) {
         UIPasteboard.general.string = makeShareText(recording)
         Analytics.track("copy_summary")
