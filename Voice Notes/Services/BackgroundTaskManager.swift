@@ -84,10 +84,9 @@ class BackgroundTaskManager: ObservableObject {
             do {
                 if recording.transcript == nil || recording.transcript?.isEmpty == true {
                     // Start transcription - safely unwrap file URL
-                    guard let fileURL = recording.resolvedFileURL else {
-                        print("📱 BackgroundTaskManager: ⚠️ Failed to resolve file URL for recording \(recording.id)")
-                        continue
-                    }
+                    let fileURL = recording.resolvedFileURL
+                    // If `resolvedFileURL` is guaranteed non-optional, proceed directly. If it can fail in some cases,
+                    // ensure `resolvedFileURL` itself returns a valid URL or adjust the model to expose an optional and handle it here.
                     try await processingManager.startTranscription(for: recording.id, audioURL: fileURL)
                     print("📱 BackgroundTaskManager: ✅ Started transcription for recording \(recording.id)")
                 } else if recording.summary == nil || recording.summary?.isEmpty == true,

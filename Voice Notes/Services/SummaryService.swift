@@ -96,7 +96,18 @@ enum SummaryMode: String, CaseIterable, Identifiable {
             languageInstruction = "Generate the summary in the same language as the app interface (\(languageCode))."
         }
 
-        let baseFormatting = "Output must be plain text. No markdown headings (#). Put bold labels with double asterisks on their own line, then one blank line. One blank line between sections. Use bullets '• '. Omit empty sections. Do not invent facts, owners, or deadlines. \(languageInstruction)"
+        let actionItemCriteria = """
+        CRITICAL: For action items section - ONLY include items that:
+        • Are explicitly stated as something that must be done/completed
+        • Contain clear action verbs (e.g., "schedule", "send", "review", "create", "contact")
+        • Are NOT generic statements, observations, or context
+        • Are NOT section headers like "context", "hoofdpunten", "summary"
+        • Are NOT suggestions or possibilities unless explicitly framed as "we should do X" or "action: do Y"
+        • Must be concrete, actionable tasks that someone can execute
+        If no real action items are found, OMIT the action items section entirely. Do not force items into this section.
+        """
+
+        let baseFormatting = "Output must be plain text. No markdown headings (#). Put bold labels with double asterisks on their own line, then one blank line. One blank line between sections. Use bullets '• '. Omit empty sections. Do not invent facts, owners, or deadlines. \(actionItemCriteria) \(languageInstruction)"
         let lengthInstruction = length.lengthModifier
         
         switch self {
@@ -110,16 +121,16 @@ enum SummaryMode: String, CaseIterable, Identifiable {
             return "Summarize this dental consultation in a clear and structured way. Start with patient context and dental concerns. Identify the dentist and patient interaction. Highlight dental findings, procedures performed, and treatment recommendations. Extract key dental themes, treatment decisions, patient questions, and next steps. Use dental headings and bullet points to keep it organized. Keep it factual and concise; do not add clinical interpretations not stated in the recording. Maintain a professional dental tone for quick reference. Use sections: **Patient Context**, **Dental Assessment**, **Procedures Performed**, **Treatment Recommendations**, **Follow-up Care**. " + lengthInstruction + " " + baseFormatting
             
         case .techTeam:
-            return "Summarize this technical team meeting in a clear and structured way. Start with team context and meeting purpose. Identify the participants and technical topics discussed. Highlight the main technical points, architecture decisions, and development priorities. Extract key technical themes, engineering decisions, outstanding questions, and next steps. Use technical headings and bullet points to keep it organized. Keep it factual and concise; do not add technical assumptions not stated in the meeting. Maintain a professional technical tone for quick team reference. Use sections: **Meeting Context**, **Technical Discussion**, **Key Decisions**, **Action Items**, **Next Steps**. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this technical team meeting in a clear and structured way. Start with team context and meeting purpose. Identify the participants and technical topics discussed. Highlight the main technical points, architecture decisions, and development priorities. Extract key technical themes and engineering decisions. For Action Items: ONLY include explicit tasks someone committed to doing (e.g., 'John will refactor the API', 'Deploy by Friday'). Exclude observations, discussions, or general statements. Use technical headings and bullet points to keep it organized. Keep it factual and concise; do not add technical assumptions not stated in the meeting. Maintain a professional technical tone for quick team reference. Use sections: **Meeting Context**, **Technical Discussion**, **Key Decisions**, **Action Items** (only if explicit tasks exist). " + lengthInstruction + " " + baseFormatting
             
         case .planning:
-            return "Summarize this planning session in a clear and structured way. Start with project context and planning objectives. Identify the participants and project scope being discussed. Highlight the main planning points, resource allocations, and timeline decisions. Extract key planning themes, strategic decisions, scheduling questions, and next steps. Use planning headings and bullet points to keep it organized. Keep it factual and concise; do not add project assumptions not stated in the session. Maintain a professional project tone for quick planning reference. Use sections: **Project Context**, **Planning Discussion**, **Key Milestones**, **Resource Decisions**, **Action Items**. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this planning session in a clear and structured way. Start with project context and planning objectives. Identify the participants and project scope being discussed. Highlight the main planning points, resource allocations, and timeline decisions. Extract key planning themes and strategic decisions. For Action Items: ONLY include explicit tasks with clear ownership or deadlines (e.g., 'Sarah will prepare budget by Monday'). Do not include general planning topics or observations. Use planning headings and bullet points to keep it organized. Keep it factual and concise; do not add project assumptions not stated in the session. Maintain a professional project tone for quick planning reference. Use sections: **Project Context**, **Planning Discussion**, **Key Milestones**, **Resource Decisions**, **Action Items** (only if explicit tasks exist). " + lengthInstruction + " " + baseFormatting
             
         case .alignment:
-            return "Summarize this alignment meeting in a clear and structured way. Start with participants and alignment objectives. Identify the team members and strategic topics being aligned on. Highlight the main alignment points, priority decisions, and coordination agreements. Extract key strategic themes, alignment decisions, clarification questions, and next steps. Use alignment headings and bullet points to keep it organized. Keep it factual and concise; do not add strategic assumptions not stated in the meeting. Maintain a professional collaborative tone for quick reference. Use sections: **Alignment Context**, **Strategic Discussion**, **Key Agreements**, **Priority Decisions**, **Follow-up Actions**. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this alignment meeting in a clear and structured way. Start with participants and alignment objectives. Identify the team members and strategic topics being aligned on. Highlight the main alignment points, priority decisions, and coordination agreements. Extract key strategic themes and alignment decisions. For Follow-up Actions: ONLY include explicit commitments or tasks assigned to specific people. Do not include general discussion points or observations. Use alignment headings and bullet points to keep it organized. Keep it factual and concise; do not add strategic assumptions not stated in the meeting. Maintain a professional collaborative tone for quick reference. Use sections: **Alignment Context**, **Strategic Discussion**, **Key Agreements**, **Priority Decisions**, **Follow-up Actions** (only if explicit tasks exist). " + lengthInstruction + " " + baseFormatting
             
         case .brainstorm:
-            return "Summarize this brainstorming session in a clear and structured way. Start with participants and creative challenge being addressed. Identify the facilitator and team members contributing ideas. Highlight the main creative concepts, innovative solutions, and promising directions. Extract key creative themes, concept decisions, exploration questions, and next steps. Use creative headings and bullet points to keep it organized. Keep it factual and concise; do not add ideas not actually proposed in the session. Maintain an energetic yet professional tone for quick creative reference. Use sections: **Session Context**, **Creative Challenge**, **Ideas Generated**, **Promising Concepts**, **Next Steps**. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this brainstorming session in a clear and structured way. Start with participants and creative challenge being addressed. Identify the facilitator and team members contributing ideas. Highlight the main creative concepts, innovative solutions, and promising directions. Extract key creative themes and concept decisions. For Next Steps: ONLY include specific actions the team committed to (e.g., 'Test prototype with users', 'Create mockups by Friday'). Do not include vague ideas or general suggestions. Use creative headings and bullet points to keep it organized. Keep it factual and concise; do not add ideas not actually proposed in the session. Maintain an energetic yet professional tone for quick creative reference. Use sections: **Session Context**, **Creative Challenge**, **Ideas Generated**, **Promising Concepts**, **Next Steps** (only if explicit commitments exist). " + lengthInstruction + " " + baseFormatting
             
         case .lecture:
             return "Summarize this educational session in a clear and structured way. Start with instructor and learning context. Identify the educator and educational objectives being covered. Highlight the main educational points, key concepts taught, and learning outcomes. Extract key educational themes, concept explanations, student questions, and next steps. Use educational headings and bullet points to keep it organized. Keep it factual and concise; do not add educational content not actually presented. Maintain a professional educational tone for quick learning reference. Use sections: **Learning Context**, **Key Concepts**, **Main Teaching Points**, **Examples Provided**, **Learning Outcomes**. " + lengthInstruction + " " + baseFormatting
@@ -128,7 +139,7 @@ enum SummaryMode: String, CaseIterable, Identifiable {
             return "Summarize this interview in a clear and structured way. Start with interviewer and interviewee context. Identify the participants and interview purpose or topic. Highlight the main discussion points, key responses, and important revelations. Extract key interview themes, significant answers, follow-up questions, and next steps. Use interview headings and bullet points to keep it organized. Keep it factual and concise; do not add interpretations not stated in the interview. Maintain a professional interview tone for quick reference. Use sections: **Interview Context**, **Key Questions**, **Main Responses**, **Important Insights**, **Follow-up Items**. " + lengthInstruction + " " + baseFormatting
             
         case .personal:
-            return "Summarize this transcript in a clear and structured way. Start with a brief context: who the speakers are and what the topic is. Highlight the main points discussed. Extract themes, decisions, questions, and next steps. Use headings and bullet points to keep it organized. Keep it factual and concise; do not add information that isn't in the transcript. Maintain a neutral, professional tone so the summary is quick to read. " + lengthInstruction + " " + baseFormatting
+            return "Summarize this transcript in a clear and structured way. Start with a brief context: who the speakers are and what the topic is. Highlight the main points discussed. Extract themes and decisions. For action items or next steps: ONLY include explicit tasks that were stated as things to do (e.g., 'Call the doctor', 'Buy groceries', 'Email John the report'). Do not include general observations, context, or discussion points. If no explicit action items exist, omit that section. Use headings and bullet points to keep it organized. Keep it factual and concise; do not add information that isn't in the transcript. Maintain a neutral, professional tone so the summary is quick to read. " + lengthInstruction + " " + baseFormatting
         }
     }
     
@@ -711,8 +722,14 @@ private func prettifySummaryPlain(_ input: String) -> String {
         .replacingOccurrences(of: "\r", with: "\n")
         .trimmingCharacters(in: .whitespacesAndNewlines)
 
-    // Known labels we enforce
-    let labels = ["Titel", "Samenvatting", "Belangrijkste punten", "Besluiten", "Actiepunten"]
+    // Known labels we enforce (Dutch)
+    let labels = [
+        "Titel", "Samenvatting", "Belangrijkste punten", "Besluiten", "Actiepunten",
+        "Context", "Hoofdpunten", "Volgende stappen", "Vervolgacties",
+        // English equivalents
+        "Title", "Summary", "Key Points", "Decisions", "Action Items",
+        "Next Steps", "Follow-up Actions", "Context"
+    ]
 
     // 0) Convert accidental Markdown headings to bold labels
     text = text.replacingOccurrences(

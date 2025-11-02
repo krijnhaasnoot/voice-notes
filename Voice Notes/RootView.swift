@@ -42,7 +42,6 @@ struct RootView: View {
     @AppStorage("hasCompletedTour") private var hasCompletedTour = false
     @AppStorage("useCompactView") private var useCompactView = true
     @State private var showingTour = false
-    @State private var showingPaywall = false
     
     var body: some View {
         TabView(selection: $appRouter.selectedTab) {
@@ -109,14 +108,7 @@ struct RootView: View {
             AppTourView(onComplete: {
                 hasCompletedTour = true
                 showingTour = false
-                // Show paywall after tour
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    showingPaywall = true
-                }
             })
-        }
-        .sheet(isPresented: $showingPaywall) {
-            PaywallView(canDismiss: true)
         }
     }
 }

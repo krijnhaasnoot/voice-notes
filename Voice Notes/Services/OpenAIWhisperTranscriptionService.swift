@@ -97,14 +97,19 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"model\"\r\n\r\n".data(using: .utf8)!)
         body.append("\(model)\r\n".data(using: .utf8)!)
-        
+
         if let languageHint = languageHint {
             let languageCode = languageHint.prefix(2)
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
             body.append("Content-Disposition: form-data; name=\"language\"\r\n\r\n".data(using: .utf8)!)
             body.append("\(languageCode)\r\n".data(using: .utf8)!)
         }
-        
+
+        // Request verbose_json format to get timestamps for speaker detection
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"response_format\"\r\n\r\n".data(using: .utf8)!)
+        body.append("verbose_json\r\n".data(using: .utf8)!)
+
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         
         request.httpBody = body
@@ -131,18 +136,35 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
             switch httpResponse.statusCode {
             case 200:
                 let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+                // Parse verbose_json response with segments
+                if let segments = json?["segments"] as? [[String: Any]] {
+                    let transcript = formatTranscriptWithSpeakers(segments: segments)
+
+                    progress(1.0)
+
+                    // Cleanup compressed file if we created one
+                    if processedURL != url {
+                        try? FileManager.default.removeItem(at: processedURL)
+                        print("🔤 🧹 Cleaned up compressed file")
+                    }
+
+                    return transcript
+                }
+
+                // Fallback to plain text if segments not available
                 guard let transcript = json?["text"] as? String else {
                     throw TranscriptionError.invalidResponse
                 }
-                
+
                 progress(1.0)
-                
+
                 // Cleanup compressed file if we created one
                 if processedURL != url {
                     try? FileManager.default.removeItem(at: processedURL)
                     print("🔤 🧹 Cleaned up compressed file")
                 }
-                
+
                 return transcript
                 
             case 401:
@@ -292,5 +314,94 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
                 }
             }
         }
+    }
+
+    // MARK: - Speaker Diarization
+
+    private func formatTranscriptWithSpeakers(segments: [[String: Any]]) -> String {
+        guard !segments.isEmpty else { return "" }
+
+        var result: [String] = []
+        var currentSpeaker = 1
+        var lastEndTime: Double = 0.0
+
+        for segment in segments {
+            guard let text = segment["text"] as? String,
+                  let startTime = segment["start"] as? Double,
+                  let endTime = segment["end"] as? Double else {
+                continue
+            }
+
+            let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedText.isEmpty else { continue }
+
+            // Detect speaker change based on pause duration and conversation patterns
+            let pauseDuration = startTime - lastEndTime
+            let shouldChangeSpeaker = detectSpeakerChange(
+                pauseDuration: pauseDuration,
+                previousText: result.last,
+                currentText: trimmedText,
+                isFirstSegment: result.isEmpty
+            )
+
+            if shouldChangeSpeaker {
+                currentSpeaker = currentSpeaker == 1 ? 2 : 1
+            }
+
+            // Add speaker label if not already present in text
+            let speakerLabel = "Speaker \(currentSpeaker):"
+            let formattedText: String
+            if result.isEmpty || shouldChangeSpeaker {
+                formattedText = "\n\(speakerLabel) \(trimmedText)"
+            } else {
+                // Continue same speaker's text
+                formattedText = " \(trimmedText)"
+            }
+
+            result.append(formattedText)
+            lastEndTime = endTime
+        }
+
+        return result.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func detectSpeakerChange(
+        pauseDuration: Double,
+        previousText: String?,
+        currentText: String,
+        isFirstSegment: Bool
+    ) -> Bool {
+        // First segment always starts with Speaker 1
+        if isFirstSegment {
+            return false
+        }
+
+        // Long pause (> 2 seconds) suggests speaker change
+        if pauseDuration > 2.0 {
+            return true
+        }
+
+        // Medium pause (> 1 second) combined with conversation patterns
+        if pauseDuration > 1.0 {
+            // Check if previous text ended with question mark or statement
+            let previousEndsWithQuestion = previousText?.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("?") ?? false
+
+            // Check if current text starts with typical response patterns
+            let currentLower = currentText.lowercased()
+            let responseStarters = [
+                "yes", "no", "yeah", "sure", "okay", "ok", "right", "exactly",
+                "well", "so", "actually", "i think", "i mean", "maybe", "perhaps",
+                "ja", "nee", "nou", "oke", "goed", "precies", "dus", "eigenlijk"  // Dutch
+            ]
+
+            let startsWithResponse = responseStarters.contains { currentLower.hasPrefix($0) }
+
+            // Question followed by response = likely speaker change
+            if previousEndsWithQuestion || startsWithResponse {
+                return true
+            }
+        }
+
+        return false
     }
 }

@@ -6,14 +6,15 @@ final class UsageViewModel: ObservableObject {
     static let shared = UsageViewModel()
     private init() {}
 
-    // MARK: - Published Properties (Backend Authoritative)
+    // MARK: - Published Properties (Real Backend Data)
 
-    @Published var isLoading: Bool = false
-    @Published var lastRefreshAt: Date?
+    @Published var isLoading: Bool = true
     @Published var secondsUsed: Int = 0
-    @Published var limitSeconds: Int = 0
-    @Published var currentPlan: String = "standard"  // safe default
-    @Published var isDebugOverrideActive: Bool = false
+    @Published var limitSeconds: Int = 1800  // Default 30 min
+    @Published var remainingSeconds: Int = 1800
+    @Published var currentPlan: String = "free"
+    @Published var lastRefreshAt: Date?
+    @Published var isDebugOverrideActive: Bool = false  // For debug settings
 
     // MARK: - Computed Properties
 
@@ -23,9 +24,8 @@ final class UsageViewModel: ObservableObject {
     }
 
     var minutesLeftText: String {
-        let secondsLeft = max(limitSeconds - secondsUsed, 0)
-        let minutes = secondsLeft / 60
-        let seconds = secondsLeft % 60
+        let minutes = remainingSeconds / 60
+        let seconds = remainingSeconds % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
 
@@ -38,98 +38,88 @@ final class UsageViewModel: ObservableObject {
     }
 
     var minutesLeftDisplay: Int {
-        max((limitSeconds - secondsUsed) / 60, 0)
+        max(remainingSeconds / 60, 0)
     }
 
-    // MARK: - Fallback Limits (when server doesn't return limit_seconds)
+    // MARK: - API Client
 
-    private let fallbackLimits: [String: Int] = [
-        "free": 30 * 60,
-        "standard": 120 * 60,
-        "premium": 600 * 60,
-        "own_key": 10000 * 60  // Client safety cap
-    ]
+    private let api = UsageAPI()
 
-    // MARK: - Refresh (Fetch from Backend)
+    // MARK: - User Key Resolution
+
+    private var userKey: String {
+        // Use device identifier as user key for free tier
+        // TODO: Replace with StoreKit original transaction ID for paid users
+        return UIDevice.current.identifierForVendor?.uuidString ?? "unknown-device"
+    }
+
+    // MARK: - Fetch Usage from Backend
 
     func refresh() async {
-        // Skip refresh if debug override is active
-        if isDebugOverrideActive {
-            print("📊 UsageViewModel: Skipping refresh - debug override active")
-            return
-        }
-
         isLoading = true
 
         do {
-            // Resolve user key via StoreKit
-            let userKey = await StoreKitManager.shared.resolveUserKey()
-            print("📊 UsageViewModel: Resolved userKey: \(userKey.value) (source: \(userKey.source))")
+            print("📊 UsageViewModel: Fetching usage for user: \(userKey)")
 
-            // Get current plan from StoreKit
-            let plan = await StoreKitManager.shared.currentPlanIdentifier() ?? "free"
-            currentPlan = plan
-            print("📊 UsageViewModel: Current plan: \(plan)")
+            let json = try await api.post("/ingest/usage/fetch", body: [
+                "user_key": userKey,
+                "plan": currentPlan
+            ])
 
-            // Determine current period in UTC
-            let periodYM = currentPeriodYM()
-            print("📊 UsageViewModel: Period: \(periodYM)")
+            // Parse response
+            self.secondsUsed = (json["seconds_used"] as? Int) ?? 0
+            self.limitSeconds = (json["limit_seconds"] as? Int) ?? 1800
+            self.remainingSeconds = max(limitSeconds - secondsUsed, 0)
 
-            // Fetch usage from backend
-            let response = try await UsageQuotaClient.shared.fetchUsage(
-                userKey: userKey.value,
-                periodYM: periodYM,
-                plan: plan
-            )
+            if let plan = json["plan"] as? String {
+                self.currentPlan = plan
+            }
 
-            // Update state with backend data
-            secondsUsed = response.seconds_used
-            limitSeconds = response.limit_seconds ?? fallbackLimits[response.plan] ?? fallbackLimits["standard"]!
-            currentPlan = response.plan
-            lastRefreshAt = Date()
+            self.lastRefreshAt = Date()
 
-            print("✅ UsageViewModel: Refreshed - used: \(secondsUsed)s, limit: \(limitSeconds)s, plan: \(currentPlan)")
+            print("✅ UsageViewModel: Refresh complete - used: \(secondsUsed)s, limit: \(limitSeconds)s, remaining: \(remainingSeconds)s")
 
         } catch {
             print("❌ UsageViewModel: Refresh failed - \(error)")
-            // Don't update lastRefreshAt on error - keeps isStale = true
-            // Keep previous values to avoid showing 0/0
+            // Keep previous values on error to avoid showing 0/0
+            // Don't update lastRefreshAt so isStale remains true
         }
 
         isLoading = false
     }
 
-    // MARK: - Book Usage (Post to Backend)
+    // MARK: - Book Usage to Backend
 
     func book(seconds: Int, recordedAt: Date) async {
         do {
-            // Resolve user key
-            let userKey = await StoreKitManager.shared.resolveUserKey()
+            print("📊 UsageViewModel: Booking \(seconds)s for user: \(userKey)")
 
-            print("📊 UsageViewModel: Booking \(seconds)s for user \(userKey.value), plan: \(currentPlan)")
+            let body: [String: Any] = [
+                "user_key": userKey,
+                "seconds": seconds,
+                "recorded_at": Int(recordedAt.timeIntervalSince1970),
+                "plan": currentPlan
+            ]
 
-            // Book to backend
-            try await UsageQuotaClient.shared.bookUsage(
-                userKey: userKey.value,
-                seconds: seconds,
-                plan: currentPlan,
-                recordedAt: recordedAt
-            )
+            let json = try await api.post("/ingest/usage/book", body: body)
 
-            // Refresh to get updated usage from server
-            await refresh()
+            // Parse response (book endpoint returns updated usage)
+            if let ok = json["ok"] as? Bool, ok {
+                self.secondsUsed = (json["seconds_used"] as? Int) ?? 0
+                self.limitSeconds = (json["limit_seconds"] as? Int) ?? 1800
+                self.remainingSeconds = (json["remaining_seconds"] as? Int) ?? max(limitSeconds - secondsUsed, 0)
+                self.lastRefreshAt = Date()
+
+                print("✅ UsageViewModel: Book complete - used: \(secondsUsed)s, remaining: \(remainingSeconds)s")
+            } else {
+                throw NSError(domain: "UsageViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Book request returned ok:false"])
+            }
 
         } catch {
-            print("❌ UsageViewModel: Booking failed - \(error)")
+            print("❌ UsageViewModel: Book failed - \(error)")
+            // Fallback: fetch to get updated state
+            print("📊 UsageViewModel: Falling back to fetch()")
+            await refresh()
         }
-    }
-
-    // MARK: - Helper
-
-    private func currentPeriodYM() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.string(from: Date())
     }
 }

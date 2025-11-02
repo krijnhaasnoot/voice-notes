@@ -9,13 +9,29 @@
 
 /* Home View */
 "home.ready_to_record" = "Ready to record";
+"home.tap_to_record" = "Tap to record";
 "home.tap_to_start" = "Tap to start recording";
 "home.recording" = "Recording";
+"home.recording_..." = "Recording...";
 "home.recording_paused" = "Recording paused";
 "home.recent_recordings" = "Recent Recordings";
 "home.view_all" = "View All";
 "home.recording_settings" = "Recording Settings";
 "home.no_recordings_message" = "Your voice notes will appear in the Recordings tab after recording.";
+"home.out_of_minutes" = "Out of recording minutes";
+"home.running_low_minutes" = "Running low on minutes";
+"home.get_more_minutes" = "Get More Minutes";
+"home.checking_quota" = "Checking quota…";
+"home.offline_mode" = "Offline mode - usage tracking unavailable";
+"home.minutes_left" = "Minutes left: %@";
+"home.multiple_speakers" = "Multiple speakers detected";
+"home.permissions_required" = "Permissions Required";
+"home.permissions_message" = "Voice Notes needs microphone and speech recognition permissions to function.";
+"home.reset_app" = "Reset App";
+"home.reset_everything" = "Reset Everything";
+"home.reset_message" = "This will permanently delete ALL recordings, documents, settings, and usage data. This action cannot be undone.";
+"home.expanded_recording" = "Expanded Recording";
+"home.close" = "Close";
 
 /* Recording States */
 "recording.new_recording" = "New Recording";
@@ -82,6 +98,15 @@
 
 /* Settings */
 "settings.title" = "Settings";
+"settings.subscription" = "Subscription";
+"settings.free_trial" = "Free Trial";
+"settings.minutes" = "minutes";
+"settings.minutes_per_month" = "minutes per month";
+"settings.usage_this_month" = "Usage this month";
+"settings.checking" = "Checking...";
+"settings.unable_to_check" = "Unable to check usage. You can still record!";
+"settings.try_again" = "Try Again";
+"settings.remaining" = "remaining";
 "settings.ai_provider" = "AI Provider";
 "settings.ai_provider_settings" = "AI Provider Settings";
 "settings.configure_providers" = "Configure OpenAI, Claude, Gemini, or Mistral";
@@ -91,15 +116,61 @@
 "settings.organize_rename_merge" = "Organize, rename, merge, and delete tags";
 "settings.summary_settings" = "Summary Settings";
 "settings.ai_summary_mode" = "AI Summary Mode";
+"settings.summary_detail_level" = "Summary Detail Level";
 "settings.summary_length" = "Summary Length";
 "settings.auto_detect_mode" = "Auto-detect mode";
+"settings.advanced_settings" = "Advanced Settings";
+"settings.advanced_settings_desc" = "AI provider, summaries, lists, tags, and interface";
+"settings.language" = "Language";
+"settings.app_language" = "App Language";
+"settings.language_change_note" = "Summaries will be generated in the selected app language. Change language in iOS Settings.";
+"settings.getting_started" = "Getting Started";
+"settings.take_tour" = "Take the Tour";
+"settings.learn_features" = "Learn about Voice Notes features";
+"settings.help_support" = "Help & Support";
+"settings.help_support_desc" = "Feedback, privacy, and analytics";
+"settings.info" = "Info";
+"settings.ai_summary" = "AI Summary";
+"settings.ai_summary_desc" = "Uses OpenAI GPT-4 for intelligent summaries";
+"settings.transcription" = "Transcription";
+"settings.transcription_desc" = "Uses OpenAI Whisper for accurate speech-to-text";
+"settings.language_recognition" = "Language Recognition";
+"settings.language_recognition_desc" = "Automatic detection of different languages";
+"settings.smart_lists" = "Smart Lists";
+"settings.smart_lists_desc" = "Organize action items into intelligent list types";
+"settings.list_settings" = "List Settings";
+"settings.default_list_type" = "Default List Type";
+"settings.default_list_note" = "When saving action items, use %@ by default if no better type is detected.";
+"settings.organization" = "Organization";
+"settings.interface" = "Interface";
 "settings.privacy_data" = "Privacy & Data";
 "settings.privacy_policy" = "Privacy Policy";
 "settings.data_usage" = "Data Usage";
+"settings.privacy_data_usage" = "Privacy & Data Usage";
+"settings.reset_analytics_pin" = "Reset Analytics PIN";
+"settings.reset_pin_desc" = "Remove the PIN required to open Analytics";
+"settings.reset_pin_message" = "You will need to create a new PIN the next time you access Analytics.";
 "settings.app_info" = "App Info";
 "settings.version" = "Version";
 "settings.build" = "Build";
 "settings.support" = "Support";
+"settings.upgrade" = "Upgrade";
+"settings.manage" = "Manage";
+"settings.feedback_support" = "Feedback & Support";
+"settings.send_feedback" = "Send Feedback via WhatsApp";
+"settings.send_feedback_desc" = "Report issues or request features";
+"settings.whatsapp_not_available" = "WhatsApp Not Available";
+"settings.copy_phone" = "Copy Phone Number";
+"settings.ok" = "OK";
+"settings.auto_mode_detection" = "Automatic Mode Detection";
+"settings.auto_mode_on" = "The app automatically detects which mode best fits the recording content.";
+"settings.auto_mode_off" = "Always uses the default mode for summaries.";
+"settings.auto_save_action_items" = "Auto-save Action Items";
+"settings.auto_save_on" = "Automatically saves detected action items to lists without asking.";
+"settings.auto_save_off" = "Asks before saving action items to lists.";
+"settings.compact_recording_view" = "Compact Recording View";
+"settings.compact_view_on" = "Using minimalist recording interface with larger controls and cleaner design";
+"settings.compact_view_off" = "Switch to minimalist recording interface with larger controls and cleaner design";
 
 /* AI Summary Modes */
 "summary.mode.personal" = "Personal";

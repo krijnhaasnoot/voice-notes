@@ -9,13 +9,29 @@
 
 /* Home View */
 "home.ready_to_record" = "Klaar om op te nemen";
+"home.tap_to_record" = "Tik om op te nemen";
 "home.tap_to_start" = "Tik om op te nemen";
 "home.recording" = "Opnemen";
+"home.recording_..." = "Opnemen...";
 "home.recording_paused" = "Opname gepauzeerd";
 "home.recent_recordings" = "Recente opnames";
 "home.view_all" = "Alles bekijken";
 "home.recording_settings" = "Opname-instellingen";
 "home.no_recordings_message" = "Je spraaknotities verschijnen in het tabblad Opnames na het opnemen.";
+"home.out_of_minutes" = "Geen opnameminuten meer";
+"home.running_low_minutes" = "Weinig minuten over";
+"home.get_more_minutes" = "Meer minuten krijgen";
+"home.checking_quota" = "Quota controleren…";
+"home.offline_mode" = "Offline modus - gebruiksregistratie niet beschikbaar";
+"home.minutes_left" = "Minuten over: %@";
+"home.multiple_speakers" = "Meerdere sprekers gedetecteerd";
+"home.permissions_required" = "Toestemmingen vereist";
+"home.permissions_message" = "Voice Notes heeft toegang tot microfoon en spraakherkenning nodig om te functioneren.";
+"home.reset_app" = "App resetten";
+"home.reset_everything" = "Alles resetten";
+"home.reset_message" = "Dit zal ALLE opnames, documenten, instellingen en gebruiksgegevens permanent verwijderen. Deze actie kan niet ongedaan worden gemaakt.";
+"home.expanded_recording" = "Uitgebreide opname";
+"home.close" = "Sluiten";
 
 /* Recording States */
 "recording.new_recording" = "Nieuwe opname";
@@ -82,6 +98,15 @@
 
 /* Settings */
 "settings.title" = "Instellingen";
+"settings.subscription" = "Abonnement";
+"settings.free_trial" = "Gratis proefversie";
+"settings.minutes" = "minuten";
+"settings.minutes_per_month" = "minuten per maand";
+"settings.usage_this_month" = "Gebruik deze maand";
+"settings.checking" = "Controleren...";
+"settings.unable_to_check" = "Kan gebruik niet controleren. Je kunt nog steeds opnemen!";
+"settings.try_again" = "Probeer opnieuw";
+"settings.remaining" = "resterend";
 "settings.ai_provider" = "AI-provider";
 "settings.ai_provider_settings" = "AI-providerinstellingen";
 "settings.configure_providers" = "OpenAI, Claude, Gemini of Mistral configureren";
@@ -91,15 +116,61 @@
 "settings.organize_rename_merge" = "Tags organiseren, hernoemen, samenvoegen en verwijderen";
 "settings.summary_settings" = "Samenvattingsinstellingen";
 "settings.ai_summary_mode" = "AI-samenvattingsmodus";
+"settings.summary_detail_level" = "Samenvattingsdetailniveau";
 "settings.summary_length" = "Samenvattingslengte";
 "settings.auto_detect_mode" = "Modus automatisch detecteren";
+"settings.advanced_settings" = "Geavanceerde instellingen";
+"settings.advanced_settings_desc" = "AI-provider, samenvattingen, lijsten, tags en interface";
+"settings.language" = "Taal";
+"settings.app_language" = "App-taal";
+"settings.language_change_note" = "Samenvattingen worden gegenereerd in de geselecteerde app-taal. Wijzig de taal in iOS-instellingen.";
+"settings.getting_started" = "Aan de slag";
+"settings.take_tour" = "Volg de rondleiding";
+"settings.learn_features" = "Leer meer over Voice Notes-functies";
+"settings.help_support" = "Help en ondersteuning";
+"settings.help_support_desc" = "Feedback, privacy en analyses";
+"settings.info" = "Info";
+"settings.ai_summary" = "AI-samenvatting";
+"settings.ai_summary_desc" = "Gebruikt OpenAI GPT-4 voor intelligente samenvattingen";
+"settings.transcription" = "Transcriptie";
+"settings.transcription_desc" = "Gebruikt OpenAI Whisper voor nauwkeurige spraak-naar-tekst";
+"settings.language_recognition" = "Taalherkenning";
+"settings.language_recognition_desc" = "Automatische detectie van verschillende talen";
+"settings.smart_lists" = "Slimme lijsten";
+"settings.smart_lists_desc" = "Organiseer actiepunten in intelligente lijsttypen";
+"settings.list_settings" = "Lijstinstellingen";
+"settings.default_list_type" = "Standaard lijsttype";
+"settings.default_list_note" = "Bij het opslaan van actiepunten wordt standaard %@ gebruikt als er geen beter type wordt gedetecteerd.";
+"settings.organization" = "Organisatie";
+"settings.interface" = "Interface";
 "settings.privacy_data" = "Privacy en gegevens";
 "settings.privacy_policy" = "Privacybeleid";
 "settings.data_usage" = "Gegevensgebruik";
+"settings.privacy_data_usage" = "Privacy en gegevensgebruik";
+"settings.reset_analytics_pin" = "Analytics-pincode resetten";
+"settings.reset_pin_desc" = "Verwijder de pincode die nodig is om Analytics te openen";
+"settings.reset_pin_message" = "Je moet een nieuwe pincode aanmaken de volgende keer dat je Analytics opent.";
 "settings.app_info" = "App-informatie";
 "settings.version" = "Versie";
 "settings.build" = "Build";
 "settings.support" = "Ondersteuning";
+"settings.upgrade" = "Upgraden";
+"settings.manage" = "Beheren";
+"settings.feedback_support" = "Feedback en ondersteuning";
+"settings.send_feedback" = "Stuur feedback via WhatsApp";
+"settings.send_feedback_desc" = "Meld problemen of vraag functies aan";
+"settings.whatsapp_not_available" = "WhatsApp niet beschikbaar";
+"settings.copy_phone" = "Telefoonnummer kopiëren";
+"settings.ok" = "OK";
+"settings.auto_mode_detection" = "Automatische modusdetectie";
+"settings.auto_mode_on" = "De app detecteert automatisch welke modus het beste bij de opname-inhoud past.";
+"settings.auto_mode_off" = "Gebruikt altijd de standaardmodus voor samenvattingen.";
+"settings.auto_save_action_items" = "Actiepunten automatisch opslaan";
+"settings.auto_save_on" = "Slaat gedetecteerde actiepunten automatisch op in lijsten zonder te vragen.";
+"settings.auto_save_off" = "Vraagt voordat actiepunten worden opgeslagen in lijsten.";
+"settings.compact_recording_view" = "Compacte opnameweergave";
+"settings.compact_view_on" = "Gebruikt minimalistische opname-interface met grotere bedieningselementen en schoner ontwerp";
+"settings.compact_view_off" = "Schakel over naar minimalistische opname-interface met grotere bedieningselementen en schoner ontwerp";
 
 /* AI Summary Modes */
 "summary.mode.personal" = "Persoonlijk";

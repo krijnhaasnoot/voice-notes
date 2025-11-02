@@ -201,14 +201,14 @@ struct AlternativeHomeView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: usageVM.isOverLimit ? "clock.badge.exclamationmark" : "clock")
                                     .foregroundStyle(usageVM.isOverLimit ? .red : .orange)
-                                Text(usageVM.isOverLimit ? "Out of recording minutes" : "Running low on minutes")
+                                Text(usageVM.isOverLimit ? NSLocalizedString("home.out_of_minutes", comment: "Out of recording minutes") : NSLocalizedString("home.running_low_minutes", comment: "Running low on minutes"))
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
                                     .foregroundColor(usageVM.isOverLimit ? .red : .orange)
                             }
 
                             Button(action: { showingSettings = true }) {
-                                Text("Get More Minutes")
+                                Text(NSLocalizedString("home.get_more_minutes", comment: "Get More Minutes"))
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                     .foregroundColor(.white)
@@ -229,7 +229,7 @@ struct AlternativeHomeView: View {
                     if !audioRecorder.isRecording && !usageVM.isOverLimit {
                         HStack(spacing: 4) {
                             if usageVM.isLoading {
-                                Text("Checking quota…")
+                                Text(NSLocalizedString("home.checking_quota", comment: "Checking quota…"))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             } else if usageVM.isStale && usageVM.limitSeconds == 0 {
@@ -238,7 +238,7 @@ struct AlternativeHomeView: View {
                                     Image(systemName: "wifi.exclamationmark")
                                         .font(.caption2)
                                         .foregroundStyle(.orange)
-                                    Text("Offline mode - usage tracking unavailable")
+                                    Text(NSLocalizedString("home.offline_mode", comment: "Offline mode"))
                                         .font(.caption)
                                         .foregroundStyle(.orange)
                                     Button {
@@ -250,7 +250,7 @@ struct AlternativeHomeView: View {
                                     }
                                 }
                             } else {
-                                Text("Minutes left: \(usageVM.minutesLeftText)")
+                                Text(String(format: NSLocalizedString("home.minutes_left", comment: "Minutes left"), usageVM.minutesLeftText))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
 
@@ -263,12 +263,6 @@ struct AlternativeHomeView: View {
                                         .foregroundStyle(.secondary)
                                 }
 
-                                // Stale indicator - less alarming
-                                if usageVM.isStale {
-                                    Text("(may be outdated)")
-                                        .font(.caption2)
-                                        .foregroundStyle(.orange)
-                                }
                             }
                         }
                         .padding(.top, 8)
@@ -279,7 +273,7 @@ struct AlternativeHomeView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "person.2.fill")
                                 .foregroundStyle(.orange)
-                            Text("Multiple speakers detected")
+                            Text(NSLocalizedString("home.multiple_speakers", comment: "Multiple speakers detected"))
                                 .font(.poppins.caption)
                                 .foregroundColor(.orange)
                         }
@@ -334,23 +328,23 @@ struct AlternativeHomeView: View {
             }
             appDidBecomeActive = true
         }
-        .alert("Permissions Required", isPresented: $showingPermissionAlert) {
-            Button("Settings") {
+        .alert(NSLocalizedString("home.permissions_required", comment: "Permissions Required"), isPresented: $showingPermissionAlert) {
+            Button(NSLocalizedString("settings.title", comment: "Settings")) {
                 if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(settingsURL)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(NSLocalizedString("alert.cancel", comment: "Cancel"), role: .cancel) {}
         } message: {
-            Text("Voice Notes needs microphone and speech recognition permissions to function.")
+            Text(NSLocalizedString("home.permissions_message", comment: "Permissions message"))
         }
-        .alert("Reset App", isPresented: $showingResetConfirmation) {
-            Button("Reset Everything", role: .destructive) {
+        .alert(NSLocalizedString("home.reset_app", comment: "Reset App"), isPresented: $showingResetConfirmation) {
+            Button(NSLocalizedString("home.reset_everything", comment: "Reset Everything"), role: .destructive) {
                 resetApp()
             }
-            Button("Cancel", role: .cancel) {}
+            Button(NSLocalizedString("alert.cancel", comment: "Cancel"), role: .cancel) {}
         } message: {
-            Text("This will permanently delete ALL recordings, documents, settings, and usage data. This action cannot be undone.")
+            Text(NSLocalizedString("home.reset_message", comment: "Reset message"))
         }
         .sheet(item: $selectedRecording) { recording in
             RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
@@ -370,11 +364,11 @@ struct AlternativeHomeView: View {
     
     private var recordingStatusText: String {
         if isPaused {
-            return "Recording paused"
+            return NSLocalizedString("home.recording_paused", comment: "Recording paused")
         } else if audioRecorder.isRecording {
-            return "Recording..."
+            return NSLocalizedString("home.recording_...", comment: "Recording...")
         } else {
-            return "Tap to record"
+            return NSLocalizedString("home.tap_to_record", comment: "Tap to record")
         }
     }
     
@@ -419,11 +413,11 @@ private struct ExpandedRecordingSheet: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
-                Text("Expanded Recording")
+                Text(NSLocalizedString("home.expanded_recording", comment: "Expanded Recording"))
                     .font(.poppins.title2)
                     .padding(.top, 24)
 
-                Text(audioRecorder.isRecording ? "Recording..." : "Ready to record")
+                Text(audioRecorder.isRecording ? NSLocalizedString("home.recording_...", comment: "Recording...") : NSLocalizedString("home.ready_to_record", comment: "Ready to record"))
                     .font(.poppins.body)
                     .foregroundColor(.secondary)
 
@@ -447,7 +441,7 @@ private struct ExpandedRecordingSheet: View {
 
                 Spacer()
                 HStack {
-                    Button("Close") { isPresented = false }
+                    Button(NSLocalizedString("home.close", comment: "Close")) { isPresented = false }
                         .buttonStyle(.bordered)
                     Spacer()
                 }
@@ -455,7 +449,7 @@ private struct ExpandedRecordingSheet: View {
             }
             .padding()
             .navigationTitle("")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { isPresented = false } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button(NSLocalizedString("home.close", comment: "Close")) { isPresented = false } } }
         }
     }
 }

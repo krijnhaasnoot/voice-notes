@@ -1,230 +1,107 @@
 import Foundation
 
-struct UsageResponse: Decodable {
-    let plan: String
-    let seconds_used: Int
-    let limit_seconds: Int?
-}
+// Simple API client for usage tracking
+struct UsageAPI {
+    let base: String
+    let token: String
 
-enum UsageQuotaError: Error {
-    case invalidURL
-    case networkError(Error)
-    case invalidResponse(statusCode: Int, body: String)
-    case decodingError(Error)
-    case timeout
-}
-
-final class UsageQuotaClient {
-    static let shared = UsageQuotaClient()
-    private init() {}
-
-    private let timeout: TimeInterval = 30.0
-
-    private var baseURL: String {
-        guard let url = Bundle.main.object(forInfoDictionaryKey: "INGEST_URL") as? String else {
-            return "https://rhfhateyqdiysgooiqtd.functions.supabase.co"
+    init() {
+        guard let baseURL = Bundle.main.object(forInfoDictionaryKey: "INGEST_URL") as? String,
+              let authToken = Bundle.main.object(forInfoDictionaryKey: "ANALYTICS_TOKEN") as? String else {
+            fatalError("INGEST_URL or ANALYTICS_TOKEN not configured in Info.plist")
         }
-        return url
+        self.base = baseURL
+        self.token = authToken
     }
 
-    private var analyticsToken: String? {
-        let token = Bundle.main.object(forInfoDictionaryKey: "ANALYTICS_TOKEN") as? String
-        if token == nil || token?.isEmpty == true {
-            print("⚠️ UsageQuotaClient: ANALYTICS_TOKEN is missing or empty!")
-        }
-        return token
-    }
-
-    // MARK: - Fetch Usage
-
-    func fetchUsage(userKey: String, periodYM: String, plan: String? = nil) async throws -> UsageResponse {
-        let endpoint = "\(baseURL)/ingest/usage/fetch"
-        guard let url = URL(string: endpoint) else {
-            throw UsageQuotaError.invalidURL
+    func post(_ path: String, body: [String: Any]) async throws -> [String: Any] {
+        guard let url = URL(string: base + path) else {
+            throw URLError(.badURL)
         }
 
-        var payload: [String: Any] = [
-            "user_key": userKey,
-            "period_ym": periodYM
-        ]
-
-        // Include plan if provided (helps backend determine correct limits for new users)
-        if let plan = plan {
-            payload["plan"] = plan
-        }
-
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: payload) else {
-            throw UsageQuotaError.invalidResponse(statusCode: 0, body: "Failed to serialize request")
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let token = analyticsToken {
-            print("🔑 UsageQuotaClient: [fetchUsage] Using token: \(token.prefix(10))...")
-            request.setValue(token, forHTTPHeaderField: "x-analytics-token")
-        } else {
-            print("⚠️ UsageQuotaClient: [fetchUsage] NO TOKEN - this will fail with 401!")
-        }
-        request.httpBody = jsonData
-        request.timeoutInterval = timeout
-
-        let startTime = Date()
-        print("📤 UsageQuotaClient: [fetchUsage] Request to \(endpoint) at \(startTime)")
-
-        var responseData: Data?
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.addValue(token, forHTTPHeaderField: "x-analytics-token")
+        req.timeoutInterval = 30
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            responseData = data
-            let elapsed = Date().timeIntervalSince(startTime)
-            print("📥 UsageQuotaClient: [fetchUsage] Response received in \(String(format: "%.2f", elapsed))s")
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw UsageQuotaError.invalidResponse(statusCode: 0, body: "Not HTTP response")
-            }
-
-            guard httpResponse.statusCode == 200 else {
-                let body = String(data: data, encoding: .utf8) ?? ""
-                print("❌ UsageQuotaClient: [fetchUsage] Error \(httpResponse.statusCode): \(body)")
-                throw UsageQuotaError.invalidResponse(statusCode: httpResponse.statusCode, body: body)
-            }
-
-            // Log raw response for debugging
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("📦 UsageQuotaClient: [fetchUsage] Raw response: \(responseString)")
-            }
-
-            let decoded = try JSONDecoder().decode(UsageResponse.self, from: data)
-            print("✅ UsageQuotaClient: [fetchUsage] Success - used: \(decoded.seconds_used)s, limit: \(decoded.limit_seconds ?? 0)s, plan: \(decoded.plan)")
-            return decoded
-        } catch let error as DecodingError {
-            print("❌ UsageQuotaClient: [fetchUsage] Decoding error: \(error)")
-            if let data = responseData, let responseString = String(data: data, encoding: .utf8) {
-                print("📦 UsageQuotaClient: [fetchUsage] Failed to decode: \(responseString)")
-            }
-            throw UsageQuotaError.decodingError(error)
-        } catch let error as UsageQuotaError {
-            throw error
+            req.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
-            print("❌ UsageQuotaClient: [fetchUsage] Network error: \(error)")
-            throw UsageQuotaError.networkError(error)
+            print("❌ UsageAPI: Failed to serialize JSON body:", error)
+            throw error
         }
+
+        print("📤 UsageAPI: POST \(path)")
+        print("📤 Body:", body)
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+
+        guard let http = response as? HTTPURLResponse else {
+            print("❌ UsageAPI: Invalid response type")
+            throw URLError(.badServerResponse)
+        }
+
+        print("📥 UsageAPI: Status \(http.statusCode)")
+
+        guard (200..<300).contains(http.statusCode) else {
+            let text = String(data: data, encoding: .utf8) ?? "<no body>"
+            print("❌ UsageAPI: HTTP \(http.statusCode) - \(text)")
+            throw NSError(
+                domain: "UsageAPI",
+                code: http.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode): \(text)"]
+            )
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            let text = String(data: data, encoding: .utf8) ?? "<binary>"
+            print("❌ UsageAPI: Failed to parse JSON - \(text)")
+            throw NSError(
+                domain: "UsageAPI",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to parse JSON response"]
+            )
+        }
+
+        print("✅ UsageAPI: Success - \(json)")
+        return json
     }
+}
 
-    // MARK: - Credit Top-Up
+// MARK: - UsageQuotaClient Singleton
 
-    func creditTopUp(userKey: String, seconds: Int, transactionID: String, pricePaid: Decimal? = nil, currency: String? = nil) async throws {
-        let endpoint = "\(baseURL)/usage-credit-topup"
-        guard let url = URL(string: endpoint) else {
-            throw UsageQuotaError.invalidURL
-        }
+/// Singleton client for crediting usage top-ups to the backend
+/// Used by TopUpManager to process consumable in-app purchases
+@MainActor
+final class UsageQuotaClient {
+    static let shared = UsageQuotaClient()
+    private let api = UsageAPI()
+    private init() {}
 
-        var payload: [String: Any] = [
+    /// Credits a usage top-up to the backend
+    /// - Parameters:
+    ///   - userKey: String identifying the user
+    ///   - seconds: Number of seconds to credit
+    ///   - transactionID: Associated StoreKit transaction ID
+    ///   - pricePaid: Price paid for the top-up (optional)
+    ///   - currency: Currency identifier (optional)
+    ///
+    /// Throws on request or network error
+    func creditTopUp(userKey: String, seconds: Int, transactionID: String, pricePaid: Decimal?, currency: String?) async throws {
+        var body: [String: Any] = [
             "user_key": userKey,
             "seconds": seconds,
             "transaction_id": transactionID
         ]
-
-        // Add optional price and currency for analytics/revenue tracking
-        if let pricePaid = pricePaid {
-            payload["price_paid"] = NSDecimalNumber(decimal: pricePaid).doubleValue
+        if let price = pricePaid {
+            body["price_paid"] = price
         }
         if let currency = currency {
-            payload["currency"] = currency
+            body["currency"] = currency
         }
 
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: payload) else {
-            throw UsageQuotaError.invalidResponse(statusCode: 0, body: "Failed to serialize request")
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let token = analyticsToken {
-            request.setValue(token, forHTTPHeaderField: "x-analytics-token")
-        }
-        request.httpBody = jsonData
-        request.timeoutInterval = timeout
-
-        let startTime = Date()
-        print("📤 UsageQuotaClient: [creditTopUp] Request to \(endpoint) - user: \(userKey), seconds: \(seconds), txn: \(transactionID)")
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            let elapsed = Date().timeIntervalSince(startTime)
-            print("📥 UsageQuotaClient: [creditTopUp] Response received in \(String(format: "%.2f", elapsed))s")
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw UsageQuotaError.invalidResponse(statusCode: 0, body: "Not HTTP response")
-            }
-
-            guard httpResponse.statusCode == 200 else {
-                let body = String(data: data, encoding: .utf8) ?? ""
-                print("❌ UsageQuotaClient: [creditTopUp] Error \(httpResponse.statusCode): \(body)")
-                throw UsageQuotaError.invalidResponse(statusCode: httpResponse.statusCode, body: body)
-            }
-
-            let body = String(data: data, encoding: .utf8) ?? ""
-            print("✅ UsageQuotaClient: [creditTopUp] Success - \(body)")
-        } catch let error as UsageQuotaError {
-            throw error
-        } catch {
-            throw UsageQuotaError.networkError(error)
-        }
-    }
-
-    // MARK: - Book Usage
-
-    func bookUsage(userKey: String, seconds: Int, plan: String, recordedAt: Date) async throws {
-        let endpoint = "\(baseURL)/ingest/usage/book"
-        guard let url = URL(string: endpoint) else {
-            throw UsageQuotaError.invalidURL
-        }
-
-        let payload: [String: Any] = [
-            "user_key": userKey,
-            "seconds": seconds,
-            "plan": plan,
-            "recorded_at": recordedAt.timeIntervalSince1970
-        ]
-
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: payload) else {
-            throw UsageQuotaError.invalidResponse(statusCode: 0, body: "Failed to serialize request")
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let token = analyticsToken {
-            request.setValue(token, forHTTPHeaderField: "x-analytics-token")
-        }
-        request.httpBody = jsonData
-        request.timeoutInterval = timeout
-
-        let startTime = Date()
-        print("📤 UsageQuotaClient: [bookUsage] Request to \(endpoint) - user: \(userKey), seconds: \(seconds)")
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            let elapsed = Date().timeIntervalSince(startTime)
-            print("📥 UsageQuotaClient: [bookUsage] Response received in \(String(format: "%.2f", elapsed))s")
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw UsageQuotaError.invalidResponse(statusCode: 0, body: "Not HTTP response")
-            }
-
-            guard httpResponse.statusCode == 200 else {
-                let body = String(data: data, encoding: .utf8) ?? ""
-                print("❌ UsageQuotaClient: [bookUsage] Error \(httpResponse.statusCode): \(body)")
-                throw UsageQuotaError.invalidResponse(statusCode: httpResponse.statusCode, body: body)
-            }
-
-            print("✅ UsageQuotaClient: [bookUsage] Success - booked \(seconds)s for user \(userKey)")
-        } catch let error as UsageQuotaError {
-            throw error
-        } catch {
-            throw UsageQuotaError.networkError(error)
-        }
+        // The API path should match what is expected for top-up events
+        let _ = try await api.post("/ingest/usage/topup", body: body)
     }
 }

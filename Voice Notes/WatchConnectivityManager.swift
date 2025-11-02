@@ -271,7 +271,7 @@ extension WatchConnectivityManager: WCSessionDelegate {
         }
     }
 
-    private func handleReceivedFile(_ file: WCSessionFile) {
+    @MainActor private func handleReceivedFile(_ file: WCSessionFile) {
         guard let metadata = file.metadata,
               let type = metadata["type"] as? String,
               type == "recording" else {

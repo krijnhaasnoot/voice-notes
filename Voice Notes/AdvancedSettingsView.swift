@@ -26,17 +26,17 @@ struct AdvancedSettingsView: View {
     var body: some View {
         Form {
             // AI Provider
-            Section(header: Text("AI Provider")) {
+            Section(header: Text(NSLocalizedString("settings.ai_provider", comment: "AI Provider"))) {
                 NavigationLink(destination: AIProviderSettingsView()) {
                     HStack {
                         Image(systemName: "brain.head.profile")
                             .foregroundColor(.blue)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("AI Provider Settings")
+                            Text(NSLocalizedString("settings.ai_provider_settings", comment: "AI Provider Settings"))
                                 .font(.poppins.body)
 
-                            Text("Configure OpenAI, Claude, Gemini, or Mistral")
+                            Text(NSLocalizedString("settings.configure_providers", comment: "Configure providers"))
                                 .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -50,10 +50,10 @@ struct AdvancedSettingsView: View {
                             .foregroundColor(.blue)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Usage Analytics")
+                            Text(NSLocalizedString("settings.usage_analytics", comment: "Usage Analytics"))
                                 .font(.poppins.body)
 
-                            Text("View AI provider performance stats")
+                            Text(NSLocalizedString("settings.view_performance", comment: "View performance stats"))
                                 .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -63,10 +63,10 @@ struct AdvancedSettingsView: View {
             }
 
             // Summary Settings
-            Section(header: Text("Summary Settings")) {
+            Section(header: Text(NSLocalizedString("settings.summary_settings", comment: "Summary Settings"))) {
                 // AI Summary Mode Picker
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("AI Summary Mode")
+                    Text(NSLocalizedString("settings.ai_summary_mode", comment: "AI Summary Mode"))
                         .font(.poppins.headline)
 
                     Picker("AI Summary Mode", selection: Binding(
@@ -94,7 +94,7 @@ struct AdvancedSettingsView: View {
 
                 // Summary Length Picker
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Summary Detail Level")
+                    Text(NSLocalizedString("settings.summary_detail_level", comment: "Summary Detail Level"))
                         .font(.poppins.headline)
 
                     Picker("Summary Length", selection: Binding(
@@ -122,12 +122,12 @@ struct AdvancedSettingsView: View {
 
                 // Auto-detection Toggle
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Automatic Mode Detection", isOn: $autoDetectMode)
+                    Toggle(NSLocalizedString("settings.auto_mode_detection", comment: "Automatic Mode Detection"), isOn: $autoDetectMode)
                         .font(.poppins.headline)
 
                     Text(autoDetectMode ?
-                         "The app automatically detects which mode best fits the recording content." :
-                         "Always uses the default mode for summaries.")
+                         NSLocalizedString("settings.auto_mode_on", comment: "Auto mode on") :
+                         NSLocalizedString("settings.auto_mode_off", comment: "Auto mode off"))
                         .font(.poppins.caption)
                         .foregroundColor(.secondary)
                 }
@@ -135,10 +135,10 @@ struct AdvancedSettingsView: View {
             }
 
             // List Settings
-            Section(header: Text("List Settings")) {
+            Section(header: Text(NSLocalizedString("settings.list_settings", comment: "List Settings"))) {
                 // Default List Type Picker
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Default List Type")
+                    Text(NSLocalizedString("settings.default_list_type", comment: "Default List Type"))
                         .font(.poppins.headline)
 
                     Picker("Default List Type", selection: Binding(
@@ -156,7 +156,7 @@ struct AdvancedSettingsView: View {
                     }
                     .pickerStyle(.menu)
 
-                    Text("When saving action items, use \(selectedDocumentType.displayName) by default if no better type is detected.")
+                    Text(String(format: NSLocalizedString("settings.default_list_note", comment: "Default list note"), selectedDocumentType.displayName))
                         .font(.poppins.caption)
                         .foregroundColor(.secondary)
                 }
@@ -164,12 +164,12 @@ struct AdvancedSettingsView: View {
 
                 // Auto-save to documents Toggle
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Auto-save Action Items", isOn: $autoSaveToDocuments)
+                    Toggle(NSLocalizedString("settings.auto_save_action_items", comment: "Auto-save Action Items"), isOn: $autoSaveToDocuments)
                         .font(.poppins.headline)
 
                     Text(autoSaveToDocuments ?
-                         "Automatically saves detected action items to lists without asking." :
-                         "Asks before saving action items to lists.")
+                         NSLocalizedString("settings.auto_save_on", comment: "Auto-save on") :
+                         NSLocalizedString("settings.auto_save_off", comment: "Auto-save off"))
                         .font(.poppins.caption)
                         .foregroundColor(.secondary)
                 }
@@ -177,17 +177,17 @@ struct AdvancedSettingsView: View {
             }
 
             // Organization
-            Section(header: Text("Organization")) {
+            Section(header: Text(NSLocalizedString("settings.organization", comment: "Organization"))) {
                 NavigationLink(destination: TagManagementView()) {
                     HStack {
                         Image(systemName: "tag.fill")
                             .foregroundColor(.green)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Manage Tags")
+                            Text(NSLocalizedString("settings.manage_tags", comment: "Manage Tags"))
                                 .font(.poppins.body)
 
-                            Text("Organize, rename, merge, and delete tags")
+                            Text(NSLocalizedString("settings.organize_rename_merge", comment: "Organize, rename, merge tags"))
                                 .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -197,9 +197,9 @@ struct AdvancedSettingsView: View {
             }
 
             // Interface
-            Section(header: Text("Interface")) {
+            Section(header: Text(NSLocalizedString("settings.interface", comment: "Interface"))) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Compact Recording View", isOn: Binding(
+                    Toggle(NSLocalizedString("settings.compact_recording_view", comment: "Compact Recording View"), isOn: Binding(
                         get: { useCompactView },
                         set: { newValue in
                             useCompactView = newValue
@@ -221,15 +221,15 @@ struct AdvancedSettingsView: View {
                         .font(.poppins.headline)
 
                     Text(useCompactView ?
-                         "Using minimalist recording interface with larger controls and cleaner design" :
-                         "Switch to minimalist recording interface with larger controls and cleaner design")
+                         NSLocalizedString("settings.compact_view_on", comment: "Compact view on") :
+                         NSLocalizedString("settings.compact_view_off", comment: "Compact view off"))
                         .font(.poppins.caption)
                         .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 4)
             }
         }
-        .navigationTitle("Advanced Settings")
+        .navigationTitle(NSLocalizedString("settings.advanced_settings", comment: "Advanced Settings"))
         .navigationBarTitleDisplayMode(.large)
     }
 }

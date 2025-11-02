@@ -25,7 +25,6 @@ struct RecordingDetailView: View {
     @State private var showingSummarySettings = false
     @State private var selectedSummaryMode: SummaryMode = .personal
     @State private var selectedSummaryLength: SummaryLength = .standard
-    @State private var showingAddTagSheet = false
     @State private var showingPaywall = false
     @State private var showingMinutesExhaustedAlert = false
     @State private var showingListItemConfirmation = false
@@ -51,7 +50,6 @@ struct RecordingDetailView: View {
                             transcriptSection(recording)
                             actionItemsSection(recording)
                             playbackSection(recording)
-                            tagsSection(recording)
 
                             // Share/Copy buttons at bottom
                             if hasContent(recording) {
@@ -124,11 +122,6 @@ struct RecordingDetailView: View {
                         }
                     }
                 )
-            }
-        }
-        .sheet(isPresented: $showingAddTagSheet) {
-            AddTagSheet(isPresented: $showingAddTagSheet) { tag in
-                recordingsManager.addTagToRecording(recordingId: recordingId, tag: tag)
             }
         }
         .sheet(isPresented: $showingPaywall) {
@@ -257,53 +250,7 @@ struct RecordingDetailView: View {
         .background(Color.orange.opacity(0.1))
         .cornerRadius(12)
     }
-    
-    private func tagsSection(_ recording: Recording) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Tags")
-                    .font(.poppins.headline)
-                    .fontWeight(.semibold)
 
-                Spacer()
-
-                // Auto-tag button
-                if recording.tags.isEmpty && (recording.summary != nil || recording.transcript != nil) {
-                    Button(action: {
-                        autoGenerateTags(for: recording)
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 12))
-                            Text("Auto-fill")
-                                .font(.poppins.caption)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundColor(.blue)
-                        .cornerRadius(8)
-                    }
-                }
-            }
-
-            TagRowView(
-                tags: recording.tags,
-                maxVisible: 10,
-                isRemovable: true,
-                onRemove: { tag in
-                    recordingsManager.removeTagFromRecording(recordingId: recordingId, tag: tag)
-                },
-                onAddTag: {
-                    showingAddTagSheet = true
-                }
-            )
-        }
-        .padding()
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(12)
-    }
-    
     private func recordingInfoSection(_ recording: Recording) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Recording Information")
@@ -630,94 +577,116 @@ struct RecordingDetailView: View {
     }
     
     private func shareSection(_ recording: Recording) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
             Text("Actions")
                 .font(.poppins.headline)
+                .fontWeight(.semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            
-            VStack(spacing: 8) {
-                Button(action: {
-                    showingSaveToDocuments = true
-                }) {
-                    Label("Save to List", systemImage: "folder.badge.plus")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(8)
-                }
-                
+
+            // Grid layout with 3 buttons
+            HStack(spacing: 12) {
                 // Share Audio File
                 Button(action: {
                     shareAudioFile(recording)
                 }) {
-                    HStack {
-                        Image(systemName: "waveform")
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Share Audio File")
-                                .font(.poppins.body)
-                                .fontWeight(.medium)
-                            Text("Share original recording as audio file")
-                                .font(.poppins.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(Color.red.opacity(0.1))
-                    .cornerRadius(8)
-                }
+                    VStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .fill(LinearGradient(colors: [Color.blue.opacity(0.2), Color.blue.opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(width: 50, height: 50)
 
-                // Share as PDF (recommended for long content)
+                            Image(systemName: "waveform.circle")
+                                .font(.system(size: 22))
+                                .foregroundColor(.blue)
+                        }
+
+                        Text("Share Audio")
+                            .font(.poppins.caption)
+                            .fontWeight(.medium)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.primary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.blue.opacity(0.08))
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+
+                // Share as PDF
                 Button(action: {
                     sharePDFRecording(recording)
                 }) {
-                    HStack {
-                        Image(systemName: "doc.richtext")
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Share as PDF")
-                                .font(.poppins.body)
-                                .fontWeight(.medium)
-                            Text("Professional format, perfect for long content")
-                                .font(.poppins.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(Color.purple.opacity(0.1))
-                    .cornerRadius(8)
-                }
+                    VStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .fill(LinearGradient(colors: [Color.purple.opacity(0.2), Color.purple.opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(width: 50, height: 50)
 
-                HStack(spacing: 8) {
-                    Button(action: {
-                        shareRecording(recording)
-                    }) {
-                        Label("Share Text", systemImage: "square.and.arrow.up")
-                            .font(.poppins.body)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue.opacity(0.1))
-                            .cornerRadius(8)
+                            Image(systemName: "doc.richtext")
+                                .font(.system(size: 22))
+                                .foregroundColor(.purple)
+                        }
+
+                        Text("Share PDF")
+                            .font(.poppins.caption)
+                            .fontWeight(.medium)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.primary)
                     }
-                    
-                    Button(action: {
-                        copyRecording(recording)
-                    }) {
-                        Label("Copy Text", systemImage: "doc.on.doc")
-                            .font(.poppins.body)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.green.opacity(0.1))
-                            .cornerRadius(8)
-                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.purple.opacity(0.08))
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+                    )
                 }
+                .buttonStyle(.plain)
+
+                // Copy Text
+                Button(action: {
+                    copyRecording(recording)
+                }) {
+                    VStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .fill(LinearGradient(colors: [Color.green.opacity(0.2), Color.green.opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(width: 50, height: 50)
+
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 22))
+                                .foregroundColor(.green)
+                        }
+
+                        Text("Copy Text")
+                            .font(.poppins.caption)
+                            .fontWeight(.medium)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.primary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.green.opacity(0.08))
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.green.opacity(0.2), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding()
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.secondary.opacity(0.05))
+        )
     }
     
     private func actionItemsSection(_ recording: Recording) -> some View {
@@ -884,60 +853,115 @@ struct RecordingDetailView: View {
     
     private func extractActionItems(from recording: Recording) -> [String] {
         var items: [String] = []
-        
+
         // Extract from summary if available
         if let summary = recording.summary, !summary.isEmpty {
             items = parseActionItemsFromSummary(summary)
         }
-        
+
         // If no items found in summary, try transcript
         if items.isEmpty, let transcript = recording.transcript, !transcript.isEmpty {
             items = parseActionItemsFromTranscript(transcript)
         }
-        
-        // Filter to only include actionable items
-        return items.filter { $0.isLikelyAction }
+
+        // Items are already filtered by explicit action phrases, no additional filtering needed
+        return items
     }
     
     private func parseActionItemsFromSummary(_ summary: String) -> [String] {
         var items: [String] = []
         let lines = summary.components(separatedBy: .newlines)
-        
-        // Common section headers to exclude
-        let sectionHeaders = [
-            "title", "session title", "topic", "subject",
-            "summary", "overview", "description",
-            "action items", "actions", "next steps", "todo", "tasks",
-            "key points", "main points", "highlights",
-            "decisions", "conclusions", "outcomes",
-            "participants", "attendees",
-            "agenda", "notes", "takeaways",
-            "challenge", "goal", "objective",
-            "ideas generated", "best ideas",
-            "key concepts", "examples", "case studies"
+
+        // Action item section headers (Dutch and English)
+        let actionSectionHeaders = [
+            "actiepunten", "action items", "actions", "next steps",
+            "volgende stappen", "vervolgacties", "follow-up actions",
+            "to do", "todo", "tasks", "taken"
         ]
-        
+
+        var inActionSection = false
+        var currentSectionHeader = ""
+
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            // Look for bullet points or numbered items
-            if trimmed.hasPrefix("•") || trimmed.hasPrefix("-") || trimmed.hasPrefix("*") {
-                let item = trimmed.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
-                if !item.isEmpty && item.count > 3 && !isSectionHeaderSimple(item, headers: sectionHeaders) {
-                    items.append(item)
-                }
-            } else if let regex = try? NSRegularExpression(pattern: "^\\d+\\.", options: []) {
-                let range = NSRange(location: 0, length: trimmed.count)
-                if regex.firstMatch(in: trimmed, options: [], range: range) != nil {
-                    let item = regex.stringByReplacingMatches(in: trimmed, options: [], range: range, withTemplate: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !item.isEmpty && item.count > 3 && !isSectionHeaderSimple(item, headers: sectionHeaders) {
+            let lowercased = trimmed.lowercased()
+
+            // Check if this line is a section header (bold text: **Header**)
+            if trimmed.hasPrefix("**") && trimmed.hasSuffix("**") {
+                let headerText = trimmed.dropFirst(2).dropLast(2).trimmingCharacters(in: .whitespacesAndNewlines)
+                currentSectionHeader = headerText.lowercased()
+
+                // Check if we're entering an action items section
+                inActionSection = actionSectionHeaders.contains { currentSectionHeader.contains($0) }
+                continue
+            }
+
+            // Only extract bullets if we're in an action items section
+            if inActionSection {
+                // Look for bullet points or numbered items
+                if trimmed.hasPrefix("•") || trimmed.hasPrefix("-") {
+                    let item = trimmed.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
+
+                    // Additional validation: must have action verbs or be a real task
+                    if !item.isEmpty && item.count > 10 && looksLikeActionItem(item) {
                         items.append(item)
+                    }
+                } else if trimmed.hasPrefix("*") && !trimmed.hasPrefix("**") {
+                    let item = trimmed.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !item.isEmpty && item.count > 10 && looksLikeActionItem(item) {
+                        items.append(item)
+                    }
+                } else if let regex = try? NSRegularExpression(pattern: "^\\d+\\.", options: []) {
+                    let range = NSRange(location: 0, length: trimmed.count)
+                    if regex.firstMatch(in: trimmed, options: [], range: range) != nil {
+                        let item = regex.stringByReplacingMatches(in: trimmed, options: [], range: range, withTemplate: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !item.isEmpty && item.count > 10 && looksLikeActionItem(item) {
+                            items.append(item)
+                        }
                     }
                 }
             }
+
+            // Exit action section if we hit a new bold header or empty line sequence
+            if trimmed.isEmpty && inActionSection {
+                // Don't exit immediately on first empty line, but track it
+            } else if !trimmed.isEmpty && !trimmed.hasPrefix("•") && !trimmed.hasPrefix("-") && !trimmed.hasPrefix("*") && !trimmed.hasPrefix("**") && inActionSection {
+                // Likely moved to regular text after bullets, exit section
+                if trimmed.first?.isNumber != true {
+                    inActionSection = false
+                }
+            }
         }
-        
+
         return Array(items.prefix(10))
+    }
+
+    private func looksLikeActionItem(_ text: String) -> Bool {
+        let lowercased = text.lowercased()
+
+        // Reject obvious non-action items
+        let nonActionPatterns = [
+            "*context*", "*hoofdpunten*", "*summary*", "*samenvatting*",
+            "context", "hoofdpunten", "key points", "belangrijkste punten",
+            "summary", "samenvatting", "overview", "overzicht"
+        ]
+
+        for pattern in nonActionPatterns {
+            if lowercased.contains(pattern) || lowercased == pattern.replacingOccurrences(of: "*", with: "") {
+                return false
+            }
+        }
+
+        // Must contain action verbs or imperative language
+        let actionVerbs = [
+            "schedule", "send", "review", "create", "contact", "call", "email",
+            "prepare", "finalize", "submit", "update", "complete", "deliver",
+            "organize", "plan", "book", "order", "buy", "purchase", "arrange",
+            "follow up", "follow-up", "check", "confirm", "verify", "test",
+            "will ", " moet ", " zal ", " ga ", " moet "  // Dutch/English future indicators
+        ]
+
+        return actionVerbs.contains { lowercased.contains($0) }
     }
     
     private func isSectionHeaderSimple(_ text: String, headers: [String]) -> Bool {
@@ -967,18 +991,30 @@ struct RecordingDetailView: View {
     private func parseActionItemsFromTranscript(_ transcript: String) -> [String] {
         let sentences = transcript.components(separatedBy: CharacterSet(charactersIn: ".!?"))
         var items: [String] = []
-        
-        let actionKeywords = ["need to", "should", "must", "have to", "remember to", "don't forget", "make sure"]
-        
+
+        // Only detect EXPLICIT action item phrases - be very critical
+        let explicitActionPhrases = [
+            "add to list", "add to the list", "add to my list",
+            "add this to", "add that to",
+            "put on list", "put on the list", "put on my list",
+            "todo", "to do", "to-do",
+            "we should do", "I should do", "let's do",
+            "remember to add", "don't forget to add",
+            "make sure to add", "need to add",
+            "write down", "note to self",
+            "action item", "action items"
+        ]
+
         for sentence in sentences {
             let trimmed = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
             let lowercased = trimmed.lowercased()
-            
-            if actionKeywords.contains(where: { lowercased.contains($0) }) && trimmed.count > 10 {
+
+            // Only include if it contains an EXPLICIT action phrase
+            if explicitActionPhrases.contains(where: { lowercased.contains($0) }) && trimmed.count > 10 {
                 items.append(trimmed)
             }
         }
-        
+
         return Array(items.prefix(5))
     }
     
@@ -1004,12 +1040,7 @@ struct RecordingDetailView: View {
     private func shareAudioFile(_ recording: Recording) {
         Analytics.track("share_audio_file")
 
-        guard let audioURL = recording.resolvedFileURL else {
-            print("❌ No audio file URL available for recording")
-            shareItems = ["Audio file not available"]
-            isSharePresented = true
-            return
-        }
+        let audioURL = recording.resolvedFileURL
 
         // Check if file exists
         guard FileManager.default.fileExists(atPath: audioURL.path) else {
@@ -1097,6 +1128,21 @@ struct RecordingDetailView: View {
     private func copyRecording(_ recording: Recording) {
         UIPasteboard.general.string = makeShareText(recording)
         Analytics.track("copy_summary")
+
+        // Show success toast
+        toastMessage = "Recording details copied to clipboard"
+        showingToast = true
+
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+
+        // Auto-hide after 3 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            if showingToast {
+                showingToast = false
+            }
+        }
     }
     
     private func makeShareText(_ recording: Recording) -> String {
@@ -1871,84 +1917,126 @@ struct SaveToDocumentsSheet: View {
     private func parseActionItemsFromSummary(_ summary: String) -> [String] {
         var items: [String] = []
         let lines = summary.components(separatedBy: .newlines)
-        
-        // Common section headers to exclude
-        let sectionHeaders = [
-            "title", "session title", "topic", "subject",
-            "summary", "overview", "description",
-            "action items", "actions", "next steps", "todo", "tasks",
-            "key points", "main points", "highlights",
-            "decisions", "conclusions", "outcomes",
-            "participants", "attendees",
-            "agenda", "notes", "takeaways",
-            "challenge", "goal", "objective",
-            "ideas generated", "best ideas",
-            "key concepts", "examples", "case studies"
+
+        // Action item section headers (Dutch and English)
+        let actionSectionHeaders = [
+            "actiepunten", "action items", "actions", "next steps",
+            "volgende stappen", "vervolgacties", "follow-up actions",
+            "to do", "todo", "tasks", "taken"
         ]
-        
+
+        var inActionSection = false
+        var currentSectionHeader = ""
+
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            // Look for bullet points or numbered items
-            if trimmed.hasPrefix("•") || trimmed.hasPrefix("-") || trimmed.hasPrefix("*") {
-                let item = trimmed.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
-                if !item.isEmpty && item.count > 3 && !isSectionHeader(item, headers: sectionHeaders) {
-                    items.append(item)
-                }
-            } else if let regex = try? NSRegularExpression(pattern: "^\\d+\\.", options: []) {
-                let range = NSRange(location: 0, length: trimmed.count)
-                if regex.firstMatch(in: trimmed, options: [], range: range) != nil {
-                    let item = regex.stringByReplacingMatches(in: trimmed, options: [], range: range, withTemplate: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !item.isEmpty && item.count > 3 && !isSectionHeader(item, headers: sectionHeaders) {
+            let lowercased = trimmed.lowercased()
+
+            // Check if this line is a section header (bold text: **Header**)
+            if trimmed.hasPrefix("**") && trimmed.hasSuffix("**") {
+                let headerText = trimmed.dropFirst(2).dropLast(2).trimmingCharacters(in: .whitespacesAndNewlines)
+                currentSectionHeader = headerText.lowercased()
+
+                // Check if we're entering an action items section
+                inActionSection = actionSectionHeaders.contains { currentSectionHeader.contains($0) }
+                continue
+            }
+
+            // Only extract bullets if we're in an action items section
+            if inActionSection {
+                // Look for bullet points or numbered items
+                if trimmed.hasPrefix("•") || trimmed.hasPrefix("-") {
+                    let item = trimmed.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
+
+                    // Additional validation: must have action verbs or be a real task
+                    if !item.isEmpty && item.count > 10 && looksLikeRealActionItem(item) {
                         items.append(item)
+                    }
+                } else if trimmed.hasPrefix("*") && !trimmed.hasPrefix("**") {
+                    let item = trimmed.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !item.isEmpty && item.count > 10 && looksLikeRealActionItem(item) {
+                        items.append(item)
+                    }
+                } else if let regex = try? NSRegularExpression(pattern: "^\\d+\\.", options: []) {
+                    let range = NSRange(location: 0, length: trimmed.count)
+                    if regex.firstMatch(in: trimmed, options: [], range: range) != nil {
+                        let item = regex.stringByReplacingMatches(in: trimmed, options: [], range: range, withTemplate: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !item.isEmpty && item.count > 10 && looksLikeRealActionItem(item) {
+                            items.append(item)
+                        }
                     }
                 }
             }
-        }
-        
-        return Array(items.prefix(10)) // Limit to 10 items
-    }
-    
-    private func isSectionHeader(_ text: String, headers: [String]) -> Bool {
-        let lowercased = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Check if the text exactly matches or starts with a section header
-        for header in headers {
-            if lowercased == header || lowercased.hasPrefix(header + ":") {
-                return true
-            }
-        }
-        
-        // Check if it looks like a markdown header (contains only header words)
-        let words = lowercased.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
-        if words.count <= 3 { // Short phrases are likely headers
-            let joinedWords = words.joined(separator: " ")
-            for header in headers {
-                if joinedWords.contains(header) || header.contains(joinedWords) {
-                    return true
+
+            // Exit action section if we hit a new bold header
+            if trimmed.isEmpty && inActionSection {
+                // Don't exit immediately on first empty line
+            } else if !trimmed.isEmpty && !trimmed.hasPrefix("•") && !trimmed.hasPrefix("-") && !trimmed.hasPrefix("*") && !trimmed.hasPrefix("**") && inActionSection {
+                // Likely moved to regular text after bullets
+                if trimmed.first?.isNumber != true {
+                    inActionSection = false
                 }
             }
         }
-        
-        return false
+
+        return Array(items.prefix(10)) // Limit to 10 items
+    }
+
+    private func looksLikeRealActionItem(_ text: String) -> Bool {
+        let lowercased = text.lowercased()
+
+        // Reject obvious non-action items
+        let nonActionPatterns = [
+            "*context*", "*hoofdpunten*", "*summary*", "*samenvatting*",
+            "context", "hoofdpunten", "key points", "belangrijkste punten",
+            "summary", "samenvatting", "overview", "overzicht"
+        ]
+
+        for pattern in nonActionPatterns {
+            if lowercased.contains(pattern) || lowercased == pattern.replacingOccurrences(of: "*", with: "") {
+                return false
+            }
+        }
+
+        // Must contain action verbs or imperative language
+        let actionVerbs = [
+            "schedule", "send", "review", "create", "contact", "call", "email",
+            "prepare", "finalize", "submit", "update", "complete", "deliver",
+            "organize", "plan", "book", "order", "buy", "purchase", "arrange",
+            "follow up", "follow-up", "check", "confirm", "verify", "test",
+            "will ", " moet ", " zal ", " ga "  // Dutch/English future indicators
+        ]
+
+        return actionVerbs.contains { lowercased.contains($0) }
     }
     
     private func parseActionItemsFromTranscript(_ transcript: String) -> [String] {
-        // Simple heuristic: look for sentences that sound like action items
         let sentences = transcript.components(separatedBy: CharacterSet(charactersIn: ".!?"))
         var items: [String] = []
-        
-        let actionKeywords = ["need to", "should", "must", "have to", "remember to", "don't forget", "make sure"]
-        
+
+        // Only detect EXPLICIT action item phrases - be very critical
+        let explicitActionPhrases = [
+            "add to list", "add to the list", "add to my list",
+            "add this to", "add that to",
+            "put on list", "put on the list", "put on my list",
+            "todo", "to do", "to-do",
+            "we should do", "I should do", "let's do",
+            "remember to add", "don't forget to add",
+            "make sure to add", "need to add",
+            "write down", "note to self",
+            "action item", "action items"
+        ]
+
         for sentence in sentences {
             let trimmed = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
             let lowercased = trimmed.lowercased()
-            
-            if actionKeywords.contains(where: { lowercased.contains($0) }) && trimmed.count > 10 {
+
+            // Only include if it contains an EXPLICIT action phrase
+            if explicitActionPhrases.contains(where: { lowercased.contains($0) }) && trimmed.count > 10 {
                 items.append(trimmed)
             }
         }
-        
+
         return Array(items.prefix(5)) // Limit to 5 items from transcript
     }
     

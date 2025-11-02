@@ -8,7 +8,7 @@ struct HelpSupportView: View {
     var body: some View {
         Form {
             // Feedback & Support
-            Section(header: Text("Feedback & Support")) {
+            Section(header: Text(NSLocalizedString("settings.feedback_support", comment: "Feedback & Support"))) {
                 Button(action: { sendFeedback() }) {
                     HStack(spacing: 12) {
                         Image(systemName: "message.fill")
@@ -17,11 +17,11 @@ struct HelpSupportView: View {
                             .frame(width: 28, height: 28)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Send Feedback via WhatsApp")
+                            Text(NSLocalizedString("settings.send_feedback", comment: "Send Feedback via WhatsApp"))
                                 .font(.poppins.body)
                                 .foregroundColor(.primary)
 
-                            Text("Report issues or request features")
+                            Text(NSLocalizedString("settings.send_feedback_desc", comment: "Report issues or request features"))
                                 .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -37,7 +37,7 @@ struct HelpSupportView: View {
             }
 
             // Privacy & Data Usage
-            Section(header: Text("Privacy & Data Usage")) {
+            Section(header: Text(NSLocalizedString("settings.privacy_data_usage", comment: "Privacy & Data Usage"))) {
                 NavigationLink(destination: PrivacyInfoView()) {
                     HStack(spacing: 12) {
                         Image(systemName: "lock.shield")
@@ -46,7 +46,7 @@ struct HelpSupportView: View {
                             .frame(width: 28, height: 28)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Privacy & Data Usage")
+                            Text(NSLocalizedString("settings.privacy_data_usage", comment: "Privacy & Data Usage"))
                                 .font(.poppins.body)
                                 .foregroundColor(.primary)
 
@@ -69,10 +69,10 @@ struct HelpSupportView: View {
                             .foregroundColor(.red)
                             .frame(width: 28, height: 28)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Reset Analytics PIN")
+                            Text(NSLocalizedString("settings.reset_analytics_pin", comment: "Reset Analytics PIN"))
                                 .font(.poppins.body)
                                 .foregroundColor(.primary)
-                            Text("Remove the PIN required to open Analytics")
+                            Text(NSLocalizedString("settings.reset_pin_desc", comment: "Remove the PIN required to open Analytics"))
                                 .font(.poppins.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -82,19 +82,19 @@ struct HelpSupportView: View {
                 .padding(.vertical, 4)
             }
         }
-        .navigationTitle("Help & Support")
+        .navigationTitle(NSLocalizedString("settings.help_support", comment: "Help & Support"))
         .navigationBarTitleDisplayMode(.large)
         .confirmationDialog(
-            "Reset Analytics PIN?",
+            NSLocalizedString("settings.reset_analytics_pin", comment: "Reset Analytics PIN") + "?",
             isPresented: $showResetPinConfirm,
             titleVisibility: .visible
         ) {
-            Button("Reset PIN", role: .destructive) {
+            Button(NSLocalizedString("settings.reset_analytics_pin", comment: "Reset PIN"), role: .destructive) {
                 analyticsPIN = ""
             }
-            Button("Cancel", role: .cancel) {}
+            Button(NSLocalizedString("alert.cancel", comment: "Cancel"), role: .cancel) {}
         } message: {
-            Text("You will need to create a new PIN the next time you access Analytics.")
+            Text(NSLocalizedString("settings.reset_pin_message", comment: "Reset PIN message"))
         }
     }
 

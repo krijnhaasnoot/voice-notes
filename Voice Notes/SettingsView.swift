@@ -54,52 +54,62 @@ struct SettingsView: View {
     private var selectedMode: SummaryMode {
         SummaryMode(rawValue: defaultMode) ?? .personal
     }
-    
+
     private var selectedSummaryLength: SummaryLength {
         SummaryLength(rawValue: defaultSummaryLength) ?? .standard
     }
-    
+
     private var selectedDocumentType: DocumentType {
         DocumentType(rawValue: defaultDocumentType) ?? .todo
+    }
+
+    // Check if user is on the highest tier (Own Key subscription)
+    private var isOnHighestTier: Bool {
+        guard let subscription = subscriptionManager.activeSubscription else {
+            return false
+        }
+        return subscription == .ownKey
     }
     
     var body: some View {
         NavigationStack {
             Form {
                 // Subscription & Minutes Section
-                Section(header: Text("Subscription")) {
+                Section(header: Text(NSLocalizedString("settings.subscription", comment: "Subscription"))) {
                     // Backend-authoritative usage display
                     VStack(spacing: 16) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(subscriptionManager.activeSubscription?.displayName ?? "Free Trial")
+                                Text(subscriptionManager.activeSubscription?.displayName ?? NSLocalizedString("settings.free_trial", comment: "Free Trial"))
                                     .font(.headline)
                                     .fontWeight(.bold)
 
-                                Text("\(subscriptionManager.currentMonthlyMinutes) minutes per month")
+                                // Show "minutes" for free trial, "minutes per month" for paid subscriptions
+                                Text(subscriptionManager.activeSubscription == nil
+                                     ? "\(subscriptionManager.currentMonthlyMinutes) \(NSLocalizedString("settings.minutes", comment: "minutes"))"
+                                     : "\(subscriptionManager.currentMonthlyMinutes) \(NSLocalizedString("settings.minutes_per_month", comment: "minutes per month"))")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
 
                             Spacer()
 
-                            if subscriptionManager.activeSubscription == nil {
-                                Button(action: { showingPaywall = true }) {
-                                    Text("Upgrade")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                        .background(Color.blue)
-                                        .cornerRadius(8)
-                                }
+                            // Show "Upgrade" if user can upgrade, "Manage" if on highest tier
+                            Button(action: { showingPaywall = true }) {
+                                Text(isOnHighestTier ? NSLocalizedString("settings.manage", comment: "Manage") : NSLocalizedString("settings.upgrade", comment: "Upgrade"))
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(Color.blue)
+                                    .cornerRadius(8)
                             }
                         }
 
                         VStack(spacing: 8) {
                             HStack {
-                                Text("Usage this month")
+                                Text(NSLocalizedString("settings.usage_this_month", comment: "Usage this month"))
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
 
@@ -109,7 +119,7 @@ struct SettingsView: View {
                                     ProgressView()
                                 } else if usageVM.isStale && usageVM.limitSeconds == 0 {
                                     // Never synced or sync failed - show friendly message
-                                    Text("Checking...")
+                                    Text(NSLocalizedString("settings.checking", comment: "Checking..."))
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
                                         .foregroundColor(.orange)
@@ -127,7 +137,7 @@ struct SettingsView: View {
                                     HStack(spacing: 8) {
                                         Image(systemName: "wifi.exclamationmark")
                                             .foregroundColor(.orange)
-                                        Text("Unable to check usage. You can still record!")
+                                        Text(NSLocalizedString("settings.unable_to_check", comment: "Unable to check usage"))
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                     }
@@ -137,7 +147,7 @@ struct SettingsView: View {
                                     } label: {
                                         HStack(spacing: 6) {
                                             Image(systemName: "arrow.clockwise")
-                                            Text("Try Again")
+                                            Text(NSLocalizedString("settings.try_again", comment: "Try Again"))
                                         }
                                         .font(.caption)
                                         .fontWeight(.medium)
@@ -165,17 +175,11 @@ struct SettingsView: View {
                                 .frame(height: 12)
 
                                 HStack {
-                                    Text("\(usageVM.minutesLeftText) remaining")
+                                    Text("\(usageVM.minutesLeftText) \(NSLocalizedString("settings.remaining", comment: "remaining"))")
                                         .font(.caption)
                                         .foregroundColor(usageVM.isOverLimit ? .red : .secondary)
 
                                     Spacer()
-
-                                    if usageVM.isStale {
-                                        Text("(may be outdated)")
-                                            .font(.caption2)
-                                            .foregroundColor(.orange)
-                                    }
 
                                     Button {
                                         Task { await usageVM.refresh() }
@@ -251,40 +255,6 @@ struct SettingsView: View {
                     .onAppear {
                         Task { await usageVM.refresh() }
                     }
-
-                    Button(action: { showingPaywall = true }) {
-                        HStack {
-                            Image(systemName: subscriptionManager.isSubscribed ? "checkmark.seal.fill" : "star.circle.fill")
-                                .foregroundColor(subscriptionManager.isSubscribed ? .green : .yellow)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                if let subscription = subscriptionManager.activeSubscription {
-                                    Text(subscription.displayName)
-                                        .font(.poppins.body)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.primary)
-
-                                    Text("\(subscription.monthlyMinutes) minutes per month")
-                                        .font(.poppins.caption)
-                                        .foregroundColor(.secondary)
-                                } else {
-                                    Text("Free Trial")
-                                        .font(.poppins.body)
-                                        .foregroundColor(.primary)
-
-                                    Text("60 minutes available")
-                                        .font(.poppins.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .font(.caption)
-                        }
-                    }
                 }
 
                 // Advanced Settings Navigation Link
@@ -297,11 +267,11 @@ struct SettingsView: View {
                                 .frame(width: 28, height: 28)
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Advanced Settings")
+                                Text(NSLocalizedString("settings.advanced_settings", comment: "Advanced Settings"))
                                     .font(.poppins.body)
                                     .foregroundColor(.primary)
 
-                                Text("AI provider, summaries, lists, tags, and interface")
+                                Text(NSLocalizedString("settings.advanced_settings_desc", comment: "AI provider, summaries, lists, tags, and interface"))
                                     .font(.poppins.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -312,7 +282,7 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
                 }
 
-                Section(header: Text("Language")) {
+                Section(header: Text(NSLocalizedString("settings.language", comment: "Language"))) {
                     Button(action: {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             UIApplication.shared.open(url)
@@ -325,7 +295,7 @@ struct SettingsView: View {
                                 .frame(width: 28, height: 28)
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("App Language")
+                                Text(NSLocalizedString("settings.app_language", comment: "App Language"))
                                     .font(.poppins.headline)
                                     .foregroundColor(.primary)
 
@@ -343,26 +313,26 @@ struct SettingsView: View {
                         .padding(.vertical, 4)
                     }
 
-                    Text("Summaries will be generated in the selected app language. Change language in iOS Settings.")
+                    Text(NSLocalizedString("settings.language_change_note", comment: "Language change note"))
                         .font(.poppins.caption)
                         .foregroundColor(.secondary)
                         .padding(.vertical, 4)
                 }
 
-                Section(header: Text("Getting Started")) {
+                Section(header: Text(NSLocalizedString("settings.getting_started", comment: "Getting Started"))) {
                     Button(action: { showingTour = true }) {
                         HStack(spacing: 12) {
                             Image(systemName: "play.circle.fill")
                                 .font(.poppins.regular(size: 20))
                                 .foregroundColor(.blue)
                                 .frame(width: 28, height: 28)
-                            
+
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Take the Tour")
+                                Text(NSLocalizedString("settings.take_tour", comment: "Take the Tour"))
                                     .font(.poppins.body)
                                     .foregroundColor(.primary)
-                                
-                                Text("Learn about Voice Notes features")
+
+                                Text(NSLocalizedString("settings.learn_features", comment: "Learn about features"))
                                     .font(.poppins.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -387,11 +357,11 @@ struct SettingsView: View {
                                 .frame(width: 28, height: 28)
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Help & Support")
+                                Text(NSLocalizedString("settings.help_support", comment: "Help & Support"))
                                     .font(.poppins.body)
                                     .foregroundColor(.primary)
 
-                                Text("Feedback, privacy, and analytics")
+                                Text(NSLocalizedString("settings.help_support_desc", comment: "Feedback, privacy, and analytics"))
                                     .font(.poppins.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -402,30 +372,30 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
                 }
                 
-                Section(header: Text("Info")) {
+                Section(header: Text(NSLocalizedString("settings.info", comment: "Info"))) {
                     VStack(alignment: .leading, spacing: 12) {
                         SettingsInfoRow(
-                            icon: "brain.head.profile", 
-                            title: "AI Summary", 
-                            description: "Uses OpenAI GPT-4 for intelligent summaries"
+                            icon: "brain.head.profile",
+                            title: NSLocalizedString("settings.ai_summary", comment: "AI Summary"),
+                            description: NSLocalizedString("settings.ai_summary_desc", comment: "AI Summary description")
                         )
-                        
+
                         SettingsInfoRow(
-                            icon: "waveform", 
-                            title: "Transcription", 
-                            description: "Uses OpenAI Whisper for accurate speech-to-text"
+                            icon: "waveform",
+                            title: NSLocalizedString("settings.transcription", comment: "Transcription"),
+                            description: NSLocalizedString("settings.transcription_desc", comment: "Transcription description")
                         )
-                        
+
                         SettingsInfoRow(
-                            icon: "person.2.fill", 
-                            title: "Language Recognition",
-                            description: "Automatic detection of different languages"
+                            icon: "person.2.fill",
+                            title: NSLocalizedString("settings.language_recognition", comment: "Language Recognition"),
+                            description: NSLocalizedString("settings.language_recognition_desc", comment: "Language Recognition description")
                         )
-                        
+
                         SettingsInfoRow(
-                            icon: "doc.text.fill", 
-                            title: "Smart Lists",
-                            description: "Organize action items into intelligent list types"
+                            icon: "doc.text.fill",
+                            title: NSLocalizedString("settings.smart_lists", comment: "Smart Lists"),
+                            description: NSLocalizedString("settings.smart_lists_desc", comment: "Smart Lists description")
                         )
                     }
                     .padding(.vertical, 4)
@@ -440,7 +410,7 @@ struct SettingsView: View {
                     }
                 }
         }
-        .navigationTitle("Settings")
+        .navigationTitle(NSLocalizedString("settings.title", comment: "Settings"))
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showingTour) {
             AppTourView(onComplete: {
