@@ -9,11 +9,14 @@ struct AlternativeHomeView: View {
     @EnvironmentObject var documentStore: DocumentStore
     @ObservedObject private var usageVM = UsageViewModel.shared
     @AppStorage("hasCompletedTour") private var hasCompletedTour = false
+    @AppStorage("debug_modeEnabled") private var debugModeEnabled: Bool = false
 
     @State private var showingPermissionAlert = false
     @State private var permissionGranted = false
     @State private var selectedRecording: Recording?
     @State private var showingSettings = false
+    @State private var showingTopUpPurchase = false
+    @State private var showingDebugSettings = false
     @State private var currentRecordingFileName: String?
     @State private var isPaused = false
     @State private var showingExpandedRecording = false
@@ -65,6 +68,27 @@ struct AlternativeHomeView: View {
                         }
 
                     Spacer()
+
+                    // Debug indicator (tappable)
+                    if debugModeEnabled {
+                        Button(action: { showingDebugSettings = true }) {
+                            Text("Debug")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Capsule()
+                                        .fill(.orange.opacity(0.15))
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(.orange.opacity(0.3), lineWidth: 1)
+                                        )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
 
                     Button(action: { showingSettings = true }) {
                         Image(systemName: "gearshape.fill")
@@ -207,7 +231,7 @@ struct AlternativeHomeView: View {
                                     .foregroundColor(usageVM.isOverLimit ? .red : .orange)
                             }
 
-                            Button(action: { showingSettings = true }) {
+                            Button(action: { showingTopUpPurchase = true }) {
                                 Text(NSLocalizedString("home.get_more_minutes", comment: "Get More Minutes"))
                                     .font(.subheadline)
                                     .fontWeight(.medium)
@@ -293,7 +317,7 @@ struct AlternativeHomeView: View {
                         Button(action: {
                             selectedRecording = latestSessionRecording
                         }) {
-                            CompactRecordingCard(recording: latestSessionRecording)
+                            CompactRecordingCard(recording: latestSessionRecording, recordingsManager: recordingsManager)
                         }
                         .buttonStyle(.plain)
                         .transition(.asymmetric(
@@ -351,6 +375,12 @@ struct AlternativeHomeView: View {
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView(showingAlternativeView: .constant(false), recordingsManager: recordingsManager)
+        }
+        .sheet(isPresented: $showingTopUpPurchase) {
+            TopUpPurchaseSheet()
+        }
+        .sheet(isPresented: $showingDebugSettings) {
+            DebugSettingsView(recordingsManager: recordingsManager)
         }
     }
     
@@ -614,7 +644,8 @@ private struct ExpandedRecordingSheet: View {
 // MARK: - Compact Recording Card Component (Bottom of Screen)
 struct CompactRecordingCard: View {
     let recording: Recording
-    
+    @ObservedObject var recordingsManager: RecordingsManager
+
     var body: some View {
         HStack(spacing: 12) {
             // Status icon (smaller)
@@ -622,12 +653,12 @@ struct CompactRecordingCard: View {
                 Circle()
                     .fill(statusColor.opacity(0.15))
                     .frame(width: 36, height: 36)
-                
+
                 Image(systemName: statusIcon)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(statusColor)
             }
-            
+
             // Recording info
             VStack(alignment: .leading, spacing: 2) {
                 Text(displayTitle)
@@ -635,7 +666,7 @@ struct CompactRecordingCard: View {
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                
+
                 HStack(spacing: 8) {
                     Text(formattedTime)
                         .font(.poppins.caption2)
@@ -764,13 +795,17 @@ struct CompactRecordingCard: View {
         let seconds = Int(recording.duration) % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
-    
+
     private var statusColor: Color {
         switch recording.status {
         case .transcribing:
             return .blue
+        case .transcribingPaused:
+            return .blue.opacity(0.7)
         case .summarizing:
             return .orange
+        case .summarizingPaused:
+            return .orange.opacity(0.7)
         case .failed:
             return .red
         case .done:
@@ -779,13 +814,17 @@ struct CompactRecordingCard: View {
             return .gray
         }
     }
-    
+
     private var statusIcon: String {
         switch recording.status {
         case .transcribing:
             return "waveform"
+        case .transcribingPaused:
+            return "pause.circle.fill"
         case .summarizing:
             return "brain.head.profile"
+        case .summarizingPaused:
+            return "pause.circle.fill"
         case .failed:
             return "exclamationmark.triangle"
         case .done:
@@ -794,11 +833,13 @@ struct CompactRecordingCard: View {
             return "mic"
         }
     }
-    
+
     private var statusText: String {
         switch recording.status {
         case .transcribing:
             return NSLocalizedString("recording.transcribing", comment: "Transcribing")
+        case .transcribingPaused:
+            return NSLocalizedString("recording.transcribing_paused", comment: "Transcription Paused")
         case .summarizing:
             // Check if large transcript
             if let transcript = recording.transcript, transcript.count > 50000 {
@@ -806,6 +847,8 @@ struct CompactRecordingCard: View {
                 return String(format: NSLocalizedString("progress.large_transcript_status", comment: "Large transcript status"), estimatedMinutes)
             }
             return NSLocalizedString("recording.summarizing", comment: "Summarizing")
+        case .summarizingPaused:
+            return NSLocalizedString("recording.summarizing_paused", comment: "Summary Paused")
         case .failed:
             return NSLocalizedString("recording.failed", comment: "Failed")
         case .done:
@@ -819,7 +862,8 @@ struct CompactRecordingCard: View {
 // MARK: - Latest Recording Card Component
 struct LatestRecordingCard: View {
     let recording: Recording
-    
+    @ObservedObject var recordingsManager: RecordingsManager
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header with title and status
@@ -829,7 +873,7 @@ struct LatestRecordingCard: View {
                     Circle()
                         .fill(statusColor.opacity(0.1))
                         .frame(width: 44, height: 44)
-                    
+
                     Image(systemName: statusIcon)
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(statusColor)
@@ -1021,8 +1065,12 @@ struct LatestRecordingCard: View {
         switch recording.status {
         case .transcribing:
             return .blue
+        case .transcribingPaused:
+            return .blue.opacity(0.7)
         case .summarizing:
             return .orange
+        case .summarizingPaused:
+            return .orange.opacity(0.7)
         case .failed:
             return .red
         case .done:
@@ -1031,13 +1079,17 @@ struct LatestRecordingCard: View {
             return .gray
         }
     }
-    
+
     private var statusIcon: String {
         switch recording.status {
         case .transcribing:
             return "waveform"
+        case .transcribingPaused:
+            return "pause.circle.fill"
         case .summarizing:
             return "brain.head.profile"
+        case .summarizingPaused:
+            return "pause.circle.fill"
         case .failed:
             return "exclamationmark.triangle"
         case .done:
@@ -1046,7 +1098,7 @@ struct LatestRecordingCard: View {
             return "mic"
         }
     }
-    
+
     @ViewBuilder
     private var statusDescription: some View {
         switch recording.status {
@@ -1057,6 +1109,34 @@ struct LatestRecordingCard: View {
                 Text("Transcribing: \(Int(progress * 100))%")
                     .font(.poppins.caption)
                     .foregroundColor(.blue)
+
+                // Pause button
+                Button(action: {
+                    recordingsManager.pauseTranscription(for: recording)
+                }) {
+                    Image(systemName: "pause.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.blue)
+                }
+                .buttonStyle(.plain)
+            }
+        case .transcribingPaused(let progress):
+            HStack(spacing: 8) {
+                ProgressView(value: progress)
+                    .frame(height: 4)
+                Text("Paused: \(Int(progress * 100))%")
+                    .font(.poppins.caption)
+                    .foregroundColor(.orange)
+
+                // Resume button
+                Button(action: {
+                    recordingsManager.resumeTranscription(for: recording)
+                }) {
+                    Image(systemName: "play.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.green)
+                }
+                .buttonStyle(.plain)
             }
         case .summarizing(let progress):
             HStack(spacing: 8) {
@@ -1065,6 +1145,34 @@ struct LatestRecordingCard: View {
                 Text("Creating summary: \(Int(progress * 100))%")
                     .font(.poppins.caption)
                     .foregroundColor(.orange)
+
+                // Pause button
+                Button(action: {
+                    recordingsManager.pauseSummarization(for: recording)
+                }) {
+                    Image(systemName: "pause.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.orange)
+                }
+                .buttonStyle(.plain)
+            }
+        case .summarizingPaused(let progress):
+            HStack(spacing: 8) {
+                ProgressView(value: progress)
+                    .frame(height: 4)
+                Text("Summary paused: \(Int(progress * 100))%")
+                    .font(.poppins.caption)
+                    .foregroundColor(.orange.opacity(0.7))
+
+                // Resume button
+                Button(action: {
+                    recordingsManager.resumeSummarization(for: recording)
+                }) {
+                    Image(systemName: "play.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.green)
+                }
+                .buttonStyle(.plain)
             }
         case .failed(let reason):
             HStack(spacing: 8) {
@@ -1122,6 +1230,225 @@ extension View {
         } else {
             self
         }
+    }
+}
+
+// MARK: - Top-Up Purchase Sheet
+struct TopUpPurchaseSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject private var topUpManager = TopUpManager.shared
+    @ObservedObject private var usageVM = UsageViewModel.shared
+    @State private var showToast = false
+    @State private var toastMessage = ""
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 32) {
+                // Header
+                VStack(spacing: 16) {
+                    ZStack {
+                        // Outer glow circle
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 120, height: 120)
+                            .blur(radius: 10)
+
+                        // Main circle
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.blue.opacity(0.15), .purple.opacity(0.15)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 100, height: 100)
+
+                        // Voice waveform icon
+                        Image(systemName: "waveform")
+                            .font(.system(size: 42, weight: .semibold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+
+                    VStack(spacing: 8) {
+                        Text("Need More Minutes?")
+                            .font(.title)
+                            .fontWeight(.bold)
+
+                        Text("Get extra recording time instantly")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.top, 32)
+
+                // Current Usage
+                VStack(spacing: 12) {
+                    HStack {
+                        Text("Current Usage")
+                            .font(.headline)
+                        Spacer()
+                        Text("\(usageVM.minutesUsedDisplay) / \(usageVM.limitSeconds / 60) min")
+                            .font(.headline)
+                            .foregroundColor(usageVM.isOverLimit ? .red : .primary)
+                    }
+
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(height: 12)
+
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(usageVM.isOverLimit ? Color.red : Color.orange)
+                                .frame(width: geometry.size.width * min(Double(usageVM.secondsUsed) / Double(max(usageVM.limitSeconds, 1)), 1.0), height: 12)
+                        }
+                    }
+                    .frame(height: 12)
+                }
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(12)
+
+                // Purchase Button
+                Button {
+                    Task {
+                        do {
+                            try await topUpManager.purchase3Hours()
+                            let duration = formatDuration(topUpManager.secondsGranted)
+                            toastMessage = "\(duration) added — happy recording!"
+                            showToast = true
+
+                            // Auto-dismiss after successful purchase
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                dismiss()
+                            }
+                        } catch {
+                            toastMessage = "Purchase failed: \(error.localizedDescription)"
+                            showToast = true
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "clock.badge.plus.fill")
+                            .font(.title3)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(topUpManager.displayName)
+                                .font(.headline)
+
+                            Text(topUpManager.displayDescription)
+                                .font(.caption)
+                                .opacity(0.8)
+                        }
+
+                        Spacer()
+
+                        if topUpManager.isLoading {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Text(topUpManager.displayPrice)
+                                .font(.title3)
+                                .fontWeight(.bold)
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .padding(20)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [.blue, .purple]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(16)
+                    .shadow(color: .blue.opacity(0.3), radius: 12, y: 6)
+                }
+                .disabled(topUpManager.isLoading)
+
+                // Info text
+                Text("This is a one-time purchase that adds 3 hours to your current plan. Minutes never expire.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .navigationTitle("Buy More Minutes")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Settings") {
+                        dismiss()
+                        // TODO: Open settings - need to coordinate with parent view
+                    }
+                    .font(.subheadline)
+                }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if showToast {
+                ToastView(message: toastMessage)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.bottom, 20)
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showToast)
+        .onChange(of: showToast) { _, newValue in
+            if newValue {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    showToast = false
+                }
+            }
+        }
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+
+        if hours > 0 {
+            return minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h"
+        } else {
+            return "\(minutes)m"
+        }
+    }
+}
+
+// MARK: - Toast View
+struct ToastView: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(.subheadline)
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.black.opacity(0.8))
+            .cornerRadius(10)
+            .shadow(radius: 10)
     }
 }
 
