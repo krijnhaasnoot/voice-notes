@@ -786,6 +786,7 @@ struct HomeView: View {
     @ObservedObject var audioRecorder: AudioRecorder
     @ObservedObject var recordingsManager: RecordingsManager
     @EnvironmentObject var appRouter: AppRouter
+    @EnvironmentObject var usageViewModel: UsageViewModel
 
     @State private var showingPermissionAlert = false
     @State private var permissionGranted = false
@@ -867,7 +868,10 @@ struct HomeView: View {
                         .padding(.bottom, 8)
                     }
                     .padding(.top, 32)
-                    
+
+                    // Usage Display
+                    usageDisplay
+
                     // Recent recordings section with transition
                     if !recordingsManager.recordings.isEmpty {
                         recentRecordingsSection
@@ -1055,7 +1059,52 @@ struct HomeView: View {
             return "Cloud-based transcription • Requires internet"
         }
     }
-    
+
+    private var usageDisplay: some View {
+        HStack(spacing: 16) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(usageViewModel.isOverLimit ? Color.red.opacity(0.1) : Color.blue.opacity(0.1))
+                    .frame(width: 44, height: 44)
+
+                Image(systemName: usageViewModel.isOverLimit ? "exclamationmark.triangle.fill" : "clock.fill")
+                    .foregroundStyle(usageViewModel.isOverLimit ? .red : .blue)
+                    .font(.system(size: 20, weight: .medium))
+            }
+
+            // Text content
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(usageViewModel.minutesLeftDisplay) min remaining")
+                    .font(.poppins.body)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+
+                Text(usageViewModel.currentPlan.capitalized + " plan")
+                    .font(.poppins.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            // Chevron
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(.quaternary.opacity(0.8), lineWidth: 0.5)
+        }
+        .onTapGesture {
+            showingSettings = true
+        }
+    }
+
     private var summaryModeSheetView: some View {
         NavigationView {
             List {
