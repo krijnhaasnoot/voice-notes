@@ -178,10 +178,22 @@ class WhisperModelManager: ObservableObject {
     }
 
     func checkModelStatus() {
-        if isModelDownloaded(selectedModel) {
-            downloadState = .downloaded
-        } else {
-            downloadState = .notDownloaded
+        Task {
+            let model = selectedModel
+            let path = modelPath(for: model)
+
+            let isDownloaded = await Task.detached {
+                var isDirectory: ObjCBool = false
+                return FileManager.default.fileExists(atPath: path.path, isDirectory: &isDirectory) && isDirectory.boolValue
+            }.value
+
+            await MainActor.run {
+                if isDownloaded {
+                    self.downloadState = .downloaded
+                } else {
+                    self.downloadState = .notDownloaded
+                }
+            }
         }
     }
 
@@ -417,18 +429,28 @@ class WhisperModelManager: ObservableObject {
         progress(1.0)
     }
 
-    func deleteModel(_ model: WhisperModelSize) throws {
+    func deleteModel(_ model: WhisperModelSize) async throws {
         let path = modelPath(for: model)
-        try FileManager.default.removeItem(at: path)
+
+        // Perform deletion in background
+        try await Task.detached {
+            try FileManager.default.removeItem(at: path)
+        }.value
 
         if model == selectedModel {
             checkModelStatus()
         }
     }
 
-    func deleteAllModels() throws {
-        try FileManager.default.removeItem(at: modelsDirectory)
-        try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
+    func deleteAllModels() async throws {
+        let directory = modelsDirectory
+
+        // Perform deletion in background
+        try await Task.detached {
+            try FileManager.default.removeItem(at: directory)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }.value
+
         checkModelStatus()
     }
 

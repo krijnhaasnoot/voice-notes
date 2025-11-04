@@ -214,11 +214,19 @@ struct LocalTranscriptionSettingsView: View {
             }
             .alert("Delete All Models?", isPresented: $showingDeleteConfirmation) {
                 Button("Delete", role: .destructive) {
-                    do {
-                        try modelManager.deleteAllModels()
-                        showToast("All models deleted")
-                    } catch {
-                        showToast("Failed to delete models")
+                    showToast("Deleting all models...")
+
+                    Task {
+                        do {
+                            try await modelManager.deleteAllModels()
+                            await MainActor.run {
+                                showToast("All models deleted")
+                            }
+                        } catch {
+                            await MainActor.run {
+                                showToast("Failed to delete models")
+                            }
+                        }
                     }
                 }
                 Button("Cancel", role: .cancel) {}
@@ -237,10 +245,15 @@ struct LocalTranscriptionSettingsView: View {
     // MARK: - Actions
 
     private func selectModel(_ model: WhisperModelSize) {
+        // Immediate UI feedback
         modelManager.selectedModel = model
-        modelManager.savePreferences()
-        modelManager.checkModelStatus()
         showToast("\(model.displayName) selected")
+
+        // Save and check status in background
+        Task {
+            modelManager.savePreferences()
+            modelManager.checkModelStatus()
+        }
     }
 
     private func initiateDownload(for model: WhisperModelSize) {
@@ -305,11 +318,20 @@ struct LocalTranscriptionSettingsView: View {
     }
 
     private func deleteModel(_ model: WhisperModelSize) {
-        do {
-            try modelManager.deleteModel(model)
-            showToast("\(model.displayName) deleted")
-        } catch {
-            showToast("Failed to delete model")
+        // Show immediate feedback
+        showToast("Deleting \(model.displayName)...")
+
+        Task {
+            do {
+                try await modelManager.deleteModel(model)
+                await MainActor.run {
+                    showToast("\(model.displayName) deleted")
+                }
+            } catch {
+                await MainActor.run {
+                    showToast("Failed to delete model")
+                }
+            }
         }
     }
 
