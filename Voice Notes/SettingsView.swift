@@ -34,7 +34,7 @@ struct SettingsView: View {
     @AppStorage("autoDetectMode") private var autoDetectMode: Bool = false
     @AppStorage("defaultDocumentType") private var defaultDocumentType: String = DocumentType.todo.rawValue
     @AppStorage("autoSaveToDocuments") private var autoSaveToDocuments: Bool = false
-    @AppStorage("useCompactView") private var useCompactView: Bool = true
+    @AppStorage("useCompactView") private var useCompactView: Bool = false
 
     @Binding var showingAlternativeView: Bool
     @ObservedObject var recordingsManager: RecordingsManager

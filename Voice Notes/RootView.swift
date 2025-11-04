@@ -40,7 +40,7 @@ struct RootView: View {
     @StateObject private var watchBridge = WatchConnectivityManager.shared
     @EnvironmentObject var documentStore: DocumentStore
     @AppStorage("hasCompletedTour") private var hasCompletedTour = false
-    @AppStorage("useCompactView") private var useCompactView = true
+    @AppStorage("useCompactView") private var useCompactView = false
     @State private var showingTour = false
     
     var body: some View {
@@ -795,7 +795,7 @@ struct HomeView: View {
     @State private var showingSettings = false
     @State private var showingAlternativeView = false
     @State private var isPaused = false
-    @AppStorage("useCompactView") private var useCompactView = true
+    @AppStorage("useCompactView") private var useCompactView = false
     @AppStorage("hasCompletedTour") private var hasCompletedTour = false
     
     // AI Summary mode settings
