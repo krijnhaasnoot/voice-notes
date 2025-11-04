@@ -805,6 +805,7 @@ struct HomeView: View {
     // Transcription settings
     @AppStorage("use_local_transcription") private var useLocalTranscription = false
     @ObservedObject private var modelStore = ModelStore.shared
+    @State private var showingTranscriptionSettings = false
 
     var body: some View {
         if showingAlternativeView || useCompactView {
@@ -925,52 +926,47 @@ struct HomeView: View {
         .sheet(isPresented: $showingModeSheet) {
             summaryModeSheetView
         }
+        .sheet(isPresented: $showingTranscriptionSettings) {
+            LocalTranscriptionSettingsView()
+        }
     }
     
     // MARK: - AI Summary Mode Selector
     
     private var summaryModeSelector: some View {
-        VStack(spacing: 16) {
-            Text("AI Summary Mode")
-                .font(.poppins.headline)
-                .foregroundStyle(.primary)
-
+        VStack(spacing: 8) {
             Button(action: {
                 showingModeSheet = true
             }) {
-                HStack(spacing: 16) {
-                    // Mode icon with background
-                    ZStack {
-                        Circle()
-                            .fill(selectedMode.color.opacity(0.1))
-                            .frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("AI Summary Mode")
+                            .font(.poppins.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
 
-                        Image(systemName: selectedMode.icon)
-                            .foregroundStyle(selectedMode.color)
-                            .font(.system(size: 20, weight: .medium))
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.tertiary)
                     }
 
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text(selectedMode.displayName)
-                            .font(.poppins.body)
+                            .font(.poppins.title3)
                             .fontWeight(.semibold)
                             .foregroundColor(.primary)
 
                         Text(selectedMode.shortDescription)
-                            .font(.poppins.caption)
+                            .font(.poppins.subheadline)
                             .foregroundColor(.secondary)
                             .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.tertiary)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .frame(maxWidth: .infinity)
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.regularMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay {
@@ -986,12 +982,12 @@ struct HomeView: View {
                         .font(.system(size: 14))
                         .foregroundStyle(.orange)
 
-                    Text("Auto-detect mode is enabled - mode may change during recording")
+                    Text("Auto-detect enabled")
                         .font(.poppins.caption)
                         .foregroundColor(.orange)
-                        .multilineTextAlignment(.center)
                 }
-                .padding(.top, -8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -999,54 +995,46 @@ struct HomeView: View {
     }
 
     private var transcriptionModelSelector: some View {
-        VStack(spacing: 16) {
-            Text("Transcription Model")
-                .font(.poppins.headline)
-                .foregroundStyle(.primary)
-
-            NavigationLink(destination: SettingsView(showingAlternativeView: $useCompactView, recordingsManager: recordingsManager)) {
-                HStack(spacing: 16) {
-                    // Model icon with background
-                    ZStack {
-                        Circle()
-                            .fill((useLocalTranscription ? Color.purple : Color.blue).opacity(0.1))
-                            .frame(width: 44, height: 44)
-
-                        Image(systemName: useLocalTranscription ? "cpu" : "cloud")
-                            .foregroundStyle(useLocalTranscription ? .purple : .blue)
-                            .font(.system(size: 20, weight: .medium))
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(useLocalTranscription ? "Local" : "Cloud")
-                            .font(.poppins.body)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-
-                        Text(transcriptionModelDescription)
-                            .font(.poppins.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                    }
+        Button(action: {
+            showingTranscriptionSettings = true
+        }) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Transcription Model")
+                        .font(.poppins.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.tertiary)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .frame(maxWidth: .infinity)
-                .background(.regularMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(.quaternary.opacity(0.8), lineWidth: 0.5)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(useLocalTranscription ? "Local" : "Cloud")
+                        .font(.poppins.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+
+                    Text(transcriptionModelDescription)
+                        .font(.poppins.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .buttonStyle(.plain)
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.regularMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(.quaternary.opacity(0.8), lineWidth: 0.5)
+            }
         }
+        .buttonStyle(.plain)
     }
 
     private var transcriptionModelDescription: String {
