@@ -117,6 +117,9 @@ class WhisperModelManager: ObservableObject {
         // Create directory if needed
         try? FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
 
+        // Copy bundled models if available
+        copyBundledModelsIfNeeded()
+
         // Load preferences
         loadPreferences()
 
@@ -175,6 +178,36 @@ class WhisperModelManager: ObservableObject {
         let path = modelPath(for: model)
         var isDirectory: ObjCBool = false
         return FileManager.default.fileExists(atPath: path.path, isDirectory: &isDirectory) && isDirectory.boolValue
+    }
+
+    // MARK: - Bundled Model Management
+
+    private func copyBundledModelsIfNeeded() {
+        // Check for bundled models in app bundle
+        // Model should be in the main bundle at path: "BundledModels/whisper-base/*"
+        guard let bundlePath = Bundle.main.path(forResource: "whisper-base", ofType: nil, inDirectory: "BundledModels") else {
+            print("ℹ️ WhisperModelManager: No bundled base model found")
+            return
+        }
+
+        let bundleURL = URL(fileURLWithPath: bundlePath)
+        let destinationURL = modelPath(for: .base)
+
+        // Check if already copied
+        if isModelDownloaded(.base) {
+            print("ℹ️ WhisperModelManager: Base model already exists, skipping copy")
+            return
+        }
+
+        // Copy bundled model to documents directory
+        do {
+            try FileManager.default.copyItem(at: bundleURL, to: destinationURL)
+            print("✅ WhisperModelManager: Bundled base model copied successfully")
+            print("   From: \(bundleURL.path)")
+            print("   To: \(destinationURL.path)")
+        } catch {
+            print("❌ WhisperModelManager: Failed to copy bundled model: \(error)")
+        }
     }
 
     func checkModelStatus() {
