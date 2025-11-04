@@ -120,11 +120,14 @@ class WhisperModelManager: ObservableObject {
         // Copy bundled models if available
         copyBundledModelsIfNeeded()
 
-        // Load preferences
+        // Load preferences (ensures selectedModel is .base by default)
         loadPreferences()
 
         // Start network monitoring
         startNetworkMonitoring()
+
+        // Auto-download base model on first launch if not present
+        autoDownloadBaseModelIfNeeded()
 
         // Check if current model is downloaded
         checkModelStatus()
@@ -207,6 +210,43 @@ class WhisperModelManager: ObservableObject {
             print("   To: \(destinationURL.path)")
         } catch {
             print("❌ WhisperModelManager: Failed to copy bundled model: \(error)")
+        }
+    }
+
+    private func autoDownloadBaseModelIfNeeded() {
+        // Check if base model is already available
+        if isModelDownloaded(.base) {
+            print("✅ WhisperModelManager: Base model already available")
+            return
+        }
+
+        // Check if we've already attempted auto-download
+        let autoDownloadKey = "whisper_base_auto_downloaded"
+        if UserDefaults.standard.bool(forKey: autoDownloadKey) {
+            print("ℹ️ WhisperModelManager: Auto-download already attempted previously")
+            return
+        }
+
+        // Mark that we're attempting auto-download
+        UserDefaults.standard.set(true, forKey: autoDownloadKey)
+        print("📥 WhisperModelManager: Starting automatic base model download...")
+
+        // Download in background
+        Task { @MainActor in
+            do {
+                try await self.downloadModel(.base)
+                print("✅ WhisperModelManager: Base model auto-download completed successfully")
+
+                // Show notification if app is in background
+                NotificationManager.shared.notifyModelDownloadComplete(
+                    modelName: "Base",
+                    modelSize: WhisperModelSize.base.formattedSize
+                )
+            } catch {
+                print("❌ WhisperModelManager: Base model auto-download failed: \(error.localizedDescription)")
+                // Reset flag so we can retry next launch
+                UserDefaults.standard.set(false, forKey: autoDownloadKey)
+            }
         }
     }
 
