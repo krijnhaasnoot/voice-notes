@@ -793,6 +793,10 @@ struct HomeView: View {
     @AppStorage("autoDetectMode") private var autoDetectMode: Bool = false
     @State private var showingModeSheet = false
 
+    // Transcription settings
+    @AppStorage("use_local_transcription") private var useLocalTranscription = false
+    @ObservedObject private var modelStore = ModelStore.shared
+
     var body: some View {
         if showingAlternativeView || useCompactView {
             AlternativeHomeView(
@@ -838,15 +842,18 @@ struct HomeView: View {
             // Content area 
             ScrollView {
                 VStack(spacing: 32) {
-                    // AI Summary Mode Selector (moved up for better prominence)
+                    // Recording Settings Section
                     VStack(spacing: 16) {
                         Text("Recording Settings")
                             .font(.poppins.title3)
                             .fontWeight(.semibold)
                             .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        summaryModeSelector
+
+                        HStack(alignment: .top, spacing: 16) {
+                            summaryModeSelector
+                            transcriptionModelSelector
+                        }
                     }
                     .padding(.top, 32)
                     
@@ -918,7 +925,7 @@ struct HomeView: View {
             Text("AI Summary Mode")
                 .font(.poppins.headline)
                 .foregroundStyle(.primary)
-            
+
             Button(action: {
                 showingModeSheet = true
             }) {
@@ -928,26 +935,26 @@ struct HomeView: View {
                         Circle()
                             .fill(selectedMode.color.opacity(0.1))
                             .frame(width: 44, height: 44)
-                        
+
                         Image(systemName: selectedMode.icon)
                             .foregroundStyle(selectedMode.color)
                             .font(.system(size: 20, weight: .medium))
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text(selectedMode.displayName)
                             .font(.poppins.body)
                             .fontWeight(.semibold)
                             .foregroundColor(.primary)
-                        
+
                         Text(selectedMode.shortDescription)
                             .font(.poppins.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(2)
                     }
-                    
+
                     Spacer()
-                    
+
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.tertiary)
@@ -963,13 +970,13 @@ struct HomeView: View {
                 }
             }
             .buttonStyle(.plain)
-            
+
             if autoDetectMode {
                 HStack(spacing: 8) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 14))
                         .foregroundStyle(.orange)
-                    
+
                     Text("Auto-detect mode is enabled - mode may change during recording")
                         .font(.poppins.caption)
                         .foregroundColor(.orange)
@@ -979,8 +986,70 @@ struct HomeView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(.horizontal, 24)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: autoDetectMode)
+    }
+
+    private var transcriptionModelSelector: some View {
+        VStack(spacing: 16) {
+            Text("Transcription Model")
+                .font(.poppins.headline)
+                .foregroundStyle(.primary)
+
+            NavigationLink(destination: SettingsView(showingAlternativeView: $useCompactView, recordingsManager: recordingsManager)) {
+                HStack(spacing: 16) {
+                    // Model icon with background
+                    ZStack {
+                        Circle()
+                            .fill((useLocalTranscription ? Color.purple : Color.blue).opacity(0.1))
+                            .frame(width: 44, height: 44)
+
+                        Image(systemName: useLocalTranscription ? "cpu" : "cloud")
+                            .foregroundStyle(useLocalTranscription ? .purple : .blue)
+                            .font(.system(size: 20, weight: .medium))
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(useLocalTranscription ? "Local" : "Cloud")
+                            .font(.poppins.body)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+
+                        Text(transcriptionModelDescription)
+                            .font(.poppins.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(.quaternary.opacity(0.8), lineWidth: 0.5)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var transcriptionModelDescription: String {
+        if useLocalTranscription {
+            if let selectedModelID = modelStore.selectedModelID,
+               let model = modelStore.models.first(where: { $0.id == selectedModelID }) {
+                return "\(model.name) • Offline"
+            }
+            return "Offline transcription"
+        } else {
+            return "OpenAI Whisper"
+        }
     }
     
     private var summaryModeSheetView: some View {
