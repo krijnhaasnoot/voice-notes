@@ -964,6 +964,7 @@ struct HomeView: View {
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    .frame(height: 60, alignment: .top)
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1013,7 +1014,7 @@ struct HomeView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(useLocalTranscription ? "Local" : "Cloud")
+                    Text(transcriptionModelTitle)
                         .font(.poppins.title3)
                         .fontWeight(.semibold)
                         .foregroundColor(.primary)
@@ -1024,6 +1025,7 @@ struct HomeView: View {
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(height: 60, alignment: .top)
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1037,11 +1039,19 @@ struct HomeView: View {
         .buttonStyle(.plain)
     }
 
-    private var transcriptionModelDescription: String {
+    private var transcriptionModelTitle: String {
         if useLocalTranscription {
-            return "\(modelManager.selectedModel.displayName) • Offline"
+            return modelManager.selectedModel.displayName
         } else {
             return "OpenAI Whisper"
+        }
+    }
+
+    private var transcriptionModelDescription: String {
+        if useLocalTranscription {
+            return "Local transcription • Works offline"
+        } else {
+            return "Cloud-based transcription • Requires internet"
         }
     }
     
