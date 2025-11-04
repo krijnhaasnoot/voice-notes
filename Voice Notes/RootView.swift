@@ -864,6 +864,7 @@ struct HomeView: View {
                             summaryModeSelector
                             transcriptionModelSelector
                         }
+                        .padding(.bottom, 8)
                     }
                     .padding(.top, 32)
                     
