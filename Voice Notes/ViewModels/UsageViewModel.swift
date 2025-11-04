@@ -6,6 +6,10 @@ final class UsageViewModel: ObservableObject {
     static let shared = UsageViewModel()
     private init() {}
 
+    // Access to debug override settings
+    @AppStorage("debug_subscriptionOverride") private var debugSubscriptionOverride: String = "none"
+    @AppStorage("debug_usageOverride") private var debugUsageOverride: Bool = false
+
     // MARK: - Published Properties (Real Backend Data)
 
     @Published var isLoading: Bool = true
@@ -41,6 +45,23 @@ final class UsageViewModel: ObservableObject {
         max(remainingSeconds / 60, 0)
     }
 
+    // MARK: - Plan Limits Helper
+
+    private func limitForPlan(_ plan: String) -> Int {
+        switch plan {
+        case "free":
+            return 1800 // 30 minutes
+        case "standard":
+            return 7200 // 120 minutes
+        case "premium":
+            return 36000 // 600 minutes
+        case "own_key":
+            return 600000 // 10000 minutes
+        default:
+            return 1800
+        }
+    }
+
     // MARK: - API Client
 
     private let api = UsageAPI()
@@ -55,8 +76,23 @@ final class UsageViewModel: ObservableObject {
 
     // MARK: - Fetch Usage from Backend
 
-    func refresh() async {
+    func refresh(clearDebugOverride: Bool = false) async {
+        // If debug override is active and we're not explicitly clearing it, skip refresh
+        if isDebugOverrideActive && !clearDebugOverride {
+            print("⚠️ UsageViewModel: Skipping refresh - debug override active")
+            return
+        }
+
         isLoading = true
+
+        // Clear debug override if requested (e.g., after a real purchase)
+        if clearDebugOverride && isDebugOverrideActive {
+            print("🐛 UsageViewModel: Clearing debug override for real data refresh")
+            isDebugOverrideActive = false
+            // Also clear the AppStorage debug settings
+            debugSubscriptionOverride = "none"
+            debugUsageOverride = false
+        }
 
         do {
             print("📊 UsageViewModel: Fetching usage for user: \(userKey)")

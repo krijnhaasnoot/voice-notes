@@ -1180,8 +1180,12 @@ struct RecentRecordingRow: View {
             }
         case .transcribing:
             return "waveform.circle"
+        case .transcribingPaused:
+            return "pause.circle.fill"
         case .summarizing:
             return "brain.head.profile"
+        case .summarizingPaused:
+            return "pause.circle.fill"
         case .failed:
             return "exclamationmark.circle.fill"
         case .done:
@@ -1201,6 +1205,8 @@ struct RecentRecordingRow: View {
             }
         case .transcribing, .summarizing:
             return .blue
+        case .transcribingPaused, .summarizingPaused:
+            return .blue.opacity(0.7)
         case .failed:
             return .red
         case .done:
@@ -1317,10 +1323,18 @@ extension HomeView {
                     Text("Transcribing: \(Int(progress * 100))%")
                         .font(.caption)
                         .foregroundColor(.blue)
+                case .transcribingPaused(let progress):
+                    Text("⏸️ Transcribing paused: \(Int(progress * 100))%")
+                        .font(.caption)
+                        .foregroundColor(.blue.opacity(0.7))
                 case .summarizing(let progress):
                     Text("Summarizing: \(Int(progress * 100))%")
                         .font(.caption)
                         .foregroundColor(.green)
+                case .summarizingPaused(let progress):
+                    Text("⏸️ Summarizing paused: \(Int(progress * 100))%")
+                        .font(.caption)
+                        .foregroundColor(.green.opacity(0.7))
                 case .failed(let reason):
                     Text("Failed: \(reason)")
                         .font(.caption)

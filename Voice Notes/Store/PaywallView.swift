@@ -186,7 +186,7 @@ struct PaywallView: View {
         Task {
             do {
                 try await subscriptionManager.purchase(product)
-                await usageVM.refresh()
+                await usageVM.refresh(clearDebugOverride: true)
                 dismiss()
                 onComplete?()
             } catch {
@@ -200,7 +200,7 @@ struct PaywallView: View {
         Task {
             do {
                 try await subscriptionManager.restorePurchases()
-                await usageVM.refresh()
+                await usageVM.refresh(clearDebugOverride: true)
                 isRestoring = false
                 if subscriptionManager.isSubscribed {
                     dismiss()

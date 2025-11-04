@@ -5,6 +5,9 @@ struct DebugSettingsView: View {
     @ObservedObject private var usageVM = UsageViewModel.shared
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
 
+    // Debug master toggle
+    @AppStorage("debug_modeEnabled") private var debugModeEnabled: Bool = false
+
     // Debug simulation states
     @AppStorage("debug_subscriptionOverride") private var debugSubscriptionOverride: String = "none"
     @AppStorage("debug_usageOverride") private var debugUsageOverride: Bool = false
@@ -16,10 +19,15 @@ struct DebugSettingsView: View {
     @State private var toastMessage = ""
     @Environment(\.dismiss) private var dismiss
 
+    // Computed property to check if any debug setting is active
+    private var hasActiveDebugSettings: Bool {
+        debugSubscriptionOverride != "none" || debugUsageOverride || usageVM.isDebugOverrideActive
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                // Header
+                // Header with Master Toggle
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -35,10 +43,57 @@ struct DebugSettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 8)
+
+                    // Master toggle
+                    Toggle(isOn: $debugModeEnabled) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Enable Debug Mode")
+                                .font(.poppins.headline)
+                            if debugModeEnabled && hasActiveDebugSettings {
+                                Text("Active overrides detected")
+                                    .font(.poppins.caption)
+                                    .foregroundStyle(.orange)
+                            } else if debugModeEnabled {
+                                Text("Debug controls enabled")
+                                    .font(.poppins.caption)
+                                    .foregroundStyle(.green)
+                            } else {
+                                Text("Using real data")
+                                    .font(.poppins.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .onChange(of: debugModeEnabled) { _, isEnabled in
+                        if !isEnabled {
+                            // When disabling debug mode, clear active overrides but keep settings
+                            // This allows settings to persist when debug mode is re-enabled
+                            usageVM.clearDebugOverride()
+                            subscriptionManager.objectWillChange.send()
+                            showToast(message: "Debug mode disabled - using real data")
+                        } else {
+                            // When re-enabling, reapply any previously saved debug settings
+                            if debugSubscriptionOverride != "none" {
+                                subscriptionManager.objectWillChange.send()
+                                let currentUsage = debugUsageOverride ? debugUsageSeconds : usageVM.secondsUsed
+                                let newLimit = limitForPlan(debugSubscriptionOverride)
+                                usageVM.applyDebugOverride(
+                                    secondsUsed: currentUsage,
+                                    limitSeconds: newLimit,
+                                    plan: debugSubscriptionOverride
+                                )
+                                showToast(message: "Debug mode enabled - restored previous settings")
+                            } else {
+                                showToast(message: "Debug mode enabled")
+                            }
+                        }
+                    }
                 }
 
-                // Subscription Simulation
-                Section(header: Text("Subscription Simulation")) {
+                // Only show debug controls if debug mode is enabled
+                if debugModeEnabled {
+                    // Subscription Simulation
+                    Section(header: Text("Subscription Simulation")) {
                     Picker("Simulated Plan", selection: $debugSubscriptionOverride) {
                         Text("None (Use Real)").tag("none")
                         Text("Free Trial").tag("free")
@@ -47,6 +102,32 @@ struct DebugSettingsView: View {
                         Text("Own Key").tag("own_key")
                     }
                     .pickerStyle(.menu)
+                    .onChange(of: debugSubscriptionOverride) { _, newValue in
+                        // Notify SubscriptionManager to update UI
+                        subscriptionManager.objectWillChange.send()
+
+                        // Update usage limits to match new plan
+                        if newValue != "none" {
+                            let newLimit = limitForPlan(newValue)
+                            debugLimitSeconds = newLimit
+
+                            // Use the debug slider value if override is active, otherwise use current real usage
+                            let currentUsage = debugUsageOverride ? debugUsageSeconds : usageVM.secondsUsed
+
+                            // ALWAYS update UsageViewModel with new plan limits
+                            usageVM.applyDebugOverride(
+                                secondsUsed: currentUsage,
+                                limitSeconds: newLimit,
+                                plan: newValue
+                            )
+
+                            showToast(message: "Applied: \(planDisplayName(newValue)) - \(currentUsage/60)/\(newLimit/60) min")
+                        } else {
+                            // Reset to real data
+                            usageVM.clearDebugOverride()
+                            showToast(message: "Using real subscription data")
+                        }
+                    }
 
                     if debugSubscriptionOverride != "none" {
                         HStack {
@@ -69,6 +150,14 @@ struct DebugSettingsView: View {
                 Section(header: Text("Usage Quota Simulation")) {
                     Toggle("Override Usage Data", isOn: $debugUsageOverride)
                         .font(.poppins.headline)
+                        .onChange(of: debugUsageOverride) { _, isEnabled in
+                            if isEnabled {
+                                // When enabling override, sync the limit with the current subscription
+                                if debugSubscriptionOverride != "none" {
+                                    debugLimitSeconds = limitForPlan(debugSubscriptionOverride)
+                                }
+                            }
+                        }
 
                     if debugUsageOverride {
                         VStack(alignment: .leading, spacing: 16) {
@@ -120,7 +209,10 @@ struct DebugSettingsView: View {
                         .padding(.vertical, 8)
 
                         Button {
-                            let plan = debugSubscriptionOverride != "none" ? debugSubscriptionOverride : nil
+                            // Use the subscription plan if selected, otherwise use current plan
+                            let plan = debugSubscriptionOverride != "none" ? debugSubscriptionOverride : usageVM.currentPlan
+
+                            // Apply the override
                             usageVM.applyDebugOverride(
                                 secondsUsed: debugUsageSeconds,
                                 limitSeconds: debugLimitSeconds,
@@ -229,18 +321,6 @@ struct DebugSettingsView: View {
                     }
                 }
 
-                // Real Analytics Access
-                Section(header: Text("Analytics")) {
-                    NavigationLink(destination: TelemetryView(recordingsManager: recordingsManager)) {
-                        HStack {
-                            Image(systemName: "chart.bar.xaxis")
-                                .foregroundStyle(.blue)
-                            Text("View Analytics")
-                                .font(.poppins.body)
-                        }
-                    }
-                }
-
                 // Reset
                 Section {
                     Button(role: .destructive) {
@@ -255,9 +335,42 @@ struct DebugSettingsView: View {
                         .frame(maxWidth: .infinity)
                     }
                 }
+                } // End if debugModeEnabled
+
+                // Real Analytics Access (always visible)
+                Section(header: Text("Analytics")) {
+                    NavigationLink(destination: TelemetryView(recordingsManager: recordingsManager)) {
+                        HStack {
+                            Image(systemName: "chart.bar.xaxis")
+                                .foregroundStyle(.blue)
+                            Text("View Analytics")
+                                .font(.poppins.body)
+                        }
+                    }
+                }
             }
             .navigationTitle("Debug & Analytics")
             .navigationBarTitleDisplayMode(.large)
+            .onAppear {
+                // Load real usage data when view appears (if not already overridden)
+                if !usageVM.isDebugOverrideActive {
+                    Task {
+                        await usageVM.refresh()
+
+                        // Sync debug sliders with real data after refresh
+                        await MainActor.run {
+                            if !debugUsageOverride {
+                                debugUsageSeconds = usageVM.secondsUsed
+                                debugLimitSeconds = usageVM.limitSeconds
+                            }
+                        }
+                    }
+                } else {
+                    // Already in debug mode, sync sliders with current debug values
+                    debugUsageSeconds = usageVM.secondsUsed
+                    debugLimitSeconds = usageVM.limitSeconds
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -327,6 +440,21 @@ struct DebugSettingsView: View {
             showingToast = false
         }
     }
+
+    private func limitForPlan(_ plan: String) -> Int {
+        switch plan {
+        case "free":
+            return 1800 // 30 minutes
+        case "standard":
+            return 7200 // 120 minutes
+        case "premium":
+            return 36000 // 600 minutes
+        case "own_key":
+            return 600000 // 10000 minutes
+        default:
+            return 1800
+        }
+    }
 }
 
 struct QuickScenarioButton: View {
@@ -375,13 +503,14 @@ extension UsageViewModel {
             self.isDebugOverrideActive = true
             self.secondsUsed = secondsUsed
             self.limitSeconds = limitSeconds
+            self.remainingSeconds = max(limitSeconds - secondsUsed, 0)
             if let plan = plan {
                 self.currentPlan = plan
             }
             self.isLoading = false
             // Force UI update
             self.objectWillChange.send()
-            print("🐛 Debug: Applied usage override - \(secondsUsed)s used / \(limitSeconds)s limit, plan: \(plan ?? "unchanged")")
+            print("🐛 Debug: Applied usage override - \(secondsUsed)s used / \(limitSeconds)s limit (\(limitSeconds/60) min), plan: \(plan ?? "unchanged")")
         }
     }
 

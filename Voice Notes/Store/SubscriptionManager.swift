@@ -1,5 +1,6 @@
 import Foundation
 import StoreKit
+import SwiftUI
 
 @MainActor
 class SubscriptionManager: ObservableObject {
@@ -10,7 +11,38 @@ class SubscriptionManager: ObservableObject {
     @Published var isLoading = false
     @Published var purchaseError: String?
 
+    // Debug override
+    @AppStorage("debug_subscriptionOverride") private var debugSubscriptionOverride: String = "none" {
+        didSet {
+            // Update activeSubscription when debug override changes
+            updateActiveSubscriptionFromDebug()
+        }
+    }
+
+    private var realActiveSubscription: EchoProductID?
     private var updateListenerTask: Task<Void, Error>?
+
+    private func updateActiveSubscriptionFromDebug() {
+        // Check for debug override first
+        if debugSubscriptionOverride != "none" {
+            switch debugSubscriptionOverride {
+            case "free":
+                activeSubscription = nil // Free tier = no subscription
+            case "standard":
+                activeSubscription = .standard
+            case "premium":
+                activeSubscription = .premium
+            case "own_key":
+                activeSubscription = .ownKey
+            default:
+                activeSubscription = realActiveSubscription
+            }
+        } else {
+            // Use real subscription
+            activeSubscription = realActiveSubscription
+        }
+        print("🐛 Debug: Updated activeSubscription to \(activeSubscription?.displayName ?? "Free") based on override: \(debugSubscriptionOverride)")
+    }
 
     private init() {
         updateListenerTask = listenForTransactions()
@@ -76,7 +108,11 @@ class SubscriptionManager: ObservableObject {
         }
 
         // Update on main actor since class is @MainActor
-        activeSubscription = activeProductID
+        realActiveSubscription = activeProductID
+
+        // Apply debug override if active, otherwise use real subscription
+        updateActiveSubscriptionFromDebug()
+
         print("🔐 Active subscription property updated, current value: \(activeSubscription?.displayName ?? "nil")")
     }
 

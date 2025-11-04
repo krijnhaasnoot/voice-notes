@@ -12,8 +12,9 @@ final class AudioRecorder: NSObject, ObservableObject {
     private var audioRecorder: AVAudioRecorder?
     private let audioSession = AVAudioSession.sharedInstance()
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
-    private let maxRecordingDuration: TimeInterval = 3600
+    private let maxRecordingDuration: TimeInterval = 3600  // 60 minutes - reasonable limit for transcription quality
     private let telemetryService = EnhancedTelemetryService.shared
+    private var hasShownMaxDurationWarning = false
 
     @Published var isRecording = false
     @Published var recordingDuration: TimeInterval = 0
@@ -65,25 +66,32 @@ final class AudioRecorder: NSObject, ObservableObject {
             name: AVAudioSession.interruptionNotification,
             object: nil
         )
-        
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleRouteChange),
             name: AVAudioSession.routeChangeNotification,
             object: nil
         )
-        
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleSceneChange),
             name: UIScene.didEnterBackgroundNotification,
             object: nil
         )
-        
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleAppWillEnterForeground),
             name: UIScene.willEnterForegroundNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAppWillTerminate),
+            name: UIApplication.willTerminateNotification,
             object: nil
         )
     }
@@ -135,6 +143,14 @@ final class AudioRecorder: NSObject, ObservableObject {
         if isRecording {
             print("🎵 App entering foreground, recording still active")
             // The background task will automatically end when app becomes active
+        }
+    }
+
+    @objc private func handleAppWillTerminate() {
+        if isRecording {
+            print("🎵 ⚠️ App terminating while recording - saving recording")
+            // Force save the recording before app terminates
+            let _ = stopRecording()
         }
     }
     
@@ -196,17 +212,17 @@ final class AudioRecorder: NSObject, ObservableObject {
         
         // Set up audio session
         do {
-            print("🎵 Setting up audio session...")
+            print("🎵 Setting up audio session for background recording...")
             try audioSession.setCategory(
                 .playAndRecord,
                 mode: .spokenAudio,
                 options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers]
             )
-            
+
             print("🎵 Activating audio session...")
             try audioSession.setActive(true)
-            
-            print("🎵 ✅ Audio session ready")
+
+            print("🎵 ✅ Audio session ready with background audio support")
             return true
             
         } catch {
@@ -269,7 +285,7 @@ final class AudioRecorder: NSObject, ObservableObject {
             }
             
             print("🎵 ✅ Recording started successfully")
-            
+
             // Update UI state
             isRecording = true
             recordingStartTime = Date()
@@ -277,17 +293,18 @@ final class AudioRecorder: NSObject, ObservableObject {
             pausedDuration = 0
             lastPauseTime = nil
             lastError = nil
-            
+            hasShownMaxDurationWarning = false  // Reset warning for new recording
+
             // Track recording start
             telemetryService.logRecordingStart()
-            
+
             // Analytics: recording started
             let selectedMode = UserDefaults.standard.string(forKey: "defaultMode") ?? "personal"
             Analytics.track("recording_started", props: [
                 "source": "ios",
                 "mode": selectedMode
             ])
-            
+
             // Start background task for potential background recording
             startBackgroundTask()
             
@@ -297,10 +314,19 @@ final class AudioRecorder: NSObject, ObservableObject {
                     let totalElapsed = Date().timeIntervalSince(startTime)
                     let activeDuration = totalElapsed - self.pausedDuration
                     self.recordingDuration = activeDuration
-                    
-                    // Stop recording if max duration reached (1 hour)
+
+                    // Warn user when approaching max duration (55 minutes)
+                    if activeDuration >= 3300 && !self.hasShownMaxDurationWarning {
+                        print("🎵 ⚠️ Approaching maximum recording duration (55 minutes)")
+                        self.hasShownMaxDurationWarning = true
+                        Task { @MainActor in
+                            self.lastError = "Recording will automatically stop at 60 minutes"
+                        }
+                    }
+
+                    // Stop recording if max duration reached (60 minutes)
                     if activeDuration >= self.maxRecordingDuration {
-                        print("🎵 Maximum recording duration reached, stopping recording")
+                        print("🎵 ⏱️ Maximum recording duration (60 minutes) reached - auto-saving recording")
                         Task { @MainActor in
                             let _ = self.stopRecording()
                         }
@@ -321,14 +347,14 @@ final class AudioRecorder: NSObject, ObservableObject {
     
     func stopRecording() -> (duration: TimeInterval, fileURL: URL?, fileSize: Int64?) {
         print("🎵 Stopping recording...")
-        
+
         audioRecorder?.stop()
         recordingTimer?.invalidate()
         recordingTimer = nil
-        
+
         // End background task
         endBackgroundTask()
-        
+
         isRecording = false
         
         notifyWatch()
@@ -492,6 +518,7 @@ final class AudioRecorder: NSObject, ObservableObject {
         if backgroundTaskID != .invalid {
             UIApplication.shared.endBackgroundTask(backgroundTaskID)
         }
+
         NotificationCenter.default.removeObserver(self)
     }
 }

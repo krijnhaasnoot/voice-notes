@@ -256,11 +256,15 @@ struct RecordingDetailView: View {
             Text("Recording Information")
                 .font(.poppins.headline)
                 .fontWeight(.semibold)
-            
+
             InfoRow(label: "Date & Time", value: recording.formattedDate)
             InfoRow(label: "Duration", value: recording.formattedDuration)
             InfoRow(label: "File", value: recording.fileName)
             InfoRow(label: "Size", value: formatBytes(recording.resolvedSizeBytes))
+
+            if let transcriptionModel = recording.transcriptionModel {
+                InfoRow(label: "Transcription", value: transcriptionModel)
+            }
         }
         .padding()
         .background(Color.secondary.opacity(0.1))

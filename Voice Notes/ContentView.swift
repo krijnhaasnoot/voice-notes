@@ -462,10 +462,18 @@ struct ContentView: View {
                     Text("Transcribing: \(Int(progress * 100))%")
                         .font(.poppins.caption)
                         .foregroundColor(.blue)
+                case .transcribingPaused(let progress):
+                    Text("⏸️ Transcribing paused: \(Int(progress * 100))%")
+                        .font(.poppins.caption)
+                        .foregroundColor(.blue.opacity(0.7))
                 case .summarizing(let progress):
                     Text("Summarizing: \(Int(progress * 100))%")
                         .font(.poppins.caption)
                         .foregroundColor(.green)
+                case .summarizingPaused(let progress):
+                    Text("⏸️ Summarizing paused: \(Int(progress * 100))%")
+                        .font(.poppins.caption)
+                        .foregroundColor(.green.opacity(0.7))
                 case .failed(let reason):
                     Text("Failed: \(reason)")
                         .font(.poppins.caption)
@@ -702,8 +710,12 @@ struct RecordingListRow: View, Equatable {
         switch status {
         case .transcribing:
             return .blue
+        case .transcribingPaused:
+            return .blue.opacity(0.7)
         case .summarizing:
             return .orange
+        case .summarizingPaused:
+            return .orange.opacity(0.7)
         case .failed:
             return .red
         case .done:
@@ -712,13 +724,17 @@ struct RecordingListRow: View, Equatable {
             return .gray
         }
     }
-    
+
     private var statusIcon: String {
         switch status {
         case .transcribing:
             return "waveform.circle.fill"
+        case .transcribingPaused:
+            return "pause.circle.fill"
         case .summarizing:
             return "brain.head.profile.fill"
+        case .summarizingPaused:
+            return "pause.circle.fill"
         case .failed:
             return "exclamationmark.triangle.fill"
         case .done:
@@ -743,7 +759,16 @@ struct RecordingListRow: View, Equatable {
                     .font(.poppins.subheadline)
                     .foregroundColor(.blue)
             }
-            
+
+        case .transcribingPaused(let progress):
+            HStack {
+                ProgressView(value: progress)
+                    .frame(width: 100)
+                Text("⏸️ Transcribing paused: \(Int(progress * 100))%")
+                    .font(.poppins.subheadline)
+                    .foregroundColor(.blue.opacity(0.7))
+            }
+
         case .summarizing(let progress):
             HStack {
                 ProgressView(value: progress)
@@ -752,7 +777,16 @@ struct RecordingListRow: View, Equatable {
                     .font(.poppins.subheadline)
                     .foregroundColor(.orange)
             }
-            
+
+        case .summarizingPaused(let progress):
+            HStack {
+                ProgressView(value: progress)
+                    .frame(width: 100)
+                Text("⏸️ Summarizing paused: \(Int(progress * 100))%")
+                    .font(.poppins.subheadline)
+                    .foregroundColor(.orange.opacity(0.7))
+            }
+
         case .failed(let reason):
             HStack {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -763,7 +797,7 @@ struct RecordingListRow: View, Equatable {
                     .foregroundColor(.red)
                     .lineLimit(1)
             }
-            
+
         case .done, .idle:
             // Don't duplicate preview text here - it's already shown above
             EmptyView()

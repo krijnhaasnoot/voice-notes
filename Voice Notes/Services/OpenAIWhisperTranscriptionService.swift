@@ -7,17 +7,30 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
     private let baseURL = "https://api.openai.com/v1/audio/transcriptions"
     private let model: String
     private let maxFileSize: Int64 = 25 * 1024 * 1024 // 25MB limit
+    private let maxDurationForSingleRequest: TimeInterval = 600 // 10 minutes - split longer files into chunks
     private let urlSession: URLSession
-    
+
     init(apiKey: String, model: String = "whisper-1") {
         self.apiKey = apiKey
         self.model = model
-        
+
         // Create custom URLSession with extended timeouts for long audio processing
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 900.0 // 15 minutes for request timeout (for very long recordings)
-        config.timeoutIntervalForResource = 3600.0 // 60 minutes for resource timeout (long audio processing)
+        config.timeoutIntervalForRequest = 600.0 // 10 minutes for request timeout per chunk
+        config.timeoutIntervalForResource = 1800.0 // 30 minutes for resource timeout
         self.urlSession = URLSession(configuration: config)
+    }
+
+    static func createFromInfoPlist() -> OpenAIWhisperTranscriptionService? {
+        guard let apiKey = Bundle.main.object(forInfoDictionaryKey: "OpenAIAPIKey") as? String,
+              !apiKey.isEmpty,
+              !apiKey.hasPrefix("$("),
+              apiKey.hasPrefix("sk-") else {
+            print("🔑 ❌ OpenAI API Key not found or invalid in Info.plist")
+            return nil
+        }
+        print("🔑 ✅ OpenAI API Key loaded from Info.plist")
+        return OpenAIWhisperTranscriptionService(apiKey: apiKey)
     }
     
     func transcribe(
@@ -27,7 +40,135 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
         progress: @escaping @Sendable (Double) -> Void,
         cancelToken: CancellationToken
     ) async throws -> String {
+        // Check audio duration
+        let asset = AVURLAsset(url: url)
+        let duration = try await asset.load(.duration).seconds
+
+        print("🔤 Audio duration: \(Int(duration))s (\(Int(duration/60)) minutes)")
+
+        // If recording is longer than max duration, use chunking
+        if duration > maxDurationForSingleRequest {
+            print("🔤 Recording exceeds \(Int(maxDurationForSingleRequest/60)) minutes, using chunking approach")
+            return try await transcribeWithChunking(url: url, duration: duration, languageHint: languageHint, progress: progress, cancelToken: cancelToken)
+        }
+
+        // Otherwise use single request with retry
         return try await transcribeWithRetry(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: 0)
+    }
+
+    // MARK: - Chunking for Long Recordings
+
+    private func transcribeWithChunking(
+        url: URL,
+        duration: TimeInterval,
+        languageHint: String?,
+        progress: @escaping @Sendable (Double) -> Void,
+        cancelToken: CancellationToken
+    ) async throws -> String {
+        // Calculate number of chunks needed (8 minutes per chunk to be safe)
+        let chunkDuration: TimeInterval = 480 // 8 minutes
+        let numberOfChunks = Int(ceil(duration / chunkDuration))
+
+        print("🔤 Splitting into \(numberOfChunks) chunks of ~\(Int(chunkDuration/60)) minutes each")
+
+        var transcripts: [String] = []
+        let asset = AVURLAsset(url: url)
+
+        for chunkIndex in 0..<numberOfChunks {
+            if cancelToken.isCancelled {
+                throw TranscriptionError.cancelled
+            }
+
+            let startTime = CMTime(seconds: Double(chunkIndex) * chunkDuration, preferredTimescale: 600)
+            let endTime = CMTime(seconds: min(Double(chunkIndex + 1) * chunkDuration, duration), preferredTimescale: 600)
+            let timeRange = CMTimeRange(start: startTime, end: endTime)
+
+            print("🔤 Processing chunk \(chunkIndex + 1)/\(numberOfChunks) (\(Int(startTime.seconds))s - \(Int(endTime.seconds))s)")
+
+            // Update progress (splitting takes 10% of overall progress)
+            let baseProgress = 0.1 + (Double(chunkIndex) / Double(numberOfChunks)) * 0.9
+            progress(baseProgress)
+
+            // Export chunk
+            let chunkURL = try await exportAudioChunk(asset: asset, timeRange: timeRange, chunkIndex: chunkIndex)
+
+            // Transcribe chunk
+            let chunkProgress: @Sendable (Double) -> Void = { chunkProg in
+                let overallProgress = baseProgress + (chunkProg / Double(numberOfChunks)) * 0.9
+                progress(overallProgress)
+            }
+
+            let transcript = try await transcribeWithRetry(
+                url: chunkURL,
+                languageHint: languageHint,
+                onDevicePreferred: false,
+                progress: chunkProgress,
+                cancelToken: cancelToken,
+                retryCount: 0
+            )
+
+            transcripts.append(transcript)
+
+            // Clean up chunk file
+            try? FileManager.default.removeItem(at: chunkURL)
+
+            print("🔤 Chunk \(chunkIndex + 1)/\(numberOfChunks) completed")
+        }
+
+        progress(1.0)
+
+        // Combine all transcripts
+        let finalTranscript = transcripts.joined(separator: "\n\n")
+        print("🔤 ✅ Chunked transcription complete - \(transcripts.count) chunks combined")
+
+        return finalTranscript
+    }
+
+    private func exportAudioChunk(asset: AVURLAsset, timeRange: CMTimeRange, chunkIndex: Int) async throws -> URL {
+        // Create temporary file for chunk
+        let tempDir = FileManager.default.temporaryDirectory
+        let chunkURL = tempDir.appendingPathComponent("chunk_\(chunkIndex)_\(UUID().uuidString).m4a")
+
+        // Remove existing file if present
+        try? FileManager.default.removeItem(at: chunkURL)
+
+        // Create export session
+        guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+            throw TranscriptionError.networkError(NSError(
+                domain: "AudioChunking",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Could not create export session for chunk"]
+            ))
+        }
+
+        exportSession.outputURL = chunkURL
+        exportSession.outputFileType = .m4a
+        exportSession.timeRange = timeRange
+
+        // Export chunk
+        return try await withCheckedThrowingContinuation { continuation in
+            exportSession.exportAsynchronously {
+                switch exportSession.status {
+                case .completed:
+                    continuation.resume(returning: chunkURL)
+                case .failed:
+                    let error = exportSession.error ?? NSError(
+                        domain: "AudioChunking",
+                        code: -2,
+                        userInfo: [NSLocalizedDescriptionKey: "Chunk export failed"]
+                    )
+                    continuation.resume(throwing: TranscriptionError.networkError(error))
+                case .cancelled:
+                    continuation.resume(throwing: TranscriptionError.cancelled)
+                default:
+                    continuation.resume(throwing: TranscriptionError.networkError(NSError(
+                        domain: "AudioChunking",
+                        code: -3,
+                        userInfo: [NSLocalizedDescriptionKey: "Chunk export ended with status: \(exportSession.status.rawValue)"]
+                    )))
+                }
+            }
+        }
     }
 
     private func transcribeWithRetry(

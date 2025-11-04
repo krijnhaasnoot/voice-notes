@@ -16,8 +16,9 @@ struct Recording: Identifiable, Codable {
     let detectedMode: String?
     let preferredSummaryProvider: String? // AIProviderType.rawValue
     var tags: [String]
+    let transcriptionModel: String? // e.g., "Local (Tiny)", "Cloud (OpenAI Whisper)"
     
-    init(fileName: String, date: Date = Date(), duration: TimeInterval = 0, transcript: String? = nil, summary: String? = nil, rawSummary: String? = nil, status: Status = .idle, languageHint: String? = nil, transcriptLastUpdated: Date? = nil, summaryLastUpdated: Date? = nil, title: String = "", detectedMode: String? = nil, preferredSummaryProvider: String? = nil, tags: [String] = [], id: UUID = UUID()) {
+    init(fileName: String, date: Date = Date(), duration: TimeInterval = 0, transcript: String? = nil, summary: String? = nil, rawSummary: String? = nil, status: Status = .idle, languageHint: String? = nil, transcriptLastUpdated: Date? = nil, summaryLastUpdated: Date? = nil, title: String = "", detectedMode: String? = nil, preferredSummaryProvider: String? = nil, tags: [String] = [], transcriptionModel: String? = nil, id: UUID = UUID()) {
         self.id = id
         self.fileName = fileName
         self.date = date
@@ -33,6 +34,7 @@ struct Recording: Identifiable, Codable {
         self.detectedMode = detectedMode
         self.preferredSummaryProvider = preferredSummaryProvider
         self.tags = tags.normalized()
+        self.transcriptionModel = transcriptionModel
     }
     
     // Convenience computed property for AI provider
@@ -60,10 +62,11 @@ struct Recording: Identifiable, Codable {
             detectedMode: detectedMode,
             preferredSummaryProvider: provider?.rawValue,
             tags: tags,
+            transcriptionModel: transcriptionModel,
             id: id
         )
     }
-    
+
     // Method to create a copy with updated tags
     func withTags(_ newTags: [String]) -> Recording {
         return Recording(
@@ -81,6 +84,7 @@ struct Recording: Identifiable, Codable {
             detectedMode: detectedMode,
             preferredSummaryProvider: preferredSummaryProvider,
             tags: newTags,
+            transcriptionModel: transcriptionModel,
             id: id
         )
     }
@@ -88,22 +92,34 @@ struct Recording: Identifiable, Codable {
     enum Status: Codable, Equatable {
         case idle
         case transcribing(progress: Double)
+        case transcribingPaused(progress: Double)
         case summarizing(progress: Double)
+        case summarizingPaused(progress: Double)
         case done
         case failed(reason: String)
-        
+
         var isProcessing: Bool {
             switch self {
-            case .transcribing, .summarizing:
+            case .transcribing, .transcribingPaused, .summarizing, .summarizingPaused:
                 return true
             default:
                 return false
             }
         }
-        
+
+        var isPaused: Bool {
+            switch self {
+            case .transcribingPaused, .summarizingPaused:
+                return true
+            default:
+                return false
+            }
+        }
+
         var progress: Double? {
             switch self {
-            case .transcribing(let progress), .summarizing(let progress):
+            case .transcribing(let progress), .transcribingPaused(let progress),
+                 .summarizing(let progress), .summarizingPaused(let progress):
                 return progress
             default:
                 return nil

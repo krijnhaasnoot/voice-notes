@@ -69,7 +69,31 @@ struct RecordingRow: View {
                     .font(.caption)
                     .foregroundColor(.orange)
             }
-            
+
+        case .transcribingPaused(let progress):
+            HStack {
+                ProgressView(value: progress)
+                    .frame(width: 80)
+                HStack(spacing: 4) {
+                    Image(systemName: "pause.circle.fill")
+                    Text("Transcribing paused: \(Int(progress * 100))%")
+                }
+                .font(.caption)
+                .foregroundColor(.blue.opacity(0.7))
+            }
+
+        case .summarizingPaused(let progress):
+            HStack {
+                ProgressView(value: progress)
+                    .frame(width: 80)
+                HStack(spacing: 4) {
+                    Image(systemName: "pause.circle.fill")
+                    Text("Summarizing paused: \(Int(progress * 100))%")
+                }
+                .font(.caption)
+                .foregroundColor(.orange.opacity(0.7))
+            }
+
         case .failed(let reason):
             HStack {
                 Image(systemName: "exclamationmark.triangle.fill")

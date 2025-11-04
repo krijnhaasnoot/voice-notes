@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		EF572D212E8044160019C264 /* Echo Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = EF572D202E8044160019C264 /* Echo Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		EF57DF8E2EBA745100AF636F /* SwiftWhisper in Frameworks */ = {isa = PBXBuildFile; productRef = EF57DF8D2EBA745100AF636F /* SwiftWhisper */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -132,6 +133,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EF57DF8E2EBA745100AF636F /* SwiftWhisper in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -287,6 +289,7 @@
 			);
 			name = "Voice Notes";
 			packageProductDependencies = (
+				EF57DF8D2EBA745100AF636F /* SwiftWhisper */,
 			);
 			productName = "Voice Notes";
 			productReference = EF6082862E6C82B50057421A /* Voice Notes.app */;
@@ -385,6 +388,9 @@
 			);
 			mainGroup = EF60827D2E6C82B50057421A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EF57DF8C2EBA745100AF636F /* XCRemoteSwiftPackageReference "SwiftWhisper" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EF6082872E6C82B50057421A /* Products */;
 			projectDirPath = "";
@@ -1059,6 +1065,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		EF57DF8C2EBA745100AF636F /* XCRemoteSwiftPackageReference "SwiftWhisper" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/exPHAT/SwiftWhisper";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		EF57DF8D2EBA745100AF636F /* SwiftWhisper */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EF57DF8C2EBA745100AF636F /* XCRemoteSwiftPackageReference "SwiftWhisper" */;
+			productName = SwiftWhisper;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = EF60827E2E6C82B50057421A /* Project object */;
 }

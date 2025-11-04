@@ -188,7 +188,6 @@ async function handleUsageTopUp(body: any) {
           user_key,
           period_ym: currentPeriod,
           plan: "free",
-          subscription_seconds_limit: 1800,
           topup_seconds_available: seconds,
           seconds_used: 0,
         });
@@ -296,6 +295,8 @@ async function handleUsageFetch(body: any) {
             plan: effectivePlan,
             seconds_used: 0,
             limit_seconds: 1800, // Free tier default
+            remaining_seconds: 1800,
+            topup_seconds_available: 0,
           },
         };
       }
@@ -307,6 +308,8 @@ async function handleUsageFetch(body: any) {
           plan: effectivePlan,
           seconds_used: 0,
           limit_seconds: planLimit.limit_seconds,
+          remaining_seconds: planLimit.limit_seconds,
+          topup_seconds_available: 0,
         },
       };
     }
@@ -319,7 +322,9 @@ async function handleUsageFetch(body: any) {
       data: {
         plan: usage.plan,
         seconds_used: usage.seconds_used,
-        limit_seconds: usage.limit_seconds,
+        limit_seconds: usage.total_limit || usage.limit_seconds, // Use total_limit (includes top-up)
+        remaining_seconds: usage.remaining_seconds, // Include remaining (with top-up)
+        topup_seconds_available: usage.topup_seconds_available || 0,
       },
     };
   } catch (err) {

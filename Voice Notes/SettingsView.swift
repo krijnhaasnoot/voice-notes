@@ -192,60 +192,6 @@ struct SettingsView: View {
                             }
                         }
 
-                        // Buy 3 Hours button (only show when 15 minutes or less remaining)
-                        if usageVM.minutesLeftDisplay <= 15 {
-                            Button {
-                                Task {
-                                    do {
-                                        try await TopUpManager.shared.purchase3Hours()
-                                        // Show success toast
-                                        let duration = formatDuration(TopUpManager.shared.secondsGranted)
-                                        showToast(message: "\(duration) added — happy recording!")
-                                    } catch {
-                                        print("❌ Failed to purchase: \(error)")
-                                    }
-                                }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "clock.badge.plus.fill")
-                                        .foregroundColor(.white)
-                                        .font(.body)
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(TopUpManager.shared.displayName)
-                                            .font(.poppins.subheadline)
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(.white)
-
-                                        Text(TopUpManager.shared.displayDescription)
-                                            .font(.poppins.caption)
-                                            .foregroundColor(.white.opacity(0.8))
-                                    }
-
-                                    Spacer()
-
-                                    if TopUpManager.shared.isLoading {
-                                        ProgressView()
-                                            .tint(.white)
-                                    } else {
-                                        Text(TopUpManager.shared.displayPrice)
-                                            .font(.poppins.body)
-                                            .fontWeight(.bold)
-                                            .foregroundColor(.white)
-                                    }
-                                }
-                                .padding()
-                                .background(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [.blue, .purple]),
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                            )
-                            .cornerRadius(12)
-                            }
-                            .disabled(TopUpManager.shared.isLoading)
-                        }
                     }
                     .padding()
                     .background(Color(.secondarySystemBackground))
@@ -255,6 +201,91 @@ struct SettingsView: View {
                     .onAppear {
                         Task { await usageVM.refresh() }
                     }
+                }
+
+                // Buy More Minutes Section (only show when 15 minutes or less remaining)
+                if usageVM.minutesLeftDisplay <= 15 {
+                    Section(header: Text("Need More Minutes?")) {
+                        Button {
+                            Task {
+                                do {
+                                    try await TopUpManager.shared.purchase3Hours()
+                                    // Show success toast
+                                    let duration = formatDuration(TopUpManager.shared.secondsGranted)
+                                    showToast(message: "\(duration) added — happy recording!")
+                                } catch {
+                                    print("❌ Failed to purchase: \(error)")
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "clock.badge.plus.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.white)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(TopUpManager.shared.displayName)
+                                        .font(.poppins.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.white)
+
+                                    Text(TopUpManager.shared.displayDescription)
+                                        .font(.poppins.caption)
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+
+                                Spacer()
+
+                                if TopUpManager.shared.isLoading {
+                                    ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Text(TopUpManager.shared.displayPrice)
+                                        .font(.poppins.title3)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            .padding(20)
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [.blue, .purple]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(16)
+                            .shadow(color: .blue.opacity(0.3), radius: 12, y: 6)
+                        }
+                        .disabled(TopUpManager.shared.isLoading)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                    }
+                }
+
+                // Local Transcription Navigation Link
+                Section {
+                    NavigationLink(destination: LocalTranscriptionSettingsView()) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "waveform.badge.mic")
+                                .font(.poppins.regular(size: 20))
+                                .foregroundColor(.blue)
+                                .frame(width: 28, height: 28)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Local Transcription")
+                                    .font(.poppins.body)
+                                    .foregroundColor(.primary)
+
+                                Text("On-device AI transcription with Whisper")
+                                    .font(.poppins.caption)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
 
                 // Advanced Settings Navigation Link

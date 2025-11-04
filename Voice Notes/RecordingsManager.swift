@@ -142,7 +142,8 @@ final class RecordingsManager: ObservableObject {
         var newSummary = currentRecording.summary
         var newTranscriptDate = currentRecording.transcriptLastUpdated
         var newSummaryDate = currentRecording.summaryLastUpdated
-        
+        var newTranscriptionModel = currentRecording.transcriptionModel
+
         switch operation.status {
         case .running(let progress):
             switch operation.type {
@@ -151,31 +152,53 @@ final class RecordingsManager: ObservableObject {
             case .summarization:
                 newStatus = .summarizing(progress: progress)
             }
-            
+
+        case .paused(let progress):
+            switch operation.type {
+            case .transcription:
+                newStatus = .transcribingPaused(progress: progress)
+            case .summarization:
+                newStatus = .summarizingPaused(progress: progress)
+            }
+
         case .completed(let result):
             switch result {
             case .transcript(let transcript):
                 newTranscript = transcript
                 newTranscriptDate = Date()
                 newStatus = .idle
-                
+
+                // Determine which transcription service was used
+                let useLocal = UserDefaults.standard.bool(forKey: "use_local_transcription")
+                if useLocal {
+                    // Get the selected model from ModelStore
+                    if let selectedModelID = ModelStore.shared.selectedModelID,
+                       let model = ModelStore.shared.models.first(where: { $0.id == selectedModelID }) {
+                        newTranscriptionModel = "Local (\(model.name))"
+                    } else {
+                        newTranscriptionModel = "Local"
+                    }
+                } else {
+                    newTranscriptionModel = "Cloud (OpenAI Whisper)"
+                }
+
                 if !transcript.isEmpty {
                     let _ = processingManager.startSummarization(for: operation.recordingId, transcript: transcript)
                 }
-                
+
             case .summary(let summary):
                 newSummary = summary
                 newSummaryDate = Date()
                 newStatus = .idle
             }
-            
+
         case .failed(let error):
             newStatus = .failed(reason: error.localizedDescription)
-            
+
         case .cancelled:
             newStatus = .idle
         }
-        
+
         let updatedRecording = Recording(
             fileName: currentRecording.fileName,
             date: currentRecording.date,
@@ -191,6 +214,7 @@ final class RecordingsManager: ObservableObject {
             detectedMode: currentRecording.detectedMode,
             preferredSummaryProvider: currentRecording.preferredSummaryProvider,
             tags: currentRecording.tags,
+            transcriptionModel: newTranscriptionModel,
             id: currentRecording.id
         )
         
@@ -224,10 +248,10 @@ final class RecordingsManager: ObservableObject {
         }
     }
     
-    func updateRecording(_ recordingId: UUID, status: Recording.Status? = nil, transcript: String? = nil, summary: String? = nil, rawSummary: String? = nil, languageHint: String? = nil, title: String? = nil) {
+    func updateRecording(_ recordingId: UUID, status: Recording.Status? = nil, transcript: String? = nil, summary: String? = nil, rawSummary: String? = nil, languageHint: String? = nil, title: String? = nil, transcriptionModel: String? = nil) {
         if let index = recordings.firstIndex(where: { $0.id == recordingId }) {
             let currentRecording = recordings[index]
-            
+
             // Generate title automatically if not provided and we have content
             let finalTitle: String
             if let providedTitle = title {
@@ -244,7 +268,7 @@ final class RecordingsManager: ObservableObject {
             } else {
                 finalTitle = currentRecording.title
             }
-            
+
             let updatedRecording = Recording(
                 fileName: currentRecording.fileName,
                 date: currentRecording.date,
@@ -260,9 +284,10 @@ final class RecordingsManager: ObservableObject {
                 detectedMode: currentRecording.detectedMode,
                 preferredSummaryProvider: currentRecording.preferredSummaryProvider,
                 tags: currentRecording.tags,
+                transcriptionModel: transcriptionModel ?? currentRecording.transcriptionModel,
                 id: currentRecording.id
             )
-            
+
             recordings[index] = updatedRecording
             saveRecordings()
         }
@@ -287,6 +312,7 @@ final class RecordingsManager: ObservableObject {
                 detectedMode: detectedMode,
                 preferredSummaryProvider: currentRecording.preferredSummaryProvider,
                 tags: currentRecording.tags,
+                transcriptionModel: currentRecording.transcriptionModel,
                 id: currentRecording.id
             )
             
@@ -375,8 +401,8 @@ final class RecordingsManager: ObservableObject {
             
             await MainActor.run {
                 print("🎯 RecordingsManager: ✅ Transcription completed (\(transcript.count) chars)")
-                updateRecording(recordingId, status: .idle, transcript: transcript)
-                
+                updateRecording(recordingId, status: .idle, transcript: transcript, transcriptionModel: "Cloud (OpenAI Whisper)")
+
                 // Analytics: transcription completed
                 if let recording = recordings.first(where: { $0.id == recordingId }) {
                     Analytics.track("transcription_completed", props: [
@@ -496,7 +522,47 @@ final class RecordingsManager: ObservableObject {
         Analytics.track("retry_tapped", props: ["type": "transcription"])
         startTranscription(for: recording, languageHint: recording.languageHint)
     }
-    
+
+    func pauseTranscription(for recording: Recording) {
+        // Find the active operation for this recording
+        if let operation = processingManager.activeOperations.values.first(where: {
+            $0.recordingId == recording.id && $0.type == .transcription
+        }) {
+            processingManager.pauseOperation(operation.id)
+            print("⏸️ RecordingsManager: Paused transcription for recording \(recording.id)")
+        }
+    }
+
+    func resumeTranscription(for recording: Recording) {
+        // Find the active operation for this recording
+        if let operation = processingManager.activeOperations.values.first(where: {
+            $0.recordingId == recording.id && $0.type == .transcription
+        }) {
+            processingManager.resumeOperation(operation.id)
+            print("▶️ RecordingsManager: Resumed transcription for recording \(recording.id)")
+        }
+    }
+
+    func pauseSummarization(for recording: Recording) {
+        // Find the active operation for this recording
+        if let operation = processingManager.activeOperations.values.first(where: {
+            $0.recordingId == recording.id && $0.type == .summarization
+        }) {
+            processingManager.pauseOperation(operation.id)
+            print("⏸️ RecordingsManager: Paused summarization for recording \(recording.id)")
+        }
+    }
+
+    func resumeSummarization(for recording: Recording) {
+        // Find the active operation for this recording
+        if let operation = processingManager.activeOperations.values.first(where: {
+            $0.recordingId == recording.id && $0.type == .summarization
+        }) {
+            processingManager.resumeOperation(operation.id)
+            print("▶️ RecordingsManager: Resumed summarization for recording \(recording.id)")
+        }
+    }
+
     func retrySummarization(for recording: Recording) {
         guard let transcript = recording.transcript, !transcript.isEmpty else { return }
 

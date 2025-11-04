@@ -149,7 +149,8 @@ final class TopUpManager: ObservableObject {
         )
 
         // Refresh usage to show updated balance
-        await UsageViewModel.shared.refresh()
+        // Clear debug override to show real purchased balance
+        await UsageViewModel.shared.refresh(clearDebugOverride: true)
 
         print("✅ TopUpManager: Backend credited successfully")
     }

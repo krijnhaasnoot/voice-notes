@@ -1,110 +1,139 @@
 import Foundation
+import AVFoundation
+#if canImport(SwiftWhisper)
+import SwiftWhisper
+#endif
 
+#if canImport(SwiftWhisper)
 final class WhisperCppEngine: TranscriptionEngine {
-    private var isCancelled = false
-    private var currentModelURL: URL?
-    private var currentLanguage: TranscriptionLanguage?
+
+    private var whisper: Whisper?
+    private(set) var isModelLoaded: Bool = false
+    private var currentTask: Task<Void, Never>?
+    private var loadedModelURL: URL?
+
+    deinit {
+        whisper = nil
+    }
 
     func loadModel(url: URL, language: TranscriptionLanguage) async throws {
-        // Controleer of model bestand bestaat
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            throw NSError(
-                domain: "WhisperCppEngine",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Model bestand niet gevonden: \(url.lastPathComponent)"]
-            )
+        // avoid reloading same model
+        if isModelLoaded, loadedModelURL == url, whisper != nil { return }
+
+        // Create new Whisper instance with model file
+        do {
+            whisper = try Whisper(fromFileURL: url)
+            loadedModelURL = url
+            isModelLoaded = true
+            print("✅ Whisper model loaded: \(url.lastPathComponent)")
+        } catch {
+            throw NSError(domain: "WhisperCpp", code: 1, userInfo: [NSLocalizedDescriptionKey: "Kon Whisper-model niet laden: \(error.localizedDescription)"])
         }
-
-        // TODO: Implementeer whisper.cpp model laden
-        // Dit vereist whisper.cpp Swift bindings of C++ interop
-        // Voor nu simuleren we het laden
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconden
-
-        currentModelURL = url
-        currentLanguage = language
-
-        print("✅ WhisperCppEngine: Model \(url.lastPathComponent) geladen voor taal \(language.displayName)")
     }
 
     func transcribe(fileURL: URL, language: TranscriptionLanguage, progressCallback: @escaping (TranscriptionChunk) -> Void) async throws -> String {
-        isCancelled = false
-
-        // Controleer of audio bestand bestaat
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            throw NSError(
-                domain: "WhisperCppEngine",
-                code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "Audio bestand niet gevonden: \(fileURL.lastPathComponent)"]
-            )
+        guard let whisper else {
+            throw NSError(domain: "WhisperCpp", code: 2, userInfo: [NSLocalizedDescriptionKey: "Model is niet geladen"])
         }
 
-        // Controleer of model is geladen
-        guard currentModelURL != nil else {
-            throw NSError(
-                domain: "WhisperCppEngine",
-                code: 3,
-                userInfo: [NSLocalizedDescriptionKey: "Model is niet geladen. Roep eerst loadModel() aan."]
-            )
-        }
+        return try await withCheckedThrowingContinuation { continuation in
+            currentTask = Task.detached(priority: .userInitiated) {
+                do {
+                    // 1) Decode & resample to mono 16k float32
+                    let decoder = AudioPCM()
+                    var lastEmit = CFAbsoluteTimeGetCurrent()
 
-        print("🎙️ WhisperCppEngine: Start transcriptie van \(fileURL.lastPathComponent)")
+                    Task { @MainActor in
+                        progressCallback(.init(progress: 0.0, text: "Audio decoderen..."))
+                    }
 
-        // TODO: Implementeer echte whisper.cpp transcriptie
-        // Dit vereist whisper.cpp Swift bindings of C++ interop
-        // Voor nu simuleren we de transcriptie met progress updates
+                    let decoded = try decoder.decodeToMono16kFloat32(fileURL: fileURL) { ratio in
+                        // emit decode progress up to 20%
+                        let now = CFAbsoluteTimeGetCurrent()
+                        if now - lastEmit > 0.1 {
+                            lastEmit = now
+                            Task { @MainActor in
+                                progressCallback(.init(progress: 0.2 * ratio, text: "Audio decoderen..."))
+                            }
+                        }
+                        if Task.isCancelled { throw CancellationError() }
+                    }
 
-        // Simuleer transcriptie in chunks
-        let totalChunks = 10
-        var accumulatedText = ""
+                    if Task.isCancelled { throw CancellationError() }
 
-        for i in 0...totalChunks {
-            // Check voor annulering
-            if isCancelled {
-                throw NSError(
-                    domain: "WhisperCppEngine",
-                    code: 4,
-                    userInfo: [NSLocalizedDescriptionKey: "Transcriptie geannuleerd door gebruiker"]
-                )
+                    Task { @MainActor in
+                        progressCallback(.init(progress: 0.2, text: "Transcriptie starten..."))
+                    }
+
+                    // 2) Prepare whisper params
+                    var params = WhisperParams()
+                    // Map our language to SwiftWhisper's WhisperLanguage enum
+                    if let whisperLang = SwiftWhisper.WhisperLanguage(rawValue: language.whisperCode) {
+                        params.language = whisperLang
+                    }
+                    params.translate = false
+
+                    // 3) Run inference with progress updates
+                    let hb = Task.detached {
+                        var t = 0.2
+                        while !Task.isCancelled {
+                            try? await Task.sleep(nanoseconds: 150_000_000) // ~150ms
+                            t = min(0.9, t + 0.02)
+                            Task { @MainActor in
+                                progressCallback(.init(progress: t, text: "Transcriberen..."))
+                            }
+                        }
+                    }
+
+                    let segments = try await whisper.transcribe(audioFrames: decoded)
+                    hb.cancel()
+
+                    if Task.isCancelled { throw CancellationError() }
+
+                    // 4) Collect segments
+                    var assembled = ""
+                    for (i, segment) in segments.enumerated() {
+                        if Task.isCancelled { throw CancellationError() }
+
+                        let text = segment.text.trimmingCharacters(in: .whitespaces)
+                        if !text.isEmpty {
+                            if !assembled.isEmpty { assembled += " " }
+                            assembled += text
+
+                            let prog = 0.9 + (Double(i + 1) / Double(max(1, segments.count))) * 0.1
+                            Task { @MainActor in
+                                progressCallback(.init(progress: min(1.0, prog), text: assembled))
+                            }
+                        }
+                    }
+
+                    Task { @MainActor in
+                        progressCallback(.init(progress: 1.0, text: assembled))
+                    }
+
+                    continuation.resume(returning: assembled)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
             }
-
-            let progress = Double(i) / Double(totalChunks)
-
-            // Simuleer tekst generatie
-            if i > 0 && i < totalChunks {
-                accumulatedText += "Dit is chunk \(i) van de getranscribeerde tekst. "
-            }
-
-            // Verstuur progress update
-            progressCallback(TranscriptionChunk(progress: progress, text: accumulatedText))
-
-            // Simuleer verwerkingstijd
-            try await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconden per chunk
         }
-
-        let finalText = """
-        Transcriptie voltooid voor: \(fileURL.lastPathComponent)
-
-        Opmerking: Voeg whisper.cpp Swift bindings toe voor echte offline transcriptie.
-
-        Deze implementatie biedt de volledige architectuur:
-        - ModelStore voor model management
-        - TranscriptionWorker voor abstractie
-        - WhisperCppEngine als engine implementatie
-        - TranscriptionSheet als gebruikersinterface
-
-        Om echte transcriptie toe te voegen:
-        1. Integreer whisper.cpp library (via SPM of manueel)
-        2. Maak Swift bindings of gebruik bestaande
-        3. Implementeer loadModel() met whisper_init_from_file()
-        4. Implementeer transcribe() met whisper_full()
-        5. Verwerk resultaten met whisper_full_get_segment_text()
-        """
-
-        return finalText
     }
 
     func cancel() {
-        isCancelled = true
-        print("⚠️ WhisperCppEngine: Annulering gevraagd")
+        currentTask?.cancel()
     }
 }
+#else
+// Fallback for when SwiftWhisper is not available
+final class WhisperCppEngine: TranscriptionEngine {
+    func loadModel(url: URL, language: TranscriptionLanguage) async throws {
+        throw NSError(domain: "WhisperCpp", code: 999, userInfo: [NSLocalizedDescriptionKey: "SwiftWhisper package niet geïnstalleerd"])
+    }
+
+    func transcribe(fileURL: URL, language: TranscriptionLanguage, progressCallback: @escaping (TranscriptionChunk) -> Void) async throws -> String {
+        throw NSError(domain: "WhisperCpp", code: 999, userInfo: [NSLocalizedDescriptionKey: "SwiftWhisper package niet geïnstalleerd"])
+    }
+
+    func cancel() {}
+}
+#endif
