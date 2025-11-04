@@ -42,12 +42,7 @@ struct AppTourView: View {
                     .tag(0)
                     
                     // Page 2: Recording
-                    TourPage(
-                        systemImage: "waveform",
-                        title: "Smart Transcription",
-                        description: "Your recordings are automatically transcribed and summarized using advanced AI.",
-                        gradient: LinearGradient(colors: [.green.opacity(0.8), .green], startPoint: .top, endPoint: .bottom)
-                    )
+                    TranscriptionTourPage()
                     .tag(1)
                     
                     // Page 3: Organization
@@ -125,6 +120,69 @@ struct AppTourView: View {
             }
         }
         .interactiveDismissDisabled()
+    }
+}
+
+// MARK: - Transcription Tour Page
+private struct TranscriptionTourPage: View {
+    var body: some View {
+        VStack(spacing: 40) {
+            Spacer()
+
+            // Icon with gradient background
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(colors: [.green.opacity(0.8), .green], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 120, height: 120)
+                    .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
+
+                Image(systemName: "waveform")
+                    .font(.system(size: 48, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+            }
+
+            // Text content
+            VStack(spacing: 16) {
+                Text("Smart Transcription")
+                    .font(.poppins.bold(size: 28))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.primary)
+
+                Text("Choose between cloud-based or offline transcription. Download a model for complete privacy.")
+                    .font(.poppins.regular(size: 18))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 32)
+
+            // Transcription features
+            VStack(spacing: 12) {
+                PermissionPoint(
+                    icon: "wifi.slash",
+                    text: "Download models for offline transcription",
+                    color: .purple
+                )
+
+                PermissionPoint(
+                    icon: "lock.shield.fill",
+                    text: "Local mode: No data sent to servers",
+                    color: .green
+                )
+
+                PermissionPoint(
+                    icon: "brain",
+                    text: "Automatic summarization with AI",
+                    color: .blue
+                )
+            }
+            .padding(.horizontal, 40)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -263,13 +321,19 @@ private struct PrivacyTourPage: View {
                     text: "Secure transmission to your chosen AI provider",
                     color: .green
                 )
-                
+
+                PrivacyTourPoint(
+                    icon: "wifi.slash",
+                    text: "Or use offline mode - no data leaves your device",
+                    color: .purple
+                )
+
                 PrivacyTourPoint(
                     icon: "hand.raised.fill",
                     text: "Your data is never used for AI training",
                     color: .orange
                 )
-                
+
                 PrivacyTourPoint(
                     icon: "person.fill.checkmark",
                     text: "You control which provider to use",
