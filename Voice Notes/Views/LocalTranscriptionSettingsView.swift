@@ -81,7 +81,8 @@ struct LocalTranscriptionSettingsView: View {
                     }
 
                     // Download Status - Always visible when downloading
-                    if case .downloading(let progress) = modelManager.downloadState {
+                    if case .downloading(let progress) = modelManager.downloadState,
+                       let downloadingModel = modelToDownload {
                         Section {
                             VStack(spacing: 16) {
                                 // Title and percentage
@@ -89,7 +90,7 @@ struct LocalTranscriptionSettingsView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Downloading Model")
                                             .font(.poppins.headline)
-                                        Text("\(modelManager.selectedModel.displayName) • \(modelManager.selectedModel.formattedSize)")
+                                        Text("\(downloadingModel.displayName) • \(downloadingModel.formattedSize)")
                                             .font(.poppins.caption)
                                             .foregroundColor(.secondary)
                                     }
@@ -121,6 +122,7 @@ struct LocalTranscriptionSettingsView: View {
                                     downloadTask?.cancel()
                                     Task { @MainActor in
                                         modelManager.downloadState = .notDownloaded
+                                        modelToDownload = nil
                                         showToast("Download cancelled")
                                     }
                                 }) {
@@ -264,6 +266,7 @@ struct LocalTranscriptionSettingsView: View {
                     print("✅ Download completed successfully")
                     showToast("\(model.displayName) downloaded successfully")
                     downloadTask = nil
+                    modelToDownload = nil
                 }
             } catch {
                 print("❌ Download failed: \(error.localizedDescription)")
@@ -271,6 +274,7 @@ struct LocalTranscriptionSettingsView: View {
                 await MainActor.run {
                     showToast("Download failed: \(error.localizedDescription)")
                     downloadTask = nil
+                    modelToDownload = nil
                 }
             }
         }
