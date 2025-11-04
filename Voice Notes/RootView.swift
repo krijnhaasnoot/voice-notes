@@ -108,7 +108,16 @@ struct RootView: View {
             AppTourView(onComplete: {
                 hasCompletedTour = true
                 showingTour = false
+
+                // Request notification permissions after tour
+                Task {
+                    _ = await NotificationManager.shared.requestAuthorization()
+                }
             })
+        }
+        .onAppear {
+            // Also clear badge when app becomes active
+            NotificationManager.shared.clearBadge()
         }
     }
 }

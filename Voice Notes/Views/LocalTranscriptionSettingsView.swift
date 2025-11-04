@@ -267,6 +267,12 @@ struct LocalTranscriptionSettingsView: View {
                     showToast("\(model.displayName) downloaded successfully")
                     downloadTask = nil
                     modelToDownload = nil
+
+                    // Notify user
+                    NotificationManager.shared.notifyModelDownloadComplete(
+                        modelName: model.displayName,
+                        modelSize: model.formattedSize
+                    )
                 }
             } catch {
                 print("❌ Download failed: \(error.localizedDescription)")
@@ -274,6 +280,15 @@ struct LocalTranscriptionSettingsView: View {
                 await MainActor.run {
                     showToast("Download failed: \(error.localizedDescription)")
                     downloadTask = nil
+
+                    // Notify user of failure
+                    if let modelToDownload = modelToDownload {
+                        NotificationManager.shared.notifyModelDownloadFailed(
+                            modelName: modelToDownload.displayName,
+                            error: error.localizedDescription
+                        )
+                    }
+
                     modelToDownload = nil
                 }
             }

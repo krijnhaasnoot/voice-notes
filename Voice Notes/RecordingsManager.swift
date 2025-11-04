@@ -182,6 +182,12 @@ final class RecordingsManager: ObservableObject {
                     newTranscriptionModel = "Cloud (OpenAI Whisper)"
                 }
 
+                // Notify user of transcription completion
+                NotificationManager.shared.notifyTranscriptionComplete(
+                    recordingTitle: currentRecording.title.isEmpty ? "Recording" : currentRecording.title,
+                    duration: currentRecording.duration
+                )
+
                 if !transcript.isEmpty {
                     let _ = processingManager.startSummarization(for: operation.recordingId, transcript: transcript)
                 }
@@ -190,6 +196,11 @@ final class RecordingsManager: ObservableObject {
                 newSummary = summary
                 newSummaryDate = Date()
                 newStatus = .idle
+
+                // Notify user of summary completion
+                NotificationManager.shared.notifySummaryComplete(
+                    recordingTitle: currentRecording.title.isEmpty ? "Recording" : currentRecording.title
+                )
             }
 
         case .failed(let error):
@@ -403,6 +414,14 @@ final class RecordingsManager: ObservableObject {
                 print("🎯 RecordingsManager: ✅ Transcription completed (\(transcript.count) chars)")
                 updateRecording(recordingId, status: .idle, transcript: transcript, transcriptionModel: "Cloud (OpenAI Whisper)")
 
+                // Notify user
+                if let recording = recordings.first(where: { $0.id == recordingId }) {
+                    NotificationManager.shared.notifyTranscriptionComplete(
+                        recordingTitle: recording.title.isEmpty ? "Recording" : recording.title,
+                        duration: recording.duration
+                    )
+                }
+
                 // Analytics: transcription completed
                 if let recording = recordings.first(where: { $0.id == recordingId }) {
                     Analytics.track("transcription_completed", props: [
@@ -495,7 +514,14 @@ final class RecordingsManager: ObservableObject {
                 await MainActor.run {
                     print("🎯 RecordingsManager: ✅ Summary completed (\(result.clean.count) chars)")
                     updateRecordingWithBothSummaries(recordingId: recordingId, cleanSummary: result.clean, rawSummary: result.raw ?? result.clean)
-                    
+
+                    // Notify user
+                    if let recording = recordings.first(where: { $0.id == recordingId }) {
+                        NotificationManager.shared.notifySummaryComplete(
+                            recordingTitle: recording.title.isEmpty ? "Recording" : recording.title
+                        )
+                    }
+
                     // Analytics: summary completed successfully
                     Analytics.track("summary_generated", provider: activeProvider, props: [
                         "ms": elapsedMs

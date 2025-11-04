@@ -201,6 +201,13 @@ final class ProgressProxy: NSObject, URLSessionDownloadDelegate {
                 // Update model met lokale URL
                 if let idx = self.store?.models.firstIndex(where: { $0.id == self.modelID }) {
                     self.store?.models[idx].localURL = destination
+
+                    // Notify user of download completion
+                    let model = self.store?.models[idx]
+                    NotificationManager.shared.notifyModelDownloadComplete(
+                        modelName: model?.name ?? "Model",
+                        modelSize: "\(model?.approxSizeMB ?? 0) MB"
+                    )
                 }
                 self.store?.progress.removeValue(forKey: self.modelID)
             }
@@ -218,6 +225,14 @@ final class ProgressProxy: NSObject, URLSessionDownloadDelegate {
         if let error = error {
             Task { @MainActor in
                 self.store?.progress.removeValue(forKey: self.modelID)
+
+                // Notify user of download failure
+                if let model = self.store?.models.first(where: { $0.id == self.modelID }) {
+                    NotificationManager.shared.notifyModelDownloadFailed(
+                        modelName: model.name,
+                        error: error.localizedDescription
+                    )
+                }
             }
             continuation?.resume(throwing: error)
             print("❌ Download failed for \(modelID): \(error)")
