@@ -389,14 +389,48 @@ final class RecordingsManager: ObservableObject {
     }
     
     private func performDirectTranscription(recordingId: UUID, audioURL: URL, languageHint: String?) async {
-        // Create transcription service directly like RecordingViewModel does
+        // Get recording details for health check
+        guard let recording = await MainActor.run(body: { recordings.first(where: { $0.id == recordingId }) }) else {
+            return
+        }
+
+        // Pre-flight health check
+        let fileSize = (try? FileManager.default.attributesOfItem(atPath: audioURL.path)[.size] as? Int64) ?? 0
+        let healthCheck = await ProcessingHealthCheck.shared.checkTranscriptionReadiness(
+            duration: recording.duration,
+            fileSize: fileSize
+        )
+
+        // Handle critical issues
+        switch healthCheck {
+        case .critical(let message, let suggestion):
+            await MainActor.run {
+                print("🎯 RecordingsManager: ❌ Pre-flight check failed: \(message)")
+                updateRecording(recordingId, status: .failed(reason: "\(message). \(suggestion)"))
+            }
+            return
+
+        case .warning(let message, let suggestion):
+            print("⚠️ RecordingsManager: Pre-flight warning: \(message) - \(suggestion)")
+            // Continue but log warning
+
+        case .healthy:
+            print("✅ RecordingsManager: Pre-flight check passed")
+        }
+
+        // Create transcription service
         guard let service = OpenAITranscriptionService.createFromInfoPlist() else {
             await MainActor.run {
                 updateRecording(recordingId, status: .failed(reason: "API key not configured"))
             }
             return
         }
-        
+
+        let startTime = Date()
+        var lastProgress: Double = 0
+        var healthChecksPassed = 0
+        var hasShownSlowWarning = false
+
         do {
             print("🎯 RecordingsManager: Calling transcription service directly")
             let transcript = try await service.transcribe(
@@ -404,6 +438,38 @@ final class RecordingsManager: ObservableObject {
                 languageHint: languageHint,
                 progress: { progress in
                     Task { @MainActor in
+                        // Monitor health during first 10 seconds
+                        let elapsed = Date().timeIntervalSince(startTime)
+                        if elapsed < 15.0 {
+                            let health = await ProcessingHealthCheck.shared.monitorTranscriptionHealth(
+                                startTime: startTime,
+                                progress: progress,
+                                timeout: 10.0
+                            )
+
+                            switch health {
+                            case .critical(let message, let suggestion):
+                                print("🎯 RecordingsManager: ❌ Health check failed: \(message)")
+                                // Auto-pause processing
+                                self.updateRecording(recordingId, status: .transcribingPaused(progress: progress))
+                                // Show error with suggestion
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    self.updateRecording(recordingId, status: .failed(reason: "\(message). \(suggestion)"))
+                                }
+                                return
+
+                            case .warning(let message, let suggestion):
+                                if !hasShownSlowWarning {
+                                    print("⚠️ RecordingsManager: Health warning: \(message) - \(suggestion)")
+                                    hasShownSlowWarning = true
+                                }
+
+                            case .healthy:
+                                healthChecksPassed += 1
+                            }
+                        }
+
+                        lastProgress = progress
                         self.updateRecording(recordingId, status: .transcribing(progress: progress))
                     }
                 },
@@ -453,18 +519,39 @@ final class RecordingsManager: ObservableObject {
     
     private func performDirectSummarization(recordingId: UUID, transcript: String) {
         updateRecording(recordingId, status: .summarizing(progress: 0.0))
-        
+
         Task {
             let summaryService = EnhancedSummaryService.shared
-            
+
             do {
+                // Pre-flight health check
+                let healthCheck = await ProcessingHealthCheck.shared.checkSummarizationReadiness(
+                    transcriptLength: transcript.count
+                )
+
+                // Handle critical issues
+                switch healthCheck {
+                case .critical(let message, let suggestion):
+                    await MainActor.run {
+                        print("❌ Pre-flight check failed: \(message)")
+                        updateRecording(recordingId, status: .failed(reason: "\(message). \(suggestion)"))
+                    }
+                    return
+
+                case .warning(let message, let suggestion):
+                    print("⚠️ Pre-flight warning: \(message) - \(suggestion)")
+
+                case .healthy:
+                    print("✅ Pre-flight check passed for summarization")
+                }
+
                 // Get user settings
                 let defaultModeString = UserDefaults.standard.string(forKey: "defaultMode") ?? SummaryMode.personal.rawValue
                 let autoDetectMode = UserDefaults.standard.bool(forKey: "autoDetectMode")
                 let defaultMode = SummaryMode(rawValue: defaultModeString) ?? .personal
-                
+
                 var selectedMode = defaultMode
-                
+
                 if autoDetectMode {
                     print("🎯 RecordingsManager: Auto-detecting mode...")
                     // NOTE: EnhancedSummaryService currently has no `detectMode` API.
@@ -483,27 +570,64 @@ final class RecordingsManager: ObservableObject {
                 } else {
                     print("🎯 RecordingsManager: Using default mode: \(selectedMode.rawValue)")
                 }
-                
+
                 // Get selected summary length
                 let selectedLength: SummaryLength = {
                     let lengthString = UserDefaults.standard.string(forKey: "defaultSummaryLength") ?? SummaryLength.standard.rawValue
                     return SummaryLength(rawValue: lengthString) ?? .standard
                 }()
-                
+
                 print("🎯 RecordingsManager: Starting summarization with mode: \(selectedMode.rawValue), length: \(selectedLength.rawValue)")
-                
+
                 // Analytics: summary requested
                 let activeProvider = "app_default" // TODO: Get actual provider from settings
                 Analytics.track("summary_requested", provider: activeProvider, props: [
                     "mode": selectedMode.rawValue,
                     "length": selectedLength.rawValue
                 ])
-                
+
                 let startTime = Date()
+                var healthChecksPassed = 0
+                var hasShownSlowWarning = false
+
                 let result = try await summaryService.summarize(
                     transcript: transcript,
                     progress: { progress in
                         Task { @MainActor in
+                            // Monitor health during first 15 seconds
+                            let elapsed = Date().timeIntervalSince(startTime)
+                            if elapsed < 15.0 {
+                                let health = await ProcessingHealthCheck.shared.monitorSummarizationHealth(
+                                    startTime: startTime,
+                                    progress: progress,
+                                    timeout: 10.0
+                                )
+
+                                switch health {
+                                case .critical(let message, let suggestion):
+                                    print("❌ Health check failed during summarization: \(message)")
+                                    // Auto-pause processing
+                                    self.updateRecording(recordingId, status: .summarizingPaused(progress: progress))
+                                    // Show error with suggestion after brief delay
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        self.updateRecording(recordingId, status: .failed(reason: "\(message). \(suggestion)"))
+                                    }
+                                    return
+
+                                case .warning(let message, let suggestion):
+                                    if !hasShownSlowWarning {
+                                        print("⚠️ Health warning: \(message) - \(suggestion)")
+                                        hasShownSlowWarning = true
+                                    }
+
+                                case .healthy:
+                                    healthChecksPassed += 1
+                                    if healthChecksPassed == 1 {
+                                        print("✅ Summarization health check passed")
+                                    }
+                                }
+                            }
+
                             self.updateRecording(recordingId, status: .summarizing(progress: progress))
                         }
                     },
