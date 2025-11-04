@@ -11,6 +11,14 @@ struct LocalTranscriptionSettingsView: View {
     @State private var toastMessage = ""
     @State private var downloadTask: Task<Void, Never>?
 
+    private func isModelDownloading(_ model: WhisperModelSize) -> Bool {
+        guard model == modelToDownload else { return false }
+        if case .downloading = modelManager.downloadState {
+            return true
+        }
+        return false
+    }
+
     var body: some View {
         NavigationView {
             Form {
@@ -63,6 +71,7 @@ struct LocalTranscriptionSettingsView: View {
                                 model: model,
                                 isSelected: model == modelManager.selectedModel,
                                 isDownloaded: modelManager.isModelDownloaded(model),
+                                isDownloading: isModelDownloading(model),
                                 onSelect: {
                                     selectModel(model)
                                 },
@@ -331,18 +340,10 @@ struct ModelRow: View {
     let model: WhisperModelSize
     let isSelected: Bool
     let isDownloaded: Bool
+    let isDownloading: Bool
     let onSelect: () -> Void
     let onDownload: () -> Void
     let onDelete: () -> Void
-    @ObservedObject private var modelManager = WhisperModelManager.shared
-
-    private var isDownloading: Bool {
-        if case .downloading = modelManager.downloadState,
-           modelManager.selectedModel == model {
-            return true
-        }
-        return false
-    }
 
     var body: some View {
         HStack(spacing: 12) {

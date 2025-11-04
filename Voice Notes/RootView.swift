@@ -804,7 +804,7 @@ struct HomeView: View {
 
     // Transcription settings
     @AppStorage("use_local_transcription") private var useLocalTranscription = false
-    @ObservedObject private var modelStore = ModelStore.shared
+    @ObservedObject private var modelManager = WhisperModelManager.shared
     @State private var showingTranscriptionSettings = false
 
     var body: some View {
@@ -1039,11 +1039,7 @@ struct HomeView: View {
 
     private var transcriptionModelDescription: String {
         if useLocalTranscription {
-            if let selectedModelID = modelStore.selectedModelID,
-               let model = modelStore.models.first(where: { $0.id == selectedModelID }) {
-                return "\(model.name) • Offline"
-            }
-            return "Offline transcription"
+            return "\(modelManager.selectedModel.displayName) • Offline"
         } else {
             return "OpenAI Whisper"
         }
