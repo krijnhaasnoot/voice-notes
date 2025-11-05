@@ -959,7 +959,7 @@ struct HomeView: View {
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text(selectedMode.displayName)
-                            .font(.poppins.title3)
+                            .font(.poppins.headline)
                             .fontWeight(.semibold)
                             .foregroundColor(.primary)
 
@@ -1020,7 +1020,7 @@ struct HomeView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(transcriptionModelTitle)
-                        .font(.poppins.title3)
+                        .font(.poppins.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(.primary)
 
