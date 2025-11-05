@@ -946,7 +946,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Text("AI Summary Mode")
-                            .font(.poppins.caption)
+                            .font(.poppins.caption2)
                             .fontWeight(.medium)
                             .foregroundStyle(.secondary)
 
@@ -964,7 +964,7 @@ struct HomeView: View {
                             .foregroundColor(.primary)
 
                         Text(selectedMode.shortDescription)
-                            .font(.poppins.subheadline)
+                            .font(.poppins.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
@@ -1007,7 +1007,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("Transcription Model")
-                        .font(.poppins.caption)
+                        .font(.poppins.caption2)
                         .fontWeight(.medium)
                         .foregroundStyle(.secondary)
 
@@ -1025,7 +1025,7 @@ struct HomeView: View {
                         .foregroundColor(.primary)
 
                     Text(transcriptionModelDescription)
-                        .font(.poppins.subheadline)
+                        .font(.poppins.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
