@@ -259,8 +259,6 @@ struct RecordingDetailView: View {
 
             InfoRow(label: "Date & Time", value: recording.formattedDate)
             InfoRow(label: "Duration", value: recording.formattedDuration)
-            InfoRow(label: "File", value: recording.fileName)
-            InfoRow(label: "Size", value: formatBytes(recording.resolvedSizeBytes))
 
             if let transcriptionModel = recording.transcriptionModel {
                 InfoRow(label: "Transcription", value: transcriptionModel)
