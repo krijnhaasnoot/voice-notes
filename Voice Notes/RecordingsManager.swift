@@ -478,7 +478,19 @@ final class RecordingsManager: ObservableObject {
             
             await MainActor.run {
                 print("🎯 RecordingsManager: ✅ Transcription completed (\(transcript.count) chars)")
-                updateRecording(recordingId, status: .idle, transcript: transcript, transcriptionModel: "Cloud (OpenAI Whisper)")
+
+                // Determine which transcription service was used
+                let modelLabel: String
+                let useLocal = UserDefaults.standard.bool(forKey: "use_local_transcription")
+                if useLocal {
+                    // Get the selected model from WhisperModelManager
+                    let selectedModel = WhisperModelManager.shared.selectedModel
+                    modelLabel = "Local (\(selectedModel.displayName))"
+                } else {
+                    modelLabel = "Cloud (OpenAI Whisper)"
+                }
+
+                updateRecording(recordingId, status: .idle, transcript: transcript, transcriptionModel: modelLabel)
 
                 // Notify user
                 if let recording = recordings.first(where: { $0.id == recordingId }) {
@@ -846,6 +858,7 @@ final class RecordingsManager: ObservableObject {
             detectedMode: currentRecording.detectedMode,
             preferredSummaryProvider: currentRecording.preferredSummaryProvider,
             tags: currentRecording.tags,
+            transcriptionModel: currentRecording.transcriptionModel,
             id: currentRecording.id
         )
         
