@@ -138,16 +138,56 @@ final class AudioRecorder: NSObject, ObservableObject {
     @objc private func handleSceneChange() {
         if isRecording {
             print("🎵 App backgrounded, continuing recording with background task")
+
+            // Invalidate the UI update timer to reduce background activity
+            // The recording will continue but we don't need UI updates
+            recordingTimer?.invalidate()
+            recordingTimer = nil
+
             Task { @MainActor in
                 startBackgroundTask()
             }
         }
     }
-    
+
     @objc private func handleAppWillEnterForeground() {
         if isRecording {
             print("🎵 App entering foreground, recording still active")
-            // The background task will automatically end when app becomes active
+
+            // Update duration immediately to reflect time spent in background
+            if let startTime = recordingStartTime {
+                let totalElapsed = Date().timeIntervalSince(startTime)
+                let activeDuration = totalElapsed - pausedDuration
+                recordingDuration = activeDuration
+                print("🎵 Recording duration after background: \(String(format: "%.1f", activeDuration))s")
+            }
+
+            // Restart the timer for UI updates now that we're in foreground
+            recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+                if let startTime = self.recordingStartTime {
+                    let totalElapsed = Date().timeIntervalSince(startTime)
+                    let activeDuration = totalElapsed - self.pausedDuration
+                    self.recordingDuration = activeDuration
+
+                    // Warn user when approaching max duration (55 minutes)
+                    if activeDuration >= 3300 && !self.hasShownMaxDurationWarning {
+                        print("🎵 ⚠️ Approaching maximum recording duration (55 minutes)")
+                        self.hasShownMaxDurationWarning = true
+                        Task { @MainActor in
+                            self.lastError = "Recording will automatically stop at 60 minutes"
+                        }
+                    }
+
+                    // Stop recording if max duration reached (60 minutes)
+                    if activeDuration >= self.maxRecordingDuration {
+                        print("🎵 ⏱️ Maximum recording duration (60 minutes) reached - auto-saving recording")
+                        Task { @MainActor in
+                            let _ = self.stopRecording()
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -486,31 +526,20 @@ final class AudioRecorder: NSObject, ObservableObject {
         backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "AudioRecording") { [weak self] in
             print("🎵 ⚠️ Background task expiring - saving recording before termination")
 
-            // Critical: Save the recording before the app is suspended
-            Task { @MainActor in
-                if let strongSelf = self, strongSelf.isRecording {
-                    print("🎵 🔴 Auto-stopping recording due to background task expiration")
-                    let result = strongSelf.stopRecording()
+            // CRITICAL: Use DispatchQueue.main.sync to ensure we complete before expiration
+            // This is one of the few cases where sync is necessary to prevent data loss
+            guard let strongSelf = self else {
+                UIApplication.shared.endBackgroundTask(self?.backgroundTaskID ?? .invalid)
+                return
+            }
 
-                    // Set error message for user to see when they return
-                    strongSelf.lastError = "Recording was automatically saved when app went to background"
-
-                    // Post notification so the UI can handle saving the recording
-                    if let fileURL = result.fileURL, let fileSize = result.fileSize, fileSize > 0 {
-                        NotificationCenter.default.post(
-                            name: .recordingAutoStopped,
-                            object: nil,
-                            userInfo: [
-                                "fileName": fileURL.lastPathComponent,
-                                "duration": result.duration,
-                                "fileURL": fileURL,
-                                "fileSize": fileSize
-                            ]
-                        )
-                    }
+            // Check if we're on main thread already, if not dispatch sync
+            if Thread.isMainThread {
+                strongSelf.handleBackgroundTaskExpiration()
+            } else {
+                DispatchQueue.main.sync {
+                    strongSelf.handleBackgroundTaskExpiration()
                 }
-
-                self?.endBackgroundTask()
             }
         }
 
@@ -519,6 +548,36 @@ final class AudioRecorder: NSObject, ObservableObject {
         } else {
             print("🎵 ✅ Background task started with ID: \(backgroundTaskID.rawValue)")
         }
+    }
+
+    @MainActor
+    private func handleBackgroundTaskExpiration() {
+        guard isRecording else {
+            endBackgroundTask()
+            return
+        }
+
+        print("🎵 🔴 Auto-stopping recording due to background task expiration")
+        let result = stopRecording()
+
+        // Set error message for user to see when they return
+        lastError = "Recording was automatically saved when app went to background"
+
+        // Post notification so the UI can handle saving the recording
+        if let fileURL = result.fileURL, let fileSize = result.fileSize, fileSize > 0 {
+            NotificationCenter.default.post(
+                name: .recordingAutoStopped,
+                object: nil,
+                userInfo: [
+                    "fileName": fileURL.lastPathComponent,
+                    "duration": result.duration,
+                    "fileURL": fileURL,
+                    "fileSize": fileSize
+                ]
+            )
+        }
+
+        endBackgroundTask()
     }
     
     private func endBackgroundTask() {
