@@ -934,8 +934,33 @@ struct HomeView: View {
         .sheet(isPresented: $showingTranscriptionSettings) {
             LocalTranscriptionSettingsView()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .recordingAutoStopped)) { notification in
+            // Handle auto-stopped recording when background task expires
+            guard let userInfo = notification.userInfo,
+                  let fileName = userInfo["fileName"] as? String,
+                  let duration = userInfo["duration"] as? TimeInterval,
+                  let fileURL = userInfo["fileURL"] as? URL,
+                  let fileSize = userInfo["fileSize"] as? Int64 else {
+                return
+            }
+
+            print("🎯 RootView: Received auto-stopped recording notification for \(fileName)")
+
+            // Create and save the recording
+            let newRecording = Recording(fileName: fileName, date: Date(), duration: duration, title: "")
+            recordingsManager.addRecording(newRecording)
+
+            // Start transcription if file has content
+            if fileSize > 0 {
+                print("🎯 RootView: Starting transcription for auto-stopped recording \(fileName)")
+                recordingsManager.startTranscription(for: newRecording)
+            }
+
+            // Clear the current recording filename since it's been saved
+            currentRecordingFileName = nil
+        }
     }
-    
+
     // MARK: - AI Summary Mode Selector
     
     private var summaryModeSelector: some View {

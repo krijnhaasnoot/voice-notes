@@ -5,6 +5,11 @@ import UIKit
 import WatchConnectivity
 #endif
 
+// Notification for when recording is auto-stopped due to background task expiration
+extension Notification.Name {
+    static let recordingAutoStopped = Notification.Name("recordingAutoStopped")
+}
+
 @MainActor
 final class AudioRecorder: NSObject, ObservableObject {
     static let shared = AudioRecorder()   // <-- singleton
@@ -476,13 +481,39 @@ final class AudioRecorder: NSObject, ObservableObject {
             print("🎵 Background task already active")
             return
         }
-        
+
         print("🎵 Starting background task for recording")
         backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "AudioRecording") { [weak self] in
-            print("🎵 Background task expiring, ending task")
-            self?.endBackgroundTask()
+            print("🎵 ⚠️ Background task expiring - saving recording before termination")
+
+            // Critical: Save the recording before the app is suspended
+            Task { @MainActor in
+                if let strongSelf = self, strongSelf.isRecording {
+                    print("🎵 🔴 Auto-stopping recording due to background task expiration")
+                    let result = strongSelf.stopRecording()
+
+                    // Set error message for user to see when they return
+                    strongSelf.lastError = "Recording was automatically saved when app went to background"
+
+                    // Post notification so the UI can handle saving the recording
+                    if let fileURL = result.fileURL, let fileSize = result.fileSize, fileSize > 0 {
+                        NotificationCenter.default.post(
+                            name: .recordingAutoStopped,
+                            object: nil,
+                            userInfo: [
+                                "fileName": fileURL.lastPathComponent,
+                                "duration": result.duration,
+                                "fileURL": fileURL,
+                                "fileSize": fileSize
+                            ]
+                        )
+                    }
+                }
+
+                self?.endBackgroundTask()
+            }
         }
-        
+
         if backgroundTaskID == .invalid {
             print("🎵 ❌ Failed to start background task")
         } else {

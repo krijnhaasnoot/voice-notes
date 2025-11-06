@@ -352,6 +352,39 @@ struct AlternativeHomeView: View {
             }
             appDidBecomeActive = true
         }
+        .onReceive(NotificationCenter.default.publisher(for: .recordingAutoStopped)) { notification in
+            // Handle auto-stopped recording when background task expires
+            guard let userInfo = notification.userInfo,
+                  let fileName = userInfo["fileName"] as? String,
+                  let duration = userInfo["duration"] as? TimeInterval,
+                  let fileURL = userInfo["fileURL"] as? URL,
+                  let fileSize = userInfo["fileSize"] as? Int64 else {
+                return
+            }
+
+            print("🎙️ AlternativeHomeView: Received auto-stopped recording notification for \(fileName)")
+
+            // Book usage to backend
+            Task {
+                await usageVM.book(seconds: Int(ceil(duration)), recordedAt: Date())
+            }
+
+            // Create and save the recording
+            let newRecording = Recording(fileName: fileName, date: Date(), duration: duration, title: "")
+            recordingsManager.addRecording(newRecording)
+
+            // Add to session recordings
+            sessionRecordingIds.insert(newRecording.id)
+
+            // Start transcription if file has content
+            if fileSize > 0 {
+                print("🎙️ AlternativeHomeView: Starting transcription for auto-stopped recording \(fileName)")
+                recordingsManager.startTranscription(for: newRecording)
+            }
+
+            // Clear the current recording filename since it's been saved
+            currentRecordingFileName = nil
+        }
         .alert(NSLocalizedString("home.permissions_required", comment: "Permissions Required"), isPresented: $showingPermissionAlert) {
             Button(NSLocalizedString("settings.title", comment: "Settings")) {
                 if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
