@@ -5,14 +5,12 @@ import Speech
 enum Tab: String, CaseIterable {
     case home = "home"
     case recordings = "recordings"
-    case documents = "documents"
     case settings = "settings"
 
     var title: String {
         switch self {
         case .home: return L10n.Tab.home.localized
         case .recordings: return L10n.Tab.recordings.localized
-        case .documents: return L10n.Tab.documents.localized
         case .settings: return L10n.Tab.settings.localized
         }
     }
@@ -21,7 +19,6 @@ enum Tab: String, CaseIterable {
         switch self {
         case .home: return "house"
         case .recordings: return "waveform"
-        case .documents: return "doc.text"
         case .settings: return "gearshape"
         }
     }
@@ -69,18 +66,6 @@ struct RootView: View {
             }
             .tag(Tab.recordings)
             .badge(watchBridge.hasNewFromWatch ? "●" : nil)
-
-            // Lists Tab
-            NavigationStack {
-                DocumentsView(
-                    audioRecorder: audioRecorder,
-                    recordingsManager: recordingsManager
-                )
-            }
-            .tabItem {
-                Label(Tab.documents.title, systemImage: Tab.documents.systemImage)
-            }
-            .tag(Tab.documents)
             
             // Settings Tab
             NavigationStack {
@@ -119,247 +104,31 @@ struct RootView: View {
             // Also clear badge when app becomes active
             NotificationManager.shared.clearBadge()
         }
-    }
-}
-
-// MARK: - Documents View
-struct DocumentsView: View {
-    @ObservedObject var audioRecorder: AudioRecorder
-    @ObservedObject var recordingsManager: RecordingsManager
-    @EnvironmentObject var appRouter: AppRouter
-    @EnvironmentObject var documentStore: DocumentStore
-    @State private var selectedDocument: Document?
-    @State private var showingCreateSheet = false
-    @State private var showingSearch = false
-    
-    var body: some View {
-        ZStack {
-            Group {
-                if documentStore.documents.isEmpty {
-                    emptyStateView
-                } else {
-                    documentsListView
-                }
-            }
-
-            // Floating search button
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Button(action: { showingSearch = true }) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 56, height: 56)
-                            .background(
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [.blue, .blue.opacity(0.8)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                            )
-                            .shadow(color: .blue.opacity(0.4), radius: 12, y: 6)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 20)
-                }
-            }
+        .task {
+            // Pre-warm the audio session so the first tap is instant
+            await audioRecorder.preWarmRecordingSession()
         }
-        .navigationTitle(L10n.Lists.title.localized)
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showingCreateSheet = true }) {
-                    Image(systemName: "plus")
-                }
-            }
-        }
-        .sheet(item: $selectedDocument) { document in
-            DocumentDetailView(document: document)
-                .onAppear {
-                    documentStore.markOpened(document.id)
-                }
-        }
-        .sheet(isPresented: $showingCreateSheet) {
-            CreateDocumentSheet()
-        }
-        .sheet(isPresented: $showingSearch) {
-            NavigationStack {
-                SearchView(recordingsManager: recordingsManager)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("Done") {
-                                showingSearch = false
-                            }
-                            .font(.poppins.body)
-                            .fontWeight(.semibold)
-                        }
-                    }
-            }
-        }
-        .overlay(alignment: .bottom) {
-            if documentStore.recentlyDeletedDocument != nil {
-                undoToast
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: documentStore.recentlyDeletedDocument != nil)
-            }
-        }
-        .onAppear {
-            EnhancedTelemetryService.shared.logListsOpen(from: "tab")
-            Analytics.track("lists_opened")
-        }
-    }
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 24) {
-            VStack(spacing: 16) {
-                Image(systemName: "doc.text")
-                    .font(.poppins.light(size: 64))
-                    .foregroundStyle(.tertiary)
-                
-                VStack(spacing: 8) {
-                    Text("Create your first document")
-                        .font(.poppins.title2)
-                        .foregroundStyle(.primary)
-                    
-                    Text("Organize your voice notes into actionable documents")
-                        .font(.poppins.body)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-            }
-            
-            // Quick create buttons for each list type
-            VStack(spacing: 12) {
-                HStack(spacing: 16) {
-                    QuickCreateButton(type: .todo, documentStore: documentStore)
-                    QuickCreateButton(type: .shopping, documentStore: documentStore)
-                }
-                
-                HStack(spacing: 16) {
-                    QuickCreateButton(type: .ideas, documentStore: documentStore)
-                    QuickCreateButton(type: .meeting, documentStore: documentStore)
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGroupedBackground))
-    }
-    
-    private var documentsListView: some View {
-        List {
-            ForEach(DocumentType.allCases, id: \.self) { type in
-                let documentsOfType = documentStore.documents.filter { $0.type == type }
-                
-                if !documentsOfType.isEmpty {
-                    Section(header: 
-                        HStack {
-                            Image(systemName: type.systemImage)
-                                .foregroundStyle(type.color)
-                            Text(type.displayName)
-                                .textCase(nil)
-                        }
-                        .font(.headline)
-                    ) {
-                        ForEach(documentsOfType.sorted(by: { $0.updatedAt > $1.updatedAt })) { document in
-                            Button(action: {
-                                selectedDocument = document
-                            }) {
-                                DocumentRowView(document: document)
-                            }
-                            .buttonStyle(.plain)
-                            .hoverEffect(.highlight)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    documentStore.deleteDocument(document)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .listStyle(.insetGrouped)
-        .background(Color(.systemGroupedBackground))
-    }
-    
-    private var undoToast: some View {
-        HStack {
-            Text("List deleted")
-                .font(.poppins.body)
-                .foregroundColor(.white)
-            
-            Spacer()
-            
-            Button("Undo") {
-                documentStore.undoDeleteDocument()
-            }
-            .font(.poppins.body)
-            .fontWeight(.semibold)
-            .foregroundColor(.yellow)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.black.opacity(0.85))
-        .cornerRadius(12)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 34) // Account for tab bar
     }
 }
 
 // MARK: - Search View
 struct SearchView: View {
     @ObservedObject var recordingsManager: RecordingsManager
-    @EnvironmentObject var documentStore: DocumentStore
     @State private var searchText = ""
     @State private var selectedRecording: Recording?
-    @State private var selectedDocument: Document?
-    @State private var selectedTab: SearchTab = .recordings
     @State private var selectedTagFilters: Set<String> = []
     @State private var showingTagFilterSheet = false
-
-    enum SearchTab: String, CaseIterable {
-        case recordings = "Recordings"
-        case documents = "Lists"
-
-        var systemImage: String {
-            switch self {
-            case .recordings: return "waveform"
-            case .documents: return "doc.text"
-            }
-        }
-    }
 
     var body: some View {
         VStack(spacing: 0) {
             // Search content
             VStack {
                 VStack(spacing: 12) {
-                    // Tab Picker
-                    Picker("Search Type", selection: $selectedTab) {
-                        ForEach(SearchTab.allCases, id: \.self) { tab in
-                            Label(tab.rawValue, systemImage: tab.systemImage)
-                                .tag(tab)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.top, 8)
-
                     LiquidGlassSearchBar(
                         text: $searchText,
-                        placeholder: selectedTab == .recordings ? "Search recordings..." : "Search lists..."
+                        placeholder: "Search recordings..."
                     )
+                    .padding(.top, 8)
                     
                     // Tag filters section
                     HStack {
@@ -421,13 +190,7 @@ struct SearchView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .dismissKeyboardOnTap()
         .sheet(item: $selectedRecording) { recording in
-            RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
-        }
-        .sheet(item: $selectedDocument) { document in
-            DocumentDetailView(document: document)
-                .onAppear {
-                    documentStore.markOpened(document.id)
-                }
+            RecordingAssistantView(recordingId: recording.id, recordingsManager: recordingsManager)
         }
         .sheet(isPresented: $showingTagFilterSheet) {
             TagFilterSheet(isPresented: $showingTagFilterSheet, selectedTags: $selectedTagFilters)
@@ -440,19 +203,17 @@ struct SearchView: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            Image(systemName: selectedTab.systemImage)
+            Image(systemName: "waveform")
                 .font(.poppins.light(size: 64))
                 .foregroundStyle(.tertiary)
             
             VStack(spacing: 8) {
-                Text("Search your \(selectedTab.rawValue.lowercased())")
+                Text("Search your recordings")
                     .font(.title3)
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)
                 
-                Text(selectedTab == .recordings ? 
-                     "Find recordings by title, content, or transcript" :
-                     "Find lists and items by title or content")
+                Text("Find recordings by title, content, or transcript")
                     .font(.poppins.body)
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
@@ -464,32 +225,15 @@ struct SearchView: View {
     private var searchResultsView: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                if selectedTab == .recordings {
-                    recordingResults
-                } else {
-                    documentResults
+                ForEach(filteredRecordings) { recording in
+                    RecordingRow(recording: recording)
+                        .onTapGesture {
+                            selectedRecording = recording
+                        }
                 }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
-        }
-    }
-    
-    private var recordingResults: some View {
-        ForEach(filteredRecordings) { recording in
-            RecordingRow(recording: recording)
-                .onTapGesture {
-                    selectedRecording = recording
-                }
-        }
-    }
-    
-    private var documentResults: some View {
-        ForEach(filteredDocuments) { document in
-            SearchDocumentRow(document: document, searchText: searchText)
-                .onTapGesture {
-                    selectedDocument = document
-                }
         }
     }
     
@@ -621,164 +365,6 @@ struct SearchView: View {
         return nil
     }
     
-    private var filteredDocuments: [Document] {
-        guard !searchText.isEmpty || !selectedTagFilters.isEmpty else { return [] }
-        
-        var documents = documentStore.documents
-        
-        // First apply tag filters if any
-        if !selectedTagFilters.isEmpty {
-            documents = documents.filter { document in
-                // Document must have ALL selected tags (AND logic)
-                selectedTagFilters.allSatisfy { selectedTag in
-                    document.tags.contains { documentTag in
-                        documentTag.lowercased() == selectedTag.lowercased()
-                    }
-                }
-            }
-        }
-        
-        // Then apply text search if present
-        if !searchText.isEmpty {
-            let (tagSearches, textSearch) = parseSearchText(searchText)
-            
-            documents = documents.filter { document in
-                // Tag searches (#tag) - must match ALL
-                let tagMatches = tagSearches.isEmpty || tagSearches.allSatisfy { tagSearch in
-                    document.tags.contains { documentTag in
-                        documentTag.lowercased().contains(tagSearch.lowercased())
-                    }
-                }
-                
-                // Text search (if present)
-                let textMatches = textSearch.isEmpty || (
-                    document.title.localizedCaseInsensitiveContains(textSearch) ||
-                    document.notes.localizedCaseInsensitiveContains(textSearch) ||
-                    document.items.contains { item in
-                        item.text.localizedCaseInsensitiveContains(textSearch)
-                    }
-                )
-                
-                return tagMatches && textMatches
-            }
-        }
-        
-        return documents
-    }
-}
-
-// MARK: - Search Document Row
-struct SearchDocumentRow: View {
-    let document: Document
-    let searchText: String
-    
-    private var matchingItems: [DocItem] {
-        document.items.filter { item in
-            item.text.localizedCaseInsensitiveContains(searchText)
-        }
-    }
-    
-    private var hasContentMatch: Bool {
-        document.notes.localizedCaseInsensitiveContains(searchText) && !document.notes.isEmpty
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Image(systemName: document.type.systemImage)
-                    .font(.poppins.medium(size: 20))
-                    .foregroundStyle(document.type.color)
-                    .frame(width: 24)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(document.title)
-                        .font(.headline)
-                        .lineLimit(1)
-                    
-                    HStack(spacing: 8) {
-                        Text(document.type.displayName)
-                            .font(.poppins.caption)
-                            .foregroundStyle(.secondary)
-                        
-                        if document.type.usesChecklist {
-                            Text("•")
-                                .foregroundStyle(.quaternary)
-                            Text("\(document.completedCount)/\(document.itemCount) items")
-                                .font(.poppins.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        Text(RelativeDateTimeFormatter().localizedString(for: document.updatedAt, relativeTo: Date()))
-                            .font(.poppins.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.poppins.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            
-            // Show matching content preview
-            if !matchingItems.isEmpty || hasContentMatch {
-                VStack(alignment: .leading, spacing: 4) {
-                    if !matchingItems.isEmpty {
-                        Text("Matching items:")
-                            .font(.poppins.caption)
-                            .foregroundStyle(.secondary)
-                        
-                        ForEach(Array(matchingItems.prefix(2)), id: \.id) { item in
-                            HStack(spacing: 6) {
-                                Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
-                                    .font(.poppins.caption)
-                                    .foregroundStyle(item.isDone ? .green : .secondary)
-                                
-                                Text(highlightedText(item.text))
-                                    .font(.caption)
-                                    .lineLimit(1)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        
-                        if matchingItems.count > 2 {
-                            Text("and \(matchingItems.count - 2) more...")
-                                .font(.poppins.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    
-                    if hasContentMatch {
-                        Text("Notes contain: \"\(searchText)\"")
-                            .font(.poppins.caption)
-                            .foregroundStyle(.secondary)
-                            .italic()
-                    }
-                }
-                .padding(.horizontal, 36)
-            }
-        }
-        .padding(.vertical, 8)
-        .background(Color(.systemBackground))
-        .cornerRadius(8)
-    }
-    
-    private func highlightedText(_ text: String) -> AttributedString {
-        var attributedString = AttributedString(text)
-        
-        if let range = text.range(of: searchText, options: .caseInsensitive) {
-            let nsRange = NSRange(range, in: text)
-            if let attributedRange = Range<AttributedString.Index>(nsRange, in: attributedString) {
-                attributedString[attributedRange].backgroundColor = .yellow.opacity(0.3)
-                attributedString[attributedRange].foregroundColor = .primary
-            }
-        }
-        
-        return attributedString
-    }
 }
 
 // MARK: - Home View (Original Start Screen)
@@ -795,6 +381,7 @@ struct HomeView: View {
     @State private var showingSettings = false
     @State private var showingAlternativeView = false
     @State private var isPaused = false
+    @State private var keepScreenAwake = false
     @AppStorage("useCompactView") private var useCompactView = false
     @AppStorage("hasCompletedTour") private var hasCompletedTour = false
     
@@ -853,28 +440,10 @@ struct HomeView: View {
             // Content area 
             ScrollView {
                 VStack(spacing: 32) {
-                    // Recording Settings Section
-                    VStack(spacing: 16) {
-                        Text("Recording Settings")
-                            .font(.poppins.title3)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        HStack(alignment: .top, spacing: 16) {
-                            summaryModeSelector
-                            transcriptionModelSelector
-                        }
-                        .padding(.bottom, 8)
-                    }
-                    .padding(.top, 32)
-
-                    // Usage Display
-                    usageDisplay
-
                     // Recent recordings section with transition
                     if !recordingsManager.recordings.isEmpty {
                         recentRecordingsSection
+                            .padding(.top, 32)
                             .transition(.asymmetric(
                                 insertion: .move(edge: .bottom).combined(with: .opacity.combined(with: .scale(scale: 0.9))),
                                 removal: .move(edge: .top).combined(with: .opacity)
@@ -892,6 +461,7 @@ struct HomeView: View {
                                 .multilineTextAlignment(.center)
                         }
                         .padding(.horizontal)
+                        .padding(.top, 32)
                         .transition(.asymmetric(
                             insertion: .opacity.combined(with: .scale(scale: 0.95)),
                             removal: .move(edge: .top).combined(with: .opacity)
@@ -922,7 +492,7 @@ struct HomeView: View {
             Text("Voice Notes needs microphone and speech recognition permissions to function.")
         }
         .sheet(item: $selectedRecording) { recording in
-            RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
+            RecordingAssistantView(recordingId: recording.id, recordingsManager: recordingsManager)
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView(showingAlternativeView: $showingAlternativeView, recordingsManager: recordingsManager)
@@ -1327,19 +897,15 @@ struct RecentRecordingRow: View {
             }
         case .transcribing:
             return "waveform.circle"
-        case .transcribingPaused:
-            return "pause.circle.fill"
         case .summarizing:
             return "brain.head.profile"
-        case .summarizingPaused:
-            return "pause.circle.fill"
         case .failed:
             return "exclamationmark.circle.fill"
         case .done:
             return "checkmark.circle.fill"
         }
     }
-    
+
     private var statusColor: Color {
         switch recording.status {
         case .idle:
@@ -1352,8 +918,6 @@ struct RecentRecordingRow: View {
             }
         case .transcribing, .summarizing:
             return .blue
-        case .transcribingPaused, .summarizingPaused:
-            return .blue.opacity(0.7)
         case .failed:
             return .red
         case .done:
@@ -1427,6 +991,8 @@ extension HomeView {
             .contentShape(Circle())
             .scaleEffect(audioRecorder.isRecording ? 0.95 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: audioRecorder.isRecording)
+            .disabled(audioRecorder.isStartingRecording)
+            .opacity(audioRecorder.isStartingRecording ? 0.6 : 1.0)
             .accessibilityLabel(audioRecorder.isRecording ? "Stop recording" : "Start recording")
             .if(isLiquidGlassAvailable) { view in
                 view.glassEffect(.regular.interactive())
@@ -1461,39 +1027,56 @@ extension HomeView {
                         .foregroundColor(audioRecorder.isRecording ? .primary : .secondary)
                         .multilineTextAlignment(.center)
                 }
+                
+                // Keep screen awake toggle (visible during recording)
+                if audioRecorder.isRecording {
+                    Button {
+                        keepScreenAwake.toggle()
+                        UIApplication.shared.isIdleTimerDisabled = keepScreenAwake
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: keepScreenAwake ? "sun.max.fill" : "moon.zzz")
+                                .font(.system(size: 14, weight: .medium))
+                            Text(keepScreenAwake ? "Scherm actief" : "Scherm kan dimmen")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        .foregroundColor(keepScreenAwake ? .orange : .secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(keepScreenAwake ? Color.orange.opacity(0.15) : Color.secondary.opacity(0.1))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .transition(.opacity.combined(with: .scale))
+                }
             }
             
-            // Debug: Show recent transcription status
-            if let mostRecent = recordingsManager.recordings.first {
-                switch mostRecent.status {
+            // Show active processing status only
+            if let processingRecording = recordingsManager.recordings.first(where: { $0.status.isProcessing }) {
+                switch processingRecording.status {
                 case .transcribing(let progress):
-                    Text("Transcribing: \(Int(progress * 100))%")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                case .transcribingPaused(let progress):
-                    Text("⏸️ Transcribing paused: \(Int(progress * 100))%")
-                        .font(.caption)
-                        .foregroundColor(.blue.opacity(0.7))
-                case .summarizing(let progress):
-                    Text("Summarizing: \(Int(progress * 100))%")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                case .summarizingPaused(let progress):
-                    Text("⏸️ Summarizing paused: \(Int(progress * 100))%")
-                        .font(.caption)
-                        .foregroundColor(.green.opacity(0.7))
-                case .failed(let reason):
-                    Text("Failed: \(reason)")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                case .done:
-                    if let transcript = mostRecent.transcript, !transcript.isEmpty {
-                        Text("✅ Transcribed: \(transcript.count) chars")
-                            .font(.caption)
-                            .foregroundColor(.green)
+                    HStack(spacing: 8) {
+                        ProgressView(value: progress)
+                            .frame(width: 60)
+                        Text("Transcribing \(Int(progress * 100))%")
+                            .font(.system(size: 14, weight: .medium))
                     }
-                case .idle:
+                    .foregroundColor(.blue)
+                    .transition(.opacity.combined(with: .scale))
+                    
+                case .summarizing(let progress):
+                    HStack(spacing: 8) {
+                        ProgressView(value: progress)
+                            .frame(width: 60)
+                        Text("Summarizing \(Int(progress * 100))%")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .foregroundColor(.orange)
+                    .transition(.opacity.combined(with: .scale))
+                    
+                default:
                     EmptyView()
                 }
             }
@@ -1603,6 +1186,12 @@ extension HomeView {
                 
                 // Reset pause state when stopping
                 isPaused = false
+                
+                // Turn off keep-screen-awake when stopping
+                if keepScreenAwake {
+                    keepScreenAwake = false
+                    UIApplication.shared.isIdleTimerDisabled = false
+                }
                 
                 if let fileName = currentRecordingFileName {
                     let newRecording = Recording(fileName: fileName, date: Date(), duration: result.duration, title: "")

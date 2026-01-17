@@ -22,9 +22,14 @@ final class AudioRecorder: NSObject, ObservableObject {
     private var hasShownMaxDurationWarning = false
 
     @Published var isRecording = false
+    @Published var isStartingRecording = false  // Prevents double-taps
     @Published var recordingDuration: TimeInterval = 0
     @Published var permissionStatus: AVAudioSession.RecordPermission = .undetermined
     @Published var lastError: String?
+    
+    /// Minimum recording duration in seconds - recordings shorter than this are discarded
+    private let minimumRecordingDuration: TimeInterval = 0.5
+    private var isSessionPrewarmed = false
     
     private var recordingTimer: Timer?
     private var recordingStartTime: Date?
@@ -138,11 +143,15 @@ final class AudioRecorder: NSObject, ObservableObject {
     @objc private func handleSceneChange() {
         if isRecording {
             print("🎵 App backgrounded, continuing recording with background task")
+            print("⚠️ Note: Background recording may stop after 3 minutes")
 
             // Invalidate the UI update timer to reduce background activity
             // The recording will continue but we don't need UI updates
             recordingTimer?.invalidate()
             recordingTimer = nil
+
+            // Show warning to user
+            lastError = "Keep app open for longer recordings"
 
             Task { @MainActor in
                 startBackgroundTask()
@@ -221,7 +230,7 @@ final class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
-    func ensureMicReady() async -> Bool {
+    func ensureMicReady(allowPermissionPrompt: Bool = true) async -> Bool {
         // Check permission first
         let currentPermission: AVAudioSession.RecordPermission
         if #available(iOS 17.0, *) {
@@ -240,7 +249,11 @@ final class AudioRecorder: NSObject, ObservableObject {
         switch currentPermission {
         case .undetermined:
             print("🎵 Requesting microphone permission...")
-            return await requestPermission()
+            if allowPermissionPrompt {
+                return await requestPermission()
+            } else {
+                return false
+            }
             
         case .denied:
             await MainActor.run {
@@ -253,6 +266,20 @@ final class AudioRecorder: NSObject, ObservableObject {
             
         @unknown default:
             return false
+        }
+
+        // Fast path: if we already warmed the session, just ensure it's active
+        if isSessionPrewarmed {
+            do {
+                try audioSession.setActive(true)
+                return true
+            } catch {
+                print("🎵 ❌ Failed to re-activate prewarmed session: \(error)")
+                await MainActor.run {
+                    lastError = "Audio session error: \(error.localizedDescription)"
+                }
+                // fall through to full setup
+            }
         }
         
         // Set up audio session
@@ -268,6 +295,7 @@ final class AudioRecorder: NSObject, ObservableObject {
             try audioSession.setActive(true)
 
             print("🎵 ✅ Audio session ready with background audio support")
+            isSessionPrewarmed = true
             return true
             
         } catch {
@@ -278,14 +306,55 @@ final class AudioRecorder: NSObject, ObservableObject {
             return false
         }
     }
+
+    /// Warm the audio session at app launch to avoid first-tap latency.
+    /// Skips permission prompts; only runs when permission is already granted.
+    func preWarmRecordingSession() async {
+        // Avoid re-warming
+        guard !isSessionPrewarmed else { return }
+
+        // Only prewarm when permission is already granted to avoid surprise prompts
+        let currentPermission: AVAudioSession.RecordPermission
+        if #available(iOS 17.0, *) {
+            let appPerm = AVAudioApplication.shared.recordPermission
+            switch appPerm {
+            case .undetermined: currentPermission = .undetermined
+            case .denied: currentPermission = .denied
+            case .granted: currentPermission = .granted
+            @unknown default: currentPermission = .denied
+            }
+        } else {
+            currentPermission = audioSession.recordPermission
+        }
+
+        guard currentPermission == .granted else {
+            print("🎵 Skipping prewarm (permission not granted yet)")
+            return
+        }
+
+        let ready = await ensureMicReady(allowPermissionPrompt: false)
+        if ready {
+            print("🎵 Audio session prewarmed")
+        }
+    }
     
     func startRecording() async -> String? {
         print("🎵 Starting recording...")
+        
+        // Prevent double-taps - return immediately if already starting or recording
+        guard !isStartingRecording && !isRecording else {
+            print("🎵 ⚠️ Already starting or recording - ignoring tap")
+            return nil
+        }
+        
+        // Set flag immediately to prevent double-taps
+        isStartingRecording = true
         
         // Ensure microphone is ready
         let isReady = await ensureMicReady()
         guard isReady else {
             print("🎵 ❌ Microphone not ready")
+            isStartingRecording = false
             return nil
         }
         
@@ -319,6 +388,7 @@ final class AudioRecorder: NSObject, ObservableObject {
             guard audioRecorder?.prepareToRecord() == true else {
                 print("🎵 ❌ Failed to prepare recorder")
                 lastError = "Failed to prepare audio recorder"
+                isStartingRecording = false
                 return nil
             }
             
@@ -326,6 +396,7 @@ final class AudioRecorder: NSObject, ObservableObject {
             guard audioRecorder?.record() == true else {
                 print("🎵 ❌ Failed to start recording")
                 lastError = "Failed to start recording"
+                isStartingRecording = false
                 return nil
             }
             
@@ -333,6 +404,7 @@ final class AudioRecorder: NSObject, ObservableObject {
 
             // Update UI state
             isRecording = true
+            isStartingRecording = false  // Recording started, allow future taps
             recordingStartTime = Date()
             recordingDuration = 0
             pausedDuration = 0
@@ -401,6 +473,7 @@ final class AudioRecorder: NSObject, ObservableObject {
         endBackgroundTask()
 
         isRecording = false
+        isStartingRecording = false  // Reset in case it was stuck
         
         notifyWatch()
         
@@ -416,6 +489,14 @@ final class AudioRecorder: NSObject, ObservableObject {
             return (finalDuration, nil, nil)
         }
         
+        // Discard recordings that are too short (prevents accidental double-taps)
+        if finalDuration < minimumRecordingDuration {
+            print("🎵 ⚠️ Recording too short (\(String(format: "%.2f", finalDuration))s < \(minimumRecordingDuration)s) - discarding")
+            try? FileManager.default.removeItem(at: fileURL)
+            currentRecordingURL = nil
+            return (0, nil, nil)
+        }
+        
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
             let fileSize = attributes[.size] as? Int64 ?? 0
@@ -428,7 +509,8 @@ final class AudioRecorder: NSObject, ObservableObject {
             if fileSize == 0 {
                 print("🎵 ❌ WARNING: Recording file is empty!")
                 lastError = "Recording file is empty - please try again"
-                return (finalDuration, fileURL, 0)
+                try? FileManager.default.removeItem(at: fileURL)
+                return (finalDuration, nil, 0)
             }
             
             // Track successful recording stop

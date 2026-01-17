@@ -5,7 +5,7 @@ import AVFoundation
 struct AppTourView: View {
     let onComplete: () -> Void
     @State private var currentPage = 0
-    private let totalPages = 5
+    private let totalPages = 4
     
     var body: some View {
         ZStack {
@@ -41,26 +41,17 @@ struct AppTourView: View {
                     )
                     .tag(0)
                     
-                    // Page 2: Recording
-                    TranscriptionTourPage()
+                    // Page 2: AI Assistant
+                    AIAssistantTourPage()
                     .tag(1)
                     
-                    // Page 3: Organization
-                    TourPage(
-                        systemImage: "doc.text.fill",
-                        title: "Organize Your Lists",
-                        description: "Create different types of documents: todo lists, shopping lists, meeting notes, and ideas.",
-                        gradient: LinearGradient(colors: [.orange.opacity(0.8), .orange], startPoint: .top, endPoint: .bottom)
-                    )
-                    .tag(2)
-                    
-                    // Page 4: Privacy & AI
+                    // Page 3: Privacy & AI
                     PrivacyTourPage()
-                    .tag(3)
+                    .tag(2)
 
-                    // Page 5: Permissions (announcement only, no request)
+                    // Page 4: Permissions (announcement only, no request)
                     PermissionsTourPage(onComplete: onComplete)
-                    .tag(4)
+                    .tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.3), value: currentPage)
@@ -123,8 +114,8 @@ struct AppTourView: View {
     }
 }
 
-// MARK: - Transcription Tour Page
-private struct TranscriptionTourPage: View {
+// MARK: - AI Assistant Tour Page
+private struct AIAssistantTourPage: View {
     var body: some View {
         VStack(spacing: 40) {
             Spacer()
@@ -132,11 +123,11 @@ private struct TranscriptionTourPage: View {
             // Icon with gradient background
             ZStack {
                 Circle()
-                    .fill(LinearGradient(colors: [.green.opacity(0.8), .green], startPoint: .top, endPoint: .bottom))
+                    .fill(LinearGradient(colors: [.purple.opacity(0.8), .purple], startPoint: .top, endPoint: .bottom))
                     .frame(width: 120, height: 120)
                     .shadow(color: .black.opacity(0.15), radius: 20, y: 10)
 
-                Image(systemName: "waveform")
+                Image(systemName: "sparkles")
                     .font(.system(size: 48, weight: .semibold))
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
@@ -144,12 +135,12 @@ private struct TranscriptionTourPage: View {
 
             // Text content
             VStack(spacing: 16) {
-                Text("Smart Transcription")
+                Text("Your AI Assistant")
                     .font(.poppins.bold(size: 28))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.primary)
 
-                Text("Choose between cloud-based or offline transcription. Download a model for complete privacy.")
+                Text("After recording, chat with AI to get summaries, action items, or ask any question about your recording.")
                     .font(.poppins.regular(size: 18))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
@@ -158,23 +149,23 @@ private struct TranscriptionTourPage: View {
             }
             .padding(.horizontal, 32)
 
-            // Transcription features
+            // AI features
             VStack(spacing: 12) {
                 PermissionPoint(
-                    icon: "wifi.slash",
-                    text: "Download models for offline transcription",
-                    color: .purple
-                )
-
-                PermissionPoint(
-                    icon: "lock.shield.fill",
-                    text: "Local mode: No data sent to servers",
+                    icon: "text.alignleft",
+                    text: "Automatic transcription of your voice",
                     color: .green
                 )
 
                 PermissionPoint(
-                    icon: "brain",
-                    text: "Automatic summarization with AI",
+                    icon: "sparkles",
+                    text: "Ask for summaries, notes, or action items",
+                    color: .purple
+                )
+
+                PermissionPoint(
+                    icon: "bubble.left.and.bubble.right",
+                    text: "Have a conversation about your recording",
                     color: .blue
                 )
             }
@@ -318,14 +309,8 @@ private struct PrivacyTourPage: View {
             VStack(spacing: 12) {
                 PrivacyTourPoint(
                     icon: "checkmark.shield.fill",
-                    text: "Secure transmission to your chosen AI provider",
+                    text: "Secure transmission to AI provider",
                     color: .green
-                )
-
-                PrivacyTourPoint(
-                    icon: "wifi.slash",
-                    text: "Or use offline mode - no data leaves your device",
-                    color: .purple
                 )
 
                 PrivacyTourPoint(
@@ -335,8 +320,8 @@ private struct PrivacyTourPage: View {
                 )
 
                 PrivacyTourPoint(
-                    icon: "person.fill.checkmark",
-                    text: "You control which provider to use",
+                    icon: "iphone",
+                    text: "Recordings stored locally on your device",
                     color: .blue
                 )
             }

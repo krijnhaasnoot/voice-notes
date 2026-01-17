@@ -113,7 +113,7 @@ struct RecordingsView: View {
             }
         }
         .sheet(item: $selectedRecording) { recording in
-            RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
+            RecordingAssistantView(recordingId: recording.id, recordingsManager: recordingsManager)
         }
         .sheet(isPresented: $isSharePresented) {
             ShareSheet(items: shareItems)

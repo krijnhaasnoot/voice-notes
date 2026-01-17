@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		EF572D212E8044160019C264 /* Echo Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = EF572D202E8044160019C264 /* Echo Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		EF57DF8E2EBA745100AF636F /* SwiftWhisper in Frameworks */ = {isa = PBXBuildFile; productRef = EF57DF8D2EBA745100AF636F /* SwiftWhisper */; };
+		EFF4DE332F17884400ADB02F /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = EFF4DE322F17884400ADB02F /* WhisperKit */; };
+		EFF4DE352F17884400ADB02F /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = EFF4DE342F17884400ADB02F /* whisperkit-cli */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -133,7 +135,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EFF4DE332F17884400ADB02F /* WhisperKit in Frameworks */,
 				EF57DF8E2EBA745100AF636F /* SwiftWhisper in Frameworks */,
+				EFF4DE352F17884400ADB02F /* whisperkit-cli in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -290,6 +294,8 @@
 			name = "Voice Notes";
 			packageProductDependencies = (
 				EF57DF8D2EBA745100AF636F /* SwiftWhisper */,
+				EFF4DE322F17884400ADB02F /* WhisperKit */,
+				EFF4DE342F17884400ADB02F /* whisperkit-cli */,
 			);
 			productName = "Voice Notes";
 			productReference = EF6082862E6C82B50057421A /* Voice Notes.app */;
@@ -349,7 +355,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2600;
-				LastUpgradeCheck = 2600;
+				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					EF572D1A2E8044160019C264 = {
 						CreatedOnToolsVersion = 26.0;
@@ -390,6 +396,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				EF57DF8C2EBA745100AF636F /* XCRemoteSwiftPackageReference "SwiftWhisper" */,
+				EFF4DE312F17884400ADB02F /* XCRemoteSwiftPackageReference "WhisperKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EF6082872E6C82B50057421A /* Products */;
@@ -726,6 +733,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -791,6 +799,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -851,7 +860,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = 9V592235FH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -863,14 +872,14 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.6;
+				MARKETING_VERSION = 0.1.7;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-Notes";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -886,7 +895,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = 9V592235FH;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -898,14 +907,14 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1.6;
+				MARKETING_VERSION = 0.1.7;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinder.Voice-Notes";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1075,6 +1084,14 @@
 				minimumVersion = 1.0.0;
 			};
 		};
+		EFF4DE312F17884400ADB02F /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1082,6 +1099,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = EF57DF8C2EBA745100AF636F /* XCRemoteSwiftPackageReference "SwiftWhisper" */;
 			productName = SwiftWhisper;
+		};
+		EFF4DE322F17884400ADB02F /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFF4DE312F17884400ADB02F /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
+		};
+		EFF4DE342F17884400ADB02F /* whisperkit-cli */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EFF4DE312F17884400ADB02F /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = "whisperkit-cli";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

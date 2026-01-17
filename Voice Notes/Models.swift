@@ -92,24 +92,13 @@ struct Recording: Identifiable, Codable {
     enum Status: Codable, Equatable {
         case idle
         case transcribing(progress: Double)
-        case transcribingPaused(progress: Double)
         case summarizing(progress: Double)
-        case summarizingPaused(progress: Double)
         case done
         case failed(reason: String)
 
         var isProcessing: Bool {
             switch self {
-            case .transcribing, .transcribingPaused, .summarizing, .summarizingPaused:
-                return true
-            default:
-                return false
-            }
-        }
-
-        var isPaused: Bool {
-            switch self {
-            case .transcribingPaused, .summarizingPaused:
+            case .transcribing, .summarizing:
                 return true
             default:
                 return false
@@ -118,11 +107,20 @@ struct Recording: Identifiable, Codable {
 
         var progress: Double? {
             switch self {
-            case .transcribing(let progress), .transcribingPaused(let progress),
-                 .summarizing(let progress), .summarizingPaused(let progress):
+            case .transcribing(let progress), .summarizing(let progress):
                 return progress
             default:
                 return nil
+            }
+        }
+        
+        var description: String {
+            switch self {
+            case .idle: return "idle"
+            case .transcribing(let p): return "transcribing-\(Int(p * 100))"
+            case .summarizing(let p): return "summarizing-\(Int(p * 100))"
+            case .done: return "done"
+            case .failed(let r): return "failed-\(r.hashValue)"
             }
         }
     }

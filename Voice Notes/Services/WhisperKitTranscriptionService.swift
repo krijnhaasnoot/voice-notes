@@ -1,21 +1,26 @@
 import Foundation
 import AVFoundation
-
-// MARK: - WhisperKit Integration
-// To use this service, add WhisperKit as a Swift Package dependency:
-// Repository: https://github.com/argmaxinc/WhisperKit
-// Version: Latest (1.0.0+)
-//
-// Uncomment the import below after adding the package:
-// import WhisperKit
+import WhisperKit
 
 /// On-device transcription service using WhisperKit (Apple's CoreML-optimized Whisper)
+/// 🚀 ~10x faster than real-time with Tiny model on modern devices
 actor WhisperKitTranscriptionService: TranscriptionService {
     let name = "WhisperKit (On-Device)"
 
     private let modelManager: WhisperModelManager
-    // private var whisperKit: WhisperKit?  // Uncomment when WhisperKit is added
+    private var whisperKit: WhisperKit?
     private var currentTask: Task<String, Error>?
+    private var isInitialized = false
+    
+    // Singleton to reuse model across transcriptions (memory optimization)
+    private static var sharedInstance: WhisperKitTranscriptionService?
+    
+    static func shared() -> WhisperKitTranscriptionService {
+        if sharedInstance == nil {
+            sharedInstance = WhisperKitTranscriptionService()
+        }
+        return sharedInstance!
+    }
 
     init(modelManager: WhisperModelManager = .shared) {
         self.modelManager = modelManager
@@ -30,47 +35,127 @@ actor WhisperKitTranscriptionService: TranscriptionService {
         progress: @escaping @Sendable (Double) -> Void,
         cancelToken: CancellationToken
     ) async throws -> String {
-        // Check if model is downloaded
-        let model = await modelManager.selectedModel
-        let isDownloaded = await modelManager.isModelDownloaded(model)
+        // Check for bundled model first
+        let hasBundledModel = await getBundledModelPath() != nil
+        
+        // NOTE:
+        // Previously we required the selected model to already be downloaded, otherwise we threw `modelNotDownloaded`.
+        // That creates a “fallback” behavior elsewhere (or repeated failures) and can lead to poor user experience.
+        // We now allow WhisperKit to download the selected model on-demand (or use bundled/downloaded if present).
 
-        guard isDownloaded else {
-            throw WhisperKitError.modelNotDownloaded
-        }
-
-        // Get model path
-        let modelPath = await modelManager.modelPath(for: model)
+        // Get model path (will use bundled or downloaded)
+        let modelPath = await modelManager.modelPath(for: await modelManager.selectedModel)
 
         // Initialize WhisperKit if needed
         try await initializeWhisperKitIfNeeded(modelPath: modelPath)
 
         // Start transcription with progress tracking
-        return try await performTranscription(
-            audioURL: url,
+        // Ensure audio is in a good format for WhisperKit (16kHz mono). This can improve reliability on longer files.
+        let preparedURL = try await prepareAudioFile(url)
+        
+        let result = try await performTranscription(
+            audioURL: preparedURL,
             languageHint: languageHint,
             progress: progress,
             cancelToken: cancelToken
         )
+        
+        // Release model from memory after transcription to prevent SIGKILL
+        await releaseModelFromMemory()
+        
+        return result
+    }
+    
+    /// Release model from memory to prevent iOS from killing the app
+    private func releaseModelFromMemory() async {
+        print("🧹 WhisperKit: Releasing model from memory...")
+        whisperKit = nil
+        isInitialized = false
+        
+        // Force garbage collection hint
+        await Task.yield()
     }
 
     // MARK: - WhisperKit Initialization
 
     private func initializeWhisperKitIfNeeded(modelPath: URL) async throws {
-        // Uncomment when WhisperKit is added:
-        /*
-        if whisperKit == nil {
-            print("🎙️ Initializing WhisperKit with model at: \(modelPath.path)")
+        guard !isInitialized else { return }
+        
+        let selectedModel = await modelManager.selectedModel
+        print("🎙️ Initializing WhisperKit...")
+        print("   Selected model: \(selectedModel.displayName)")
+        print("   Model path: \(modelPath.path)")
+        
+        // Check if using bundled model
+        if let bundledModelPath = await getBundledModelPath() {
+            print("📦 Using bundled Whisper model at: \(bundledModelPath)")
+            whisperKit = try await WhisperKit(
+                modelFolder: bundledModelPath,
+                computeOptions: getComputeOptions(),
+                verbose: false,
+                logLevel: .error
+            )
+        } else if FileManager.default.fileExists(atPath: modelPath.path) {
+            print("📁 Using downloaded model at: \(modelPath.path)")
             whisperKit = try await WhisperKit(
                 modelFolder: modelPath.path,
-                verbose: true,
-                logLevel: .info
+                computeOptions: getComputeOptions(),
+                verbose: false,
+                logLevel: .error
             )
-            print("✅ WhisperKit initialized successfully")
+        } else {
+            // Download the selected model from WhisperModelManager
+            let selectedModel = await modelManager.selectedModel
+            let modelIdentifier = "openai_whisper-\(selectedModel.rawValue)"
+            print("⬇️ No local model found, downloading \(selectedModel.displayName) model...")
+            print("   Model identifier: \(modelIdentifier)")
+            whisperKit = try await WhisperKit(
+                model: modelIdentifier,
+                computeOptions: getComputeOptions(),
+                verbose: false,
+                logLevel: .error
+            )
         }
-        */
-
-        // For now, throw an error to indicate WhisperKit needs to be added
-        throw WhisperKitError.notImplemented
+        
+        isInitialized = true
+        print("✅ WhisperKit initialized successfully")
+    }
+    
+    private func getComputeOptions() -> ModelComputeOptions {
+        // Optimize for speed on Neural Engine
+        return ModelComputeOptions(
+            audioEncoderCompute: .cpuAndNeuralEngine,
+            textDecoderCompute: .cpuAndNeuralEngine
+        )
+    }
+    
+    private func getBundledModelPath() async -> String? {
+        // Check for bundled model in app bundle
+        // Structure: BundledModels/openai_whisper-[model] or similar
+        // Priority: selected model first, then base, then tiny as fallback
+        let selectedModel = await modelManager.selectedModel.rawValue
+        let modelNames = [
+            "openai_whisper-\(selectedModel)", "whisper-\(selectedModel)", selectedModel,  // Selected model
+            "openai_whisper-base", "whisper-base", "base",  // Base as fallback
+            "openai_whisper-tiny", "whisper-tiny", "tiny"   // Tiny as last resort
+        ]
+        
+        print("🔍 Searching for bundled Whisper model (priority: \(selectedModel))...")
+        
+        for modelName in modelNames {
+            if let path = Bundle.main.path(forResource: modelName, ofType: nil, inDirectory: "BundledModels") {
+                print("✅ Found bundled model: \(modelName)")
+                return path
+            }
+            // Also check root bundle
+            if let path = Bundle.main.path(forResource: modelName, ofType: nil) {
+                print("✅ Found bundled model in root: \(modelName)")
+                return path
+            }
+        }
+        
+        print("❌ No bundled model found")
+        return nil
     }
 
     // MARK: - Transcription Implementation
@@ -87,54 +172,58 @@ actor WhisperKitTranscriptionService: TranscriptionService {
 
         // Create cancellable task
         let transcriptionTask = Task<String, Error> {
-            // Check for cancellation
             try Task.checkCancellation()
 
+            let currentModel = await modelManager.selectedModel
             print("🎙️ Starting WhisperKit transcription")
+            print("   Model: \(currentModel.displayName) (\(currentModel.rawValue))")
             print("   Audio: \(audioURL.lastPathComponent)")
-            print("   Language: \(language)")
+            print("   Language: \(language == "auto" ? "auto-detect" : language)")
 
-            // Uncomment when WhisperKit is added:
-            /*
             guard let whisperKit = whisperKit else {
                 throw WhisperKitError.notInitialized
             }
 
-            // Transcribe with progress callbacks
-            let result = try await whisperKit.transcribe(
-                audioPath: audioURL.path,
-                language: language,
+            // Configure transcription options
+            let options = DecodingOptions(
+                verbose: false,
                 task: .transcribe,
-                progressCallback: { progressValue in
-                    Task { @MainActor in
-                        progress(progressValue)
-                    }
-                }
+                language: language == "auto" ? nil : language,
+                temperatureFallbackCount: 3,
+                sampleLength: 224,
+                usePrefillPrompt: true,
+                usePrefillCache: true,
+                skipSpecialTokens: true,
+                withoutTimestamps: false,
+                suppressBlank: true
             )
 
-            // Check for cancellation after transcription
-            try Task.checkCancellation()
+            // Track progress
+            await MainActor.run { progress(0.1) }
 
-            // Extract text from result
-            let transcriptText = result.text
+            // Transcribe audio
+            let results = try await whisperKit.transcribe(
+                audioPath: audioURL.path,
+                decodeOptions: options
+            )
+
+            try Task.checkCancellation()
+            
+            await MainActor.run { progress(0.9) }
+
+            // Combine all segments into final transcript
+            let transcriptText = results
+                .compactMap { $0.text }
+                .joined(separator: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            await MainActor.run { progress(1.0) }
 
             print("✅ WhisperKit transcription completed")
             print("   Length: \(transcriptText.count) characters")
+            print("   Segments: \(results.count)")
 
             return transcriptText
-            */
-
-            // Temporary placeholder until WhisperKit is added
-            // Simulate transcription progress
-            for i in 0...100 {
-                try Task.checkCancellation()
-                try await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
-                await MainActor.run {
-                    progress(Double(i) / 100.0)
-                }
-            }
-
-            throw WhisperKitError.notImplemented
         }
 
         // Store task for potential cancellation
@@ -147,7 +236,7 @@ actor WhisperKitTranscriptionService: TranscriptionService {
                     transcriptionTask.cancel()
                     break
                 }
-                try await Task.sleep(nanoseconds: 100_000_000) // Check every 0.1 seconds
+                try? await Task.sleep(nanoseconds: 100_000_000)
             }
         }
 
@@ -162,7 +251,7 @@ actor WhisperKitTranscriptionService: TranscriptionService {
         } catch is CancellationError {
             throw TranscriptionError.cancelled
         } catch {
-            // Rethrow the error (likely WhisperKitError)
+            print("❌ WhisperKit transcription error: \(error)")
             throw error
         }
     }
@@ -235,7 +324,8 @@ actor WhisperKitTranscriptionService: TranscriptionService {
     func cleanup() async {
         currentTask?.cancel()
         currentTask = nil
-        // whisperKit = nil  // Uncomment when WhisperKit is added
+        whisperKit = nil
+        isInitialized = false
     }
 }
 
@@ -247,12 +337,11 @@ enum WhisperKitError: LocalizedError {
     case invalidAudioFile
     case conversionFailed
     case transcriptionFailed(String)
-    case notImplemented
 
     var errorDescription: String? {
         switch self {
         case .modelNotDownloaded:
-            return "Whisper model not downloaded. Please download a model in Settings."
+            return "Whisper model not available. Please check Settings."
         case .notInitialized:
             return "WhisperKit not initialized"
         case .invalidAudioFile:
@@ -261,8 +350,6 @@ enum WhisperKitError: LocalizedError {
             return "Failed to convert audio to required format"
         case .transcriptionFailed(let reason):
             return "Transcription failed: \(reason)"
-        case .notImplemented:
-            return "WhisperKit package needs to be added. See instructions in WhisperKitTranscriptionService.swift"
         }
     }
 }

@@ -20,7 +20,7 @@ enum SummarizationModel: String, CaseIterable, Codable {
         case .anthropicClaude35Sonnet:
             return "Claude 3.5 Sonnet"
         case .openaiGPT4oMini:
-            return "GPT-4o Mini"
+            return "GPT-4o mini"
         }
     }
 }

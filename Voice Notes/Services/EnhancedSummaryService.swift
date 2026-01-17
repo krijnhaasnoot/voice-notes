@@ -185,14 +185,11 @@ class EnhancedSummaryService: ObservableObject {
         
         let extract = sentences.prefix(extractLength).joined(separator: ". ")
         
+        // Keep this user-facing (it will appear in the recordings list), so avoid scary “all providers unavailable” text.
         let fallbackSummary = """
-        **Summary (Local Extract)**
-        
-        This is a simplified local extract as all AI providers were unavailable:
+        **Local Summary**
         
         \(extract.trimmingCharacters(in: .whitespacesAndNewlines))
-        
-        *Note: Full AI summarization was unavailable. Please check your provider configuration.*
         """
         
         return SummaryResult(clean: fallbackSummary)

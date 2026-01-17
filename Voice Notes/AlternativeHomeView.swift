@@ -19,6 +19,7 @@ struct AlternativeHomeView: View {
     @State private var showingDebugSettings = false
     @State private var currentRecordingFileName: String?
     @State private var isPaused = false
+    @State private var keepScreenAwake = false
     @State private var showingExpandedRecording = false
     @State private var showExpandedControls = false
     @State private var sessionRecordingIds: Set<UUID> = []
@@ -123,6 +124,27 @@ struct AlternativeHomeView: View {
                                 Text(formatDuration(audioRecorder.recordingDuration))
                                     .font(.poppins.body)
                                     .foregroundColor(.secondary)
+                                
+                                // Keep screen awake toggle
+                                Button {
+                                    keepScreenAwake.toggle()
+                                    UIApplication.shared.isIdleTimerDisabled = keepScreenAwake
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: keepScreenAwake ? "sun.max.fill" : "moon.zzz")
+                                            .font(.system(size: 14, weight: .medium))
+                                        Text(keepScreenAwake ? "Scherm actief" : "Scherm kan dimmen")
+                                            .font(.system(size: 13, weight: .medium))
+                                    }
+                                    .foregroundColor(keepScreenAwake ? .orange : .secondary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            .fill(keepScreenAwake ? Color.orange.opacity(0.15) : Color.secondary.opacity(0.1))
+                                    )
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -193,8 +215,8 @@ struct AlternativeHomeView: View {
                         .contentShape(Circle())
                         .scaleEffect(recordingButtonScale)
                         .animation(.easeInOut(duration: 0.2), value: recordingButtonScale)
-                        .disabled(!audioRecorder.isRecording && (usageVM.isOverLimit || usageVM.isLoading))
-                        .opacity(!audioRecorder.isRecording && (usageVM.isOverLimit || usageVM.isLoading) ? 0.5 : 1.0)
+                        .disabled(audioRecorder.isStartingRecording || (!audioRecorder.isRecording && (usageVM.isOverLimit || usageVM.isLoading)))
+                        .opacity(audioRecorder.isStartingRecording || (!audioRecorder.isRecording && (usageVM.isOverLimit || usageVM.isLoading)) ? 0.5 : 1.0)
                         .accessibilityLabel(audioRecorder.isRecording ? "Stop recording" : "Start recording")
                         .applyIf(isLiquidGlassAvailable) { view in
                             view.glassEffect(.regular.interactive())
@@ -404,7 +426,7 @@ struct AlternativeHomeView: View {
             Text(NSLocalizedString("home.reset_message", comment: "Reset message"))
         }
         .sheet(item: $selectedRecording) { recording in
-            RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
+            RecordingAssistantView(recordingId: recording.id, recordingsManager: recordingsManager)
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView(showingAlternativeView: .constant(false), recordingsManager: recordingsManager)
@@ -544,6 +566,13 @@ private struct ExpandedRecordingSheet: View {
     
     private func stopRecording() {
         isPaused = false
+        
+        // Turn off keep-screen-awake when stopping
+        if keepScreenAwake {
+            keepScreenAwake = false
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+        
         let result = audioRecorder.stopRecording()
 
         print("🎙️ AlternativeHomeView: Recording stopped. Duration: \(result.duration) seconds")
@@ -833,12 +862,8 @@ struct CompactRecordingCard: View {
         switch recording.status {
         case .transcribing:
             return .blue
-        case .transcribingPaused:
-            return .blue.opacity(0.7)
         case .summarizing:
             return .orange
-        case .summarizingPaused:
-            return .orange.opacity(0.7)
         case .failed:
             return .red
         case .done:
@@ -852,12 +877,8 @@ struct CompactRecordingCard: View {
         switch recording.status {
         case .transcribing:
             return "waveform"
-        case .transcribingPaused:
-            return "pause.circle.fill"
         case .summarizing:
             return "brain.head.profile"
-        case .summarizingPaused:
-            return "pause.circle.fill"
         case .failed:
             return "exclamationmark.triangle"
         case .done:
@@ -871,8 +892,6 @@ struct CompactRecordingCard: View {
         switch recording.status {
         case .transcribing:
             return NSLocalizedString("recording.transcribing", comment: "Transcribing")
-        case .transcribingPaused:
-            return NSLocalizedString("recording.transcribing_paused", comment: "Transcription Paused")
         case .summarizing:
             // Check if large transcript
             if let transcript = recording.transcript, transcript.count > 50000 {
@@ -880,8 +899,6 @@ struct CompactRecordingCard: View {
                 return String(format: NSLocalizedString("progress.large_transcript_status", comment: "Large transcript status"), estimatedMinutes)
             }
             return NSLocalizedString("recording.summarizing", comment: "Summarizing")
-        case .summarizingPaused:
-            return NSLocalizedString("recording.summarizing_paused", comment: "Summary Paused")
         case .failed:
             return NSLocalizedString("recording.failed", comment: "Failed")
         case .done:
@@ -1098,12 +1115,8 @@ struct LatestRecordingCard: View {
         switch recording.status {
         case .transcribing:
             return .blue
-        case .transcribingPaused:
-            return .blue.opacity(0.7)
         case .summarizing:
             return .orange
-        case .summarizingPaused:
-            return .orange.opacity(0.7)
         case .failed:
             return .red
         case .done:
@@ -1117,12 +1130,8 @@ struct LatestRecordingCard: View {
         switch recording.status {
         case .transcribing:
             return "waveform"
-        case .transcribingPaused:
-            return "pause.circle.fill"
         case .summarizing:
             return "brain.head.profile"
-        case .summarizingPaused:
-            return "pause.circle.fill"
         case .failed:
             return "exclamationmark.triangle"
         case .done:
@@ -1142,34 +1151,6 @@ struct LatestRecordingCard: View {
                 Text("Transcribing: \(Int(progress * 100))%")
                     .font(.poppins.caption)
                     .foregroundColor(.blue)
-
-                // Pause button
-                Button(action: {
-                    recordingsManager.pauseTranscription(for: recording)
-                }) {
-                    Image(systemName: "pause.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.blue)
-                }
-                .buttonStyle(.plain)
-            }
-        case .transcribingPaused(let progress):
-            HStack(spacing: 8) {
-                ProgressView(value: progress)
-                    .frame(height: 4)
-                Text("Paused: \(Int(progress * 100))%")
-                    .font(.poppins.caption)
-                    .foregroundColor(.orange)
-
-                // Resume button
-                Button(action: {
-                    recordingsManager.resumeTranscription(for: recording)
-                }) {
-                    Image(systemName: "play.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.green)
-                }
-                .buttonStyle(.plain)
             }
         case .summarizing(let progress):
             HStack(spacing: 8) {
@@ -1178,34 +1159,6 @@ struct LatestRecordingCard: View {
                 Text("Creating summary: \(Int(progress * 100))%")
                     .font(.poppins.caption)
                     .foregroundColor(.orange)
-
-                // Pause button
-                Button(action: {
-                    recordingsManager.pauseSummarization(for: recording)
-                }) {
-                    Image(systemName: "pause.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.orange)
-                }
-                .buttonStyle(.plain)
-            }
-        case .summarizingPaused(let progress):
-            HStack(spacing: 8) {
-                ProgressView(value: progress)
-                    .frame(height: 4)
-                Text("Summary paused: \(Int(progress * 100))%")
-                    .font(.poppins.caption)
-                    .foregroundColor(.orange.opacity(0.7))
-
-                // Resume button
-                Button(action: {
-                    recordingsManager.resumeSummarization(for: recording)
-                }) {
-                    Image(systemName: "play.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.green)
-                }
-                .buttonStyle(.plain)
             }
         case .failed(let reason):
             HStack(spacing: 8) {

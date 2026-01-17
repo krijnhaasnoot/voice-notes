@@ -52,12 +52,9 @@ struct ContentView: View {
                     ZStack(alignment: .topTrailing) {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 20) {
-                                VStack(spacing: 16) {
-                                    // Minutes meter
-                                    MinutesMeterView(compact: true)
-                                        .padding(.horizontal)
-
+                                VStack(spacing: 32) {
                                     recordButton
+                                        .padding(.top, 20)
 
                                     recordingStatusView
                                 }
@@ -99,7 +96,10 @@ struct ContentView: View {
                 }
             }
             // Remove .navigationBarHidden(true)
-            .onAppear { requestPermissions() }
+            .onAppear {
+                requestPermissions()
+                setupAutoStoppedRecordingHandler()
+            }
             .alert("Permissions Required", isPresented: $showingPermissionAlert) {
                 Button("Settings") {
                     if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
@@ -127,7 +127,7 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.large)
         }
         .sheet(item: $selectedRecording) { recording in
-            RecordingDetailView(recordingId: recording.id, recordingsManager: recordingsManager)
+            RecordingAssistantView(recordingId: recording.id, recordingsManager: recordingsManager)
         }
         .sheet(isPresented: $isSharePresented) {
             ShareSheet(items: shareItems)
@@ -157,15 +157,9 @@ struct ContentView: View {
     }
 
     private var recordButton: some View {
-        let canStartRecording = minutesTracker.canRecord && subscriptionManager.canRecord
-
-        return Button(action: {
+        Button(action: {
             if !audioRecorder.isRecording {
-                if !minutesTracker.canRecord {
-                    showingMinutesExhaustedAlert = true
-                } else if subscriptionManager.isOwnKeySubscriber && !subscriptionManager.hasApiKeyConfigured {
-                    showingApiKeyAlert = true
-                } else if permissionGranted {
+                if permissionGranted {
                     toggleRecording()
                 } else {
                     requestPermissions()
@@ -174,18 +168,45 @@ struct ContentView: View {
                 toggleRecording()
             }
         }) {
-            Circle()
-                .fill(audioRecorder.isRecording ? Color.red : (canStartRecording ? Color.blue : Color.gray))
-                .frame(width: 60, height: 60)
-                .overlay(
-                    Image(systemName: audioRecorder.isRecording ? "stop.fill" : "mic.fill")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.white)
-                )
-                .opacity((!audioRecorder.isRecording && !canStartRecording) ? 0.5 : 1.0)
+            ZStack {
+                // Outer glow
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                (audioRecorder.isRecording ? Color.red : Color.blue).opacity(0.3),
+                                (audioRecorder.isRecording ? Color.red : Color.blue).opacity(0.0)
+                            ],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 50
+                        )
+                    )
+                    .frame(width: 100, height: 100)
+                
+                // Main button
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: audioRecorder.isRecording 
+                                ? [Color.red, Color.red.opacity(0.8)]
+                                : [Color.blue, Color.blue.opacity(0.8)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 72, height: 72)
+                    .shadow(color: (audioRecorder.isRecording ? Color.red : Color.blue).opacity(0.4), radius: 12, x: 0, y: 6)
+                
+                // Icon
+                Image(systemName: audioRecorder.isRecording ? "stop.fill" : "mic.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+            .scaleEffect(audioRecorder.isRecording ? 1.0 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: audioRecorder.isRecording)
         }
         .buttonStyle(.plain)
-        .contentShape(Circle())
         .accessibilityLabel(audioRecorder.isRecording ? "Stop recording" : "Start recording")
     }
 
@@ -251,20 +272,23 @@ struct ContentView: View {
                 }
 
                 if let fileName = currentRecordingFileName {
-                    let newRecording = Recording(fileName: fileName, date: Date(), duration: result.duration, title: "")
-
-                    await MainActor.run {
-                        recordingsManager.addRecording(newRecording)
-                    }
-
                     // Only start transcription if we have a valid file with content
                     if let fileSize = result.fileSize, fileSize > 0 {
-                        print("🎯 ContentView: Starting transcription for \(fileName) (size: \(fileSize) bytes)")
+                        print("🎯 ContentView: Creating recording for \(fileName) (size: \(fileSize) bytes)")
+                        
+                        let newRecording = Recording(fileName: fileName, date: Date(), duration: result.duration, title: "")
+
                         await MainActor.run {
+                            // Add the recording to the list
+                            recordingsManager.addRecording(newRecording)
+                            
+                            // Start transcription after adding
+                            print("🎯 ContentView: Starting transcription for \(fileName)")
                             recordingsManager.startTranscription(for: newRecording)
                         }
                     } else {
-                        print("🎯 ContentView: ❌ NOT starting transcription - fileSize: \(result.fileSize ?? -1)")
+                        print("🎯 ContentView: ❌ Recording file has no content - fileSize: \(result.fileSize ?? -1)")
+                        print("🎯 ContentView: ❌ NOT creating recording or starting transcription")
                     }
 
                     currentRecordingFileName = nil
@@ -355,25 +379,55 @@ struct ContentView: View {
     
     private func extractPreviewFromSummary(_ summary: String) -> String {
         let lines = summary.components(separatedBy: .newlines)
-        
+
         // Skip title/header lines and find the first meaningful content
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            
+
             // Skip empty lines, title headers, and section markers
-            if trimmed.isEmpty || 
-               trimmed.hasPrefix("**") || 
+            if trimmed.isEmpty ||
+               trimmed.hasPrefix("**") ||
                trimmed.hasPrefix("#") ||
                trimmed.count < 10 {
                 continue
             }
-            
+
             // Return first meaningful content line as preview
             return trimmed.count > 100 ? String(trimmed.prefix(100)) + "..." : trimmed
         }
-        
+
         // If no meaningful content found, return first part of summary
         return String(summary.prefix(100)) + (summary.count > 100 ? "..." : "")
+    }
+
+    private func setupAutoStoppedRecordingHandler() {
+        NotificationCenter.default.addObserver(
+            forName: .recordingAutoStopped,
+            object: nil,
+            queue: .main
+        ) { [weak recordingsManager, weak minutesTracker] notification in
+            guard let userInfo = notification.userInfo,
+                  let fileName = userInfo["fileName"] as? String,
+                  let duration = userInfo["duration"] as? TimeInterval,
+                  let fileURL = userInfo["fileURL"] as? URL,
+                  let fileSize = userInfo["fileSize"] as? Int64,
+                  fileSize > 0 else {
+                print("❌ ContentView: Invalid auto-stopped recording notification")
+                return
+            }
+
+            print("🎙️ ContentView: Auto-stopped recording received - \(fileName)")
+            print("    Duration: \(duration)s, Size: \(fileSize) bytes")
+
+            // Track usage
+            minutesTracker?.addUsage(seconds: duration)
+
+            // Create and add recording
+            let newRecording = Recording(fileName: fileName, date: Date(), duration: duration, title: "")
+            recordingsManager?.addRecording(newRecording)
+
+            print("✅ ContentView: Auto-stopped recording saved and added to list")
+        }
     }
     
     private func shareRecordingImmediately(_ recording: Recording) {
@@ -386,12 +440,12 @@ struct ContentView: View {
     // MARK: - Horizontal Layout Components
     
     private var recordingSection: some View {
-        VStack(spacing: 24) {
-            VStack(spacing: 16) {
-                recordButton
-                recordingStatusView
-            }
-            .padding(.top, 40)
+        VStack(spacing: 32) {
+            recordButton
+                .padding(.top, 60)
+            
+            recordingStatusView
+            
             Spacer()
         }
         .padding()
@@ -441,55 +495,62 @@ struct ContentView: View {
     // MARK: - Extracted View Components
     
     private var recordingStatusView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             if let error = audioRecorder.lastError {
-                Text(error)
-                    .font(.poppins.caption)
-                    .foregroundColor(.blue)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 14))
+                    Text(error)
+                        .font(.system(size: 15, weight: .regular))
+                }
+                .foregroundColor(.orange)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
             } else {
-                Text(audioRecorder.isRecording ? "Recording… \(Int(audioRecorder.recordingDuration))s" : "Tap to start recording")
-                    .font(.poppins.title3)
-                    .foregroundColor(.secondary)
+                Text(audioRecorder.isRecording 
+                    ? "Recording \(formatDuration(audioRecorder.recordingDuration))" 
+                    : "Tap to start recording")
+                    .font(.system(size: 17, weight: audioRecorder.isRecording ? .semibold : .regular))
+                    .foregroundColor(audioRecorder.isRecording ? .red : .secondary)
                     .multilineTextAlignment(.center)
+                    .animation(.easeInOut(duration: 0.2), value: audioRecorder.isRecording)
             }
             
-            // Debug: Show recent transcription status
-            if let mostRecent = recordingsManager.recordings.first {
-                switch mostRecent.status {
+            // Show active processing status only (not failed/done states)
+            if let processingRecording = recordingsManager.recordings.first(where: { $0.status.isProcessing }) {
+                switch processingRecording.status {
                 case .transcribing(let progress):
-                    Text("Transcribing: \(Int(progress * 100))%")
-                        .font(.poppins.caption)
-                        .foregroundColor(.blue)
-                case .transcribingPaused(let progress):
-                    Text("⏸️ Transcribing paused: \(Int(progress * 100))%")
-                        .font(.poppins.caption)
-                        .foregroundColor(.blue.opacity(0.7))
-                case .summarizing(let progress):
-                    Text("Summarizing: \(Int(progress * 100))%")
-                        .font(.poppins.caption)
-                        .foregroundColor(.green)
-                case .summarizingPaused(let progress):
-                    Text("⏸️ Summarizing paused: \(Int(progress * 100))%")
-                        .font(.poppins.caption)
-                        .foregroundColor(.green.opacity(0.7))
-                case .failed(let reason):
-                    Text("Failed: \(reason)")
-                        .font(.poppins.caption)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                case .done:
-                    if let transcript = mostRecent.transcript, !transcript.isEmpty {
-                        Text("✅ Transcribed: \(transcript.count) chars")
-                            .font(.poppins.caption)
-                            .foregroundColor(.green)
+                    HStack(spacing: 8) {
+                        ProgressView(value: progress)
+                            .frame(width: 80)
+                        Text("Transcribing \(Int(progress * 100))%")
+                            .font(.system(size: 14, weight: .medium))
                     }
-                case .idle:
+                    .foregroundColor(.blue)
+                    .transition(.opacity.combined(with: .scale))
+                    
+                case .summarizing(let progress):
+                    HStack(spacing: 8) {
+                        ProgressView(value: progress)
+                            .frame(width: 80)
+                        Text("Summarizing \(Int(progress * 100))%")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .foregroundColor(.orange)
+                    .transition(.opacity.combined(with: .scale))
+                    
+                default:
                     EmptyView()
                 }
             }
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: recordingsManager.recordings.first?.status)
+    }
+    
+    private func formatDuration(_ seconds: TimeInterval) -> String {
+        let minutes = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return String(format: "%d:%02d", minutes, secs)
     }
     
     private var recordingsList: some View {
@@ -659,6 +720,19 @@ struct RecordingListRow: View, Equatable {
                             .lineLimit(1)
                     }
                 }
+
+                // Transcription model label (shows once transcript exists)
+                if let model = recording.transcriptionModel, !model.isEmpty, hasTranscript {
+                    HStack(spacing: 6) {
+                        Image(systemName: "cpu")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary.opacity(0.7))
+                        Text(model)
+                            .font(.poppins.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
                 
                 statusView
                 
@@ -710,12 +784,8 @@ struct RecordingListRow: View, Equatable {
         switch status {
         case .transcribing:
             return .blue
-        case .transcribingPaused:
-            return .blue.opacity(0.7)
         case .summarizing:
             return .orange
-        case .summarizingPaused:
-            return .orange.opacity(0.7)
         case .failed:
             return .red
         case .done:
@@ -729,12 +799,8 @@ struct RecordingListRow: View, Equatable {
         switch status {
         case .transcribing:
             return "waveform.circle.fill"
-        case .transcribingPaused:
-            return "pause.circle.fill"
         case .summarizing:
             return "brain.head.profile.fill"
-        case .summarizingPaused:
-            return "pause.circle.fill"
         case .failed:
             return "exclamationmark.triangle.fill"
         case .done:
@@ -760,15 +826,6 @@ struct RecordingListRow: View, Equatable {
                     .foregroundColor(.blue)
             }
 
-        case .transcribingPaused(let progress):
-            HStack {
-                ProgressView(value: progress)
-                    .frame(width: 100)
-                Text("⏸️ Transcribing paused: \(Int(progress * 100))%")
-                    .font(.poppins.subheadline)
-                    .foregroundColor(.blue.opacity(0.7))
-            }
-
         case .summarizing(let progress):
             HStack {
                 ProgressView(value: progress)
@@ -776,15 +833,6 @@ struct RecordingListRow: View, Equatable {
                 Text("Summarizing... \(Int(progress * 100))%")
                     .font(.poppins.subheadline)
                     .foregroundColor(.orange)
-            }
-
-        case .summarizingPaused(let progress):
-            HStack {
-                ProgressView(value: progress)
-                    .frame(width: 100)
-                Text("⏸️ Summarizing paused: \(Int(progress * 100))%")
-                    .font(.poppins.subheadline)
-                    .foregroundColor(.orange.opacity(0.7))
             }
 
         case .failed(let reason):
@@ -817,5 +865,7 @@ struct RecordingListRow: View, Equatable {
         return String(format: "%d:%02d", m, s)
     }
 }
+
+#Preview { ContentView() }
 
 #Preview { ContentView() }

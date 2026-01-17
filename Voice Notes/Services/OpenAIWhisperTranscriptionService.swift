@@ -22,14 +22,27 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
     }
 
     static func createFromInfoPlist() -> OpenAIWhisperTranscriptionService? {
-        guard let apiKey = Bundle.main.object(forInfoDictionaryKey: "OpenAIAPIKey") as? String,
-              !apiKey.isEmpty,
-              !apiKey.hasPrefix("$("),
-              apiKey.hasPrefix("sk-") else {
-            print("🔑 ❌ OpenAI API Key not found or invalid in Info.plist")
+        guard let apiKey = Bundle.main.object(forInfoDictionaryKey: "OpenAIAPIKey") as? String else {
+            print("🔑 ❌ OpenAI API Key not found in Info.plist")
             return nil
         }
-        print("🔑 ✅ OpenAI API Key loaded from Info.plist")
+        
+        guard !apiKey.isEmpty else {
+            print("🔑 ❌ OpenAI API Key is empty")
+            return nil
+        }
+        
+        guard !apiKey.hasPrefix("$(") else {
+            print("🔑 ❌ OpenAI API Key is still a placeholder: \(apiKey)")
+            return nil
+        }
+        
+        guard apiKey.hasPrefix("sk-") else {
+            print("🔑 ❌ OpenAI API Key has invalid format (should start with 'sk-'): \(apiKey.prefix(10))...")
+            return nil
+        }
+        
+        print("🔑 ✅ OpenAI API Key loaded from Info.plist (length: \(apiKey.count))")
         return OpenAIWhisperTranscriptionService(apiKey: apiKey)
     }
     
@@ -53,7 +66,8 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
         }
 
         // Otherwise use single request with retry
-        return try await transcribeWithRetry(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: 0)
+        let raw = try await transcribeWithRetry(url: url, languageHint: languageHint, onDevicePreferred: onDevicePreferred, progress: progress, cancelToken: cancelToken, retryCount: 0)
+        return TranscriptPostProcessor.format(raw)
     }
 
     // MARK: - Chunking for Long Recordings
@@ -183,16 +197,21 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
         if retryCount > 0 {
             print("🔤 Retry attempt \(retryCount)")
         }
+        
+        print("🔤 transcribeWithRetry called for: \(url.lastPathComponent)")
 
         guard FileManager.default.fileExists(atPath: url.path) else {
+            print("🔤 ❌ File not found at path: \(url.path)")
             throw TranscriptionError.fileNotFound
         }
         
         if cancelToken.isCancelled {
+            print("🔤 ❌ Cancellation requested")
             throw TranscriptionError.cancelled
         }
         
         guard !apiKey.isEmpty else {
+            print("🔤 ❌ API key is empty")
             throw TranscriptionError.apiKeyMissing
         }
         
@@ -239,11 +258,19 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
         body.append("Content-Disposition: form-data; name=\"model\"\r\n\r\n".data(using: .utf8)!)
         body.append("\(model)\r\n".data(using: .utf8)!)
 
+        // Validate and add language hint (only if it's a valid ISO 639-1 code)
         if let languageHint = languageHint {
-            let languageCode = languageHint.prefix(2)
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"language\"\r\n\r\n".data(using: .utf8)!)
-            body.append("\(languageCode)\r\n".data(using: .utf8)!)
+            let languageCode = String(languageHint.prefix(2)).lowercased()
+            // Only add language if it looks like a valid ISO 639-1 code
+            let validLanguages = ["en", "nl", "es", "fr", "de", "it", "pt", "pl", "tr", "ru", "ja", "ko", "zh", "ar", "hi", "sv", "da", "no", "fi"]
+            if validLanguages.contains(languageCode) {
+                print("🔤 Using language hint: \(languageCode)")
+                body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Disposition: form-data; name=\"language\"\r\n\r\n".data(using: .utf8)!)
+                body.append("\(languageCode)\r\n".data(using: .utf8)!)
+            } else {
+                print("🔤 Skipping invalid language hint: \(languageHint) - letting Whisper auto-detect")
+            }
         }
 
         // Request verbose_json format to get timestamps for speaker detection
@@ -256,15 +283,23 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
         request.httpBody = body
         
         progress(0.1)
+        print("🔤 Progress: 10% - Request prepared, body size: \(body.count) bytes")
         
         if cancelToken.isCancelled {
             throw TranscriptionError.cancelled
         }
         
+        print("🔤 Sending request to OpenAI Whisper API...")
+        print("🔤 API endpoint: \(request.url?.absoluteString ?? "unknown")")
+        print("🔤 Model: \(model)")
+        print("🔤 File: \(fileName), Size: \(audioData.count) bytes")
+        print("🔤 Content-Type: \(contentType(for: processedURL))")
+        
         do {
             let (data, response) = try await urlSession.data(for: request)
             
             progress(0.9)
+            print("🔤 Progress: 90% - Response received, parsing...")
             
             if cancelToken.isCancelled {
                 throw TranscriptionError.cancelled
@@ -276,13 +311,27 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
             
             switch httpResponse.statusCode {
             case 200:
-                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                print("🔤 ✅ Received 200 response, data size: \(data.count) bytes")
+                
+                // Try to parse JSON
+                guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    // Log response for debugging
+                    let responseString = String(data: data, encoding: .utf8) ?? "Unable to decode response"
+                    print("🔤 ❌ Failed to parse JSON response")
+                    print("🔤 Response preview: \(responseString.prefix(500))")
+                    throw TranscriptionError.invalidResponse
+                }
+                
+                print("🔤 JSON parsed successfully, keys: \(json.keys.joined(separator: ", "))")
 
                 // Parse verbose_json response with segments
-                if let segments = json?["segments"] as? [[String: Any]] {
+                if let segments = json["segments"] as? [[String: Any]] {
+                    print("🔤 Found \(segments.count) segments, formatting with speaker detection")
+                    
                     let transcript = formatTranscriptWithSpeakers(segments: segments)
 
                     progress(1.0)
+                    print("🔤 ✅ Transcription complete with segments (\(transcript.count) chars)")
 
                     // Cleanup compressed file if we created one
                     if processedURL != url {
@@ -294,11 +343,14 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
                 }
 
                 // Fallback to plain text if segments not available
-                guard let transcript = json?["text"] as? String else {
+                print("🔤 No segments found, using plain text fallback")
+                guard let transcript = json["text"] as? String else {
+                    print("🔤 ❌ No 'text' field in response either")
                     throw TranscriptionError.invalidResponse
                 }
 
                 progress(1.0)
+                print("🔤 ✅ Transcription complete as plain text (\(transcript.count) chars)")
 
                 // Cleanup compressed file if we created one
                 if processedURL != url {
@@ -344,6 +396,19 @@ actor OpenAIWhisperTranscriptionService: TranscriptionService {
 
                 throw TranscriptionError.networkError(NSError(domain: "OpenAI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error (\(httpResponse.statusCode)). Please try again later."]))
 
+            case 400:
+                let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+                print("🔤 ❌ OpenAI API Error 400 (Bad Request): \(errorBody)")
+                
+                if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let error = errorData["error"] as? [String: Any],
+                   let message = error["message"] as? String {
+                    print("🔤 ❌ Error message: \(message)")
+                    throw TranscriptionError.networkError(NSError(domain: "OpenAI", code: 400, userInfo: [NSLocalizedDescriptionKey: "OpenAI Error: \(message)"]))
+                } else {
+                    throw TranscriptionError.networkError(NSError(domain: "OpenAI", code: 400, userInfo: [NSLocalizedDescriptionKey: "Bad request: \(errorBody)"]))
+                }
+                
             default:
                 let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
                 print("OpenAI API Error \(httpResponse.statusCode): \(errorBody)")

@@ -37,48 +37,27 @@ enum SummaryLength: String, CaseIterable, Identifiable {
     }
 }
 
-// Mode-specific summary templates
+// Mode-specific summary templates - Simplified to 3 modes
 enum SummaryMode: String, CaseIterable, Identifiable {
-    case primaryCare = "primaryCare"
-    case patientRecord = "patientRecord"
-    case dentist = "dentist"
-    case techTeam = "techTeam"
-    case planning = "planning"
-    case alignment = "alignment"
-    case brainstorm = "brainstorm"
-    case lecture = "lecture"
-    case interview = "interview"
+    case medical = "medical"
+    case work = "work"
     case personal = "personal"
-    
+
     var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
-        case .primaryCare: return NSLocalizedString("summary.mode.primaryCare", comment: "Primary care summary mode")
-        case .patientRecord: return NSLocalizedString("summary.mode.patientRecord", comment: "Patient record summary mode")
-        case .dentist:     return NSLocalizedString("summary.mode.dentist", comment: "Dentist summary mode")
-        case .techTeam:    return NSLocalizedString("summary.mode.techTeam", comment: "Tech team summary mode")
-        case .planning:    return NSLocalizedString("summary.mode.planning", comment: "Planning summary mode")
-        case .alignment:   return NSLocalizedString("summary.mode.alignment", comment: "Alignment summary mode")
-        case .brainstorm:  return NSLocalizedString("summary.mode.brainstorm", comment: "Brainstorm summary mode")
-        case .lecture:     return NSLocalizedString("summary.mode.lecture", comment: "Lecture summary mode")
-        case .interview:   return NSLocalizedString("summary.mode.interview", comment: "Interview summary mode")
-        case .personal:    return NSLocalizedString("summary.mode.personal", comment: "Personal summary mode")
+        case .medical: return NSLocalizedString("summary.mode.medical", comment: "Medical summary mode")
+        case .work:    return NSLocalizedString("summary.mode.work", comment: "Work summary mode")
+        case .personal: return NSLocalizedString("summary.mode.personal", comment: "Personal summary mode")
         }
     }
-    
+
     var shortDescription: String {
         switch self {
-        case .primaryCare: return "Medical consultations and healthcare discussions"
-        case .patientRecord: return "Comprehensive patient documentation and medical records"
-        case .dentist:     return "Dental treatments and oral health consultations"
-        case .techTeam:    return "Technical meetings and development discussions"
-        case .planning:    return "Project planning and strategic sessions"
-        case .alignment:   return "Team coordination and 1:1 meetings"
-        case .brainstorm:  return "Creative ideation and brainstorming sessions"
-        case .lecture:     return "Educational content and learning sessions"
-        case .interview:   return "Interviews and structured Q&A conversations"
-        case .personal:    return "General conversations and personal notes"
+        case .medical: return "Medical consultations, healthcare, and dental visits"
+        case .work:    return "Meetings, planning, brainstorms, and work discussions"
+        case .personal: return "General conversations and personal notes"
         }
     }
     
@@ -109,35 +88,14 @@ enum SummaryMode: String, CaseIterable, Identifiable {
 
         let baseFormatting = "Output must be plain text. No markdown headings (#). Put bold labels with double asterisks on their own line, then one blank line. One blank line between sections. Use bullets '• '. Omit empty sections. Do not invent facts, owners, or deadlines. \(actionItemCriteria) \(languageInstruction)"
         let lengthInstruction = length.lengthModifier
-        
+
         switch self {
-        case .primaryCare:
-            return "Summarize this primary care consultation in a clear and structured way. Start with patient context and presenting complaint. Identify the healthcare provider and patient interaction. Highlight clinical findings, diagnosis, and treatment decisions. Extract key medical themes, clinical decisions, follow-up questions, and next steps. Use medical headings and bullet points to keep it organized. Keep it factual and concise; do not add clinical interpretations not stated in the recording. Maintain a professional medical tone for quick clinical reference. Use sections: **Patient Context**, **Chief Complaint**, **Clinical Findings**, **Treatment Plan**, **Follow-up Actions**. " + lengthInstruction + " " + baseFormatting
-            
-        case .patientRecord:
-            return "Create a comprehensive patient dossier entry based on this medical consultation or examination. Document all relevant patient information in a structured medical record format. Include patient demographics if mentioned, medical history, current symptoms and complaints, physical examination findings, diagnostic test results, clinical assessments and diagnoses, prescribed treatments and medications, patient education provided, and follow-up plans. Maintain strict medical confidentiality and accuracy. Only document information explicitly stated in the recording. Use professional medical terminology and structured sections: **Patient Information**, **Medical History**, **Present Illness**, **Physical Examination**, **Diagnostic Results**, **Assessment & Diagnosis**, **Treatment Plan**, **Medications Prescribed**, **Patient Education**, **Follow-up Plan**, **Additional Notes**. " + lengthInstruction + " " + baseFormatting
-            
-        case .dentist:
-            return "Summarize this dental consultation in a clear and structured way. Start with patient context and dental concerns. Identify the dentist and patient interaction. Highlight dental findings, procedures performed, and treatment recommendations. Extract key dental themes, treatment decisions, patient questions, and next steps. Use dental headings and bullet points to keep it organized. Keep it factual and concise; do not add clinical interpretations not stated in the recording. Maintain a professional dental tone for quick reference. Use sections: **Patient Context**, **Dental Assessment**, **Procedures Performed**, **Treatment Recommendations**, **Follow-up Care**. " + lengthInstruction + " " + baseFormatting
-            
-        case .techTeam:
-            return "Summarize this technical team meeting in a clear and structured way. Start with team context and meeting purpose. Identify the participants and technical topics discussed. Highlight the main technical points, architecture decisions, and development priorities. Extract key technical themes and engineering decisions. For Action Items: ONLY include explicit tasks someone committed to doing (e.g., 'John will refactor the API', 'Deploy by Friday'). Exclude observations, discussions, or general statements. Use technical headings and bullet points to keep it organized. Keep it factual and concise; do not add technical assumptions not stated in the meeting. Maintain a professional technical tone for quick team reference. Use sections: **Meeting Context**, **Technical Discussion**, **Key Decisions**, **Action Items** (only if explicit tasks exist). " + lengthInstruction + " " + baseFormatting
-            
-        case .planning:
-            return "Summarize this planning session in a clear and structured way. Start with project context and planning objectives. Identify the participants and project scope being discussed. Highlight the main planning points, resource allocations, and timeline decisions. Extract key planning themes and strategic decisions. For Action Items: ONLY include explicit tasks with clear ownership or deadlines (e.g., 'Sarah will prepare budget by Monday'). Do not include general planning topics or observations. Use planning headings and bullet points to keep it organized. Keep it factual and concise; do not add project assumptions not stated in the session. Maintain a professional project tone for quick planning reference. Use sections: **Project Context**, **Planning Discussion**, **Key Milestones**, **Resource Decisions**, **Action Items** (only if explicit tasks exist). " + lengthInstruction + " " + baseFormatting
-            
-        case .alignment:
-            return "Summarize this alignment meeting in a clear and structured way. Start with participants and alignment objectives. Identify the team members and strategic topics being aligned on. Highlight the main alignment points, priority decisions, and coordination agreements. Extract key strategic themes and alignment decisions. For Follow-up Actions: ONLY include explicit commitments or tasks assigned to specific people. Do not include general discussion points or observations. Use alignment headings and bullet points to keep it organized. Keep it factual and concise; do not add strategic assumptions not stated in the meeting. Maintain a professional collaborative tone for quick reference. Use sections: **Alignment Context**, **Strategic Discussion**, **Key Agreements**, **Priority Decisions**, **Follow-up Actions** (only if explicit tasks exist). " + lengthInstruction + " " + baseFormatting
-            
-        case .brainstorm:
-            return "Summarize this brainstorming session in a clear and structured way. Start with participants and creative challenge being addressed. Identify the facilitator and team members contributing ideas. Highlight the main creative concepts, innovative solutions, and promising directions. Extract key creative themes and concept decisions. For Next Steps: ONLY include specific actions the team committed to (e.g., 'Test prototype with users', 'Create mockups by Friday'). Do not include vague ideas or general suggestions. Use creative headings and bullet points to keep it organized. Keep it factual and concise; do not add ideas not actually proposed in the session. Maintain an energetic yet professional tone for quick creative reference. Use sections: **Session Context**, **Creative Challenge**, **Ideas Generated**, **Promising Concepts**, **Next Steps** (only if explicit commitments exist). " + lengthInstruction + " " + baseFormatting
-            
-        case .lecture:
-            return "Summarize this educational session in a clear and structured way. Start with instructor and learning context. Identify the educator and educational objectives being covered. Highlight the main educational points, key concepts taught, and learning outcomes. Extract key educational themes, concept explanations, student questions, and next steps. Use educational headings and bullet points to keep it organized. Keep it factual and concise; do not add educational content not actually presented. Maintain a professional educational tone for quick learning reference. Use sections: **Learning Context**, **Key Concepts**, **Main Teaching Points**, **Examples Provided**, **Learning Outcomes**. " + lengthInstruction + " " + baseFormatting
-            
-        case .interview:
-            return "Summarize this interview in a clear and structured way. Start with interviewer and interviewee context. Identify the participants and interview purpose or topic. Highlight the main discussion points, key responses, and important revelations. Extract key interview themes, significant answers, follow-up questions, and next steps. Use interview headings and bullet points to keep it organized. Keep it factual and concise; do not add interpretations not stated in the interview. Maintain a professional interview tone for quick reference. Use sections: **Interview Context**, **Key Questions**, **Main Responses**, **Important Insights**, **Follow-up Items**. " + lengthInstruction + " " + baseFormatting
-            
+        case .medical:
+            return "Summarize this medical consultation in a clear and structured way. Start with patient context and presenting complaint. Identify the healthcare provider and patient interaction. Highlight clinical findings, diagnosis, and treatment decisions. Extract key medical themes, clinical decisions, follow-up questions, and next steps. Use medical headings and bullet points to keep it organized. Keep it factual and concise; do not add clinical interpretations not stated in the recording. Maintain a professional medical tone for quick clinical reference. Use sections: **Patient Context**, **Chief Complaint**, **Clinical Findings**, **Treatment Plan**, **Follow-up Actions**. " + lengthInstruction + " " + baseFormatting
+
+        case .work:
+            return "Summarize this work meeting in a clear and structured way. Start with meeting context and purpose. Identify the participants and main topics discussed. Highlight the key points, decisions made, and priorities discussed. Extract key themes and decisions. For Action Items: ONLY include explicit tasks someone committed to doing with clear ownership (e.g., 'John will review the report by Friday'). Exclude observations, discussions, or general statements. Use clear headings and bullet points to keep it organized. Keep it factual and concise; do not add assumptions not stated in the meeting. Maintain a professional tone for quick reference. Use sections: **Meeting Context**, **Main Discussion**, **Key Decisions**, **Action Items** (only if explicit tasks exist). " + lengthInstruction + " " + baseFormatting
+
         case .personal:
             return "Summarize this transcript in a clear and structured way. Start with a brief context: who the speakers are and what the topic is. Highlight the main points discussed. Extract themes and decisions. For action items or next steps: ONLY include explicit tasks that were stated as things to do (e.g., 'Call the doctor', 'Buy groceries', 'Email John the report'). Do not include general observations, context, or discussion points. If no explicit action items exist, omit that section. Use headings and bullet points to keep it organized. Keep it factual and concise; do not add information that isn't in the transcript. Maintain a neutral, professional tone so the summary is quick to read. " + lengthInstruction + " " + baseFormatting
         }
@@ -145,30 +103,16 @@ enum SummaryMode: String, CaseIterable, Identifiable {
     
     var color: Color {
         switch self {
-        case .primaryCare: return .red
-        case .patientRecord: return .teal
-        case .dentist: return .blue
-        case .techTeam: return .purple
-        case .planning: return .orange
-        case .alignment: return .green
-        case .brainstorm: return .yellow
-        case .lecture: return .indigo
-        case .interview: return .pink
+        case .medical: return .red
+        case .work: return .blue
         case .personal: return .gray
         }
     }
-    
+
     var icon: String {
         switch self {
-        case .primaryCare: return "cross.fill"
-        case .patientRecord: return "folder.fill.badge.plus"
-        case .dentist: return "mouth.fill"
-        case .techTeam: return "laptopcomputer"
-        case .planning: return "calendar"
-        case .alignment: return "arrow.triangle.2.circlepath"
-        case .brainstorm: return "lightbulb.fill"
-        case .lecture: return "graduationcap.fill"
-        case .interview: return "person.2.fill"
+        case .medical: return "cross.fill"
+        case .work: return "briefcase.fill"
         case .personal: return "doc.text"
         }
     }
@@ -185,6 +129,7 @@ struct SummarySettings {
 
 actor SummaryService {
     private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
+    // "gpt-5-nano" caused HTTP 400s in production; use a stable small model instead.
     private let model = "gpt-4o-mini"
 
     /// Detect the most appropriate mode for a transcript
@@ -435,11 +380,18 @@ actor SummaryService {
     ) async throws -> (clean: String, raw: String) {
         if cancelToken.isCancelled { throw SummarizationError.cancelled }
 
-        // Load API key
-        let apiKey = (Bundle.main.object(forInfoDictionaryKey: "OpenAIAPIKey") as? String ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        // Load API key from KeyStore first, then fall back to Info.plist
+        var apiKey: String = ""
+        if let storedKey = try? KeyStore.shared.retrieve(for: .openai) {
+            apiKey = storedKey
+            print("📝 SummaryService: Using OpenAI API key from KeyStore")
+        } else if let plistKey = Bundle.main.object(forInfoDictionaryKey: "OpenAIAPIKey") as? String {
+            apiKey = plistKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            print("📝 SummaryService: Using OpenAI API key from Info.plist")
+        }
+        
         guard !apiKey.isEmpty, !apiKey.hasPrefix("$(") else {
-            throw SummarizationError.networkError(NSError(domain: "SummaryService", code: 401, userInfo: [NSLocalizedDescriptionKey: "OpenAI API key missing."]))
+            throw SummarizationError.networkError(NSError(domain: "SummaryService", code: 401, userInfo: [NSLocalizedDescriptionKey: "OpenAI API key missing. Please add one in Settings > AI Providers."]))
         }
 
         progress(0.1)
@@ -608,11 +560,16 @@ actor SummaryService {
     ) async throws -> String {
         if cancelToken.isCancelled { throw SummarizationError.cancelled }
 
-        // Load API key
-        let apiKey = (Bundle.main.object(forInfoDictionaryKey: "OpenAIAPIKey") as? String ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        // Load API key from KeyStore first, then fall back to Info.plist
+        var apiKey: String = ""
+        if let storedKey = try? KeyStore.shared.retrieve(for: .openai) {
+            apiKey = storedKey
+        } else if let plistKey = Bundle.main.object(forInfoDictionaryKey: "OpenAIAPIKey") as? String {
+            apiKey = plistKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        
         guard !apiKey.isEmpty, !apiKey.hasPrefix("$(") else {
-            throw SummarizationError.networkError(NSError(domain: "SummaryService", code: 401, userInfo: [NSLocalizedDescriptionKey: "OpenAI API key missing."]))
+            throw SummarizationError.networkError(NSError(domain: "SummaryService", code: 401, userInfo: [NSLocalizedDescriptionKey: "OpenAI API key missing. Please add one in Settings > AI Providers."]))
         }
 
         progress(0.1)

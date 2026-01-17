@@ -66,7 +66,7 @@ struct TranscriptionTestView: View {
                             Text("Transcript (\(viewModel.transcript.count) chars)")
                                 .font(.headline)
                             
-                            Text(viewModel.transcript)
+                            MarkdownText(viewModel.transcript)
                                 .font(.body)
                                 .padding()
                                 .background(Color(.systemBackground))

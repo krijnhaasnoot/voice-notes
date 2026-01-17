@@ -85,16 +85,9 @@ class TitleGenerator {
     private func generateFallbackTitle(mode: SummaryMode?, date: Date) -> String {
         let modeWords: [String] = {
             switch mode {
-            case .primaryCare: return ["Health", "Care", "Notes"]
-            case .dentist: return ["Dental", "Visit", "Notes"]
-            case .techTeam: return ["Tech", "Team", "Meeting"]
-            case .planning: return ["Planning", "Session", "Notes"]
-            case .alignment: return ["Alignment", "Meeting", "Notes"]
-            case .brainstorm: return ["Brainstorm", "Session", "Ideas"]
-            case .lecture: return ["Lecture", "Learning", "Notes"]
-            case .interview: return ["Interview", "Session", "Notes"]
+            case .medical: return ["Medical", "Visit", "Notes"]
+            case .work: return ["Work", "Meeting", "Notes"]
             case .personal, .none: return ["Voice", "Note", "Recording"]
-            case .some(.patientRecord): return ["Patient", "Record", "Notes"]
             }
         }()
         

@@ -7,6 +7,16 @@ final class RecordingsManager: ObservableObject {
     static let shared = RecordingsManager()
 
     @Published var recordings: [Recording] = []
+    
+    // MARK: - Bulk Summary Regeneration
+    @Published var isRegeneratingSummaries: Bool = false
+    @Published var regenerateSummariesProgress: Double = 0
+    @Published var regenerateSummariesStatusText: String = ""
+    @Published var regenerateSummariesProcessedCount: Int = 0
+    @Published var regenerateSummariesTotalCount: Int = 0
+    @Published var regenerateSummariesLastError: String?
+    private var regenerateSummariesTask: Task<Void, Never>?
+
     private let userDefaults = UserDefaults.standard
     private let recordingsKey = "SavedRecordings"
     private let processingManager = ProcessingManager()
@@ -133,6 +143,7 @@ final class RecordingsManager: ObservableObject {
     @MainActor
     private func updateRecordingFromOperation(_ operation: ProcessingOperation) {
         guard let index = recordings.firstIndex(where: { $0.id == operation.recordingId }) else { 
+            print("🎯 RecordingsManager: ⚠️ Recording not found for operation \(operation.id)")
             return 
         }
         
@@ -140,6 +151,7 @@ final class RecordingsManager: ObservableObject {
         var newStatus = currentRecording.status
         var newTranscript = currentRecording.transcript
         var newSummary = currentRecording.summary
+        var newRawSummary = currentRecording.rawSummary
         var newTranscriptDate = currentRecording.transcriptLastUpdated
         var newSummaryDate = currentRecording.summaryLastUpdated
         var newTranscriptionModel = currentRecording.transcriptionModel
@@ -149,38 +161,23 @@ final class RecordingsManager: ObservableObject {
             switch operation.type {
             case .transcription:
                 newStatus = .transcribing(progress: progress)
+                print("🎯 RecordingsManager: Transcription progress: \(Int(progress * 100))%")
             case .summarization:
                 newStatus = .summarizing(progress: progress)
-            }
-
-        case .paused(let progress):
-            switch operation.type {
-            case .transcription:
-                newStatus = .transcribingPaused(progress: progress)
-            case .summarization:
-                newStatus = .summarizingPaused(progress: progress)
+                print("🎯 RecordingsManager: Summarization progress: \(Int(progress * 100))%")
             }
 
         case .completed(let result):
             switch result {
             case .transcript(let transcript):
-                newTranscript = transcript
+                print("🎯 RecordingsManager: ✅ Transcription completed (\(transcript.count) chars)")
+                
+                newTranscript = TranscriptPostProcessor.format(transcript)
                 newTranscriptDate = Date()
                 newStatus = .idle
 
-                // Determine which transcription service was used
-                let useLocal = UserDefaults.standard.bool(forKey: "use_local_transcription")
-                if useLocal {
-                    // Get the selected model from ModelStore
-                    if let selectedModelID = ModelStore.shared.selectedModelID,
-                       let model = ModelStore.shared.models.first(where: { $0.id == selectedModelID }) {
-                        newTranscriptionModel = "Local (\(model.name))"
-                    } else {
-                        newTranscriptionModel = "Local"
-                    }
-                } else {
-                    newTranscriptionModel = "Cloud (OpenAI Whisper)"
-                }
+                // Record which model was used (ProcessingManager currently uses WhisperKit on-device)
+                newTranscriptionModel = "WhisperKit \(WhisperModelManager.shared.selectedModel.displayName)"
 
                 // Notify user of transcription completion
                 NotificationManager.shared.notifyTranscriptionComplete(
@@ -188,12 +185,23 @@ final class RecordingsManager: ObservableObject {
                     duration: currentRecording.duration
                 )
 
-                if !transcript.isEmpty {
-                    let _ = processingManager.startSummarization(for: operation.recordingId, transcript: transcript)
-                }
+                // Analytics: transcription completed
+                Analytics.track("transcription_completed", props: [
+                    "engine": "whisper",
+                    "duration_s": Int(currentRecording.duration)
+                ])
 
-            case .summary(let summary):
-                newSummary = summary
+                // Note: Auto-summarization now happens directly in startTranscription()
+                // No need to trigger it here anymore - keeping this logic simple!
+
+            case .summary(let clean, let raw):
+                print("🎯 RecordingsManager: ✅ Summarization completed (\(clean.count) chars)")
+                if let rawLength = raw?.count {
+                    print("    Raw summary: \(rawLength) chars")
+                }
+                
+                newSummary = clean
+                newRawSummary = raw ?? clean
                 newSummaryDate = Date()
                 newStatus = .idle
 
@@ -201,12 +209,31 @@ final class RecordingsManager: ObservableObject {
                 NotificationManager.shared.notifySummaryComplete(
                     recordingTitle: currentRecording.title.isEmpty ? "Recording" : currentRecording.title
                 )
+
+                // Analytics: summary completed
+                let activeProvider = UserDefaults.standard.string(forKey: "selectedProvider") ?? "app_default"
+                Analytics.track("summary_generated", provider: activeProvider, props: [:])
             }
 
         case .failed(let error):
+            print("🎯 RecordingsManager: ❌ Operation failed: \(error.localizedDescription)")
             newStatus = .failed(reason: error.localizedDescription)
+            
+            // Analytics: track failure
+            switch operation.type {
+            case .transcription:
+                Analytics.track("transcription_failed", props: [
+                    "reason": error.localizedDescription
+                ])
+            case .summarization:
+                let activeProvider = UserDefaults.standard.string(forKey: "selectedProvider") ?? "app_default"
+                Analytics.track("summary_failed", provider: activeProvider, props: [
+                    "reason": error.localizedDescription
+                ])
+            }
 
         case .cancelled:
+            print("🎯 RecordingsManager: Operation cancelled")
             newStatus = .idle
         }
 
@@ -216,7 +243,7 @@ final class RecordingsManager: ObservableObject {
             duration: currentRecording.duration,
             transcript: newTranscript,
             summary: newSummary,
-            rawSummary: currentRecording.rawSummary,
+            rawSummary: newRawSummary,
             status: newStatus,
             languageHint: currentRecording.languageHint,
             transcriptLastUpdated: newTranscriptDate,
@@ -248,14 +275,13 @@ final class RecordingsManager: ObservableObject {
         // Schedule background processing
         BackgroundTaskManager.shared.scheduleBackgroundProcessing()
         
-        // Start transcription immediately
-        Task {
-            let _ = processingManager.startTranscription(for: recording.id, audioURL: recording.resolvedFileURL)
-            
-            // End background task after a delay to ensure processing started
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                BackgroundTaskManager.shared.endBackgroundTask()
-            }
+        // Start transcription immediately using the unified method
+        // Note: Don't call startTranscription here - let the caller decide when to start
+        // This prevents double-initiation when called from ContentView
+        
+        // End background task after a delay to ensure processing can start
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            BackgroundTaskManager.shared.endBackgroundTask(taskId)
         }
     }
     
@@ -298,9 +324,24 @@ final class RecordingsManager: ObservableObject {
                 transcriptionModel: transcriptionModel ?? currentRecording.transcriptionModel,
                 id: currentRecording.id
             )
+            
+            // Debug log for transcription model
+            if let model = transcriptionModel {
+                print("📝 updateRecording: Setting transcriptionModel to '\(model)'")
+            }
 
             recordings[index] = updatedRecording
             saveRecordings()
+            
+            // Additional debug after save
+            if transcriptionModel != nil {
+                print("📝 updateRecording: Recording saved, transcriptionModel = '\(updatedRecording.transcriptionModel ?? "nil")'")
+            }
+            
+            // Notify observers on main thread to ensure UI updates
+            DispatchQueue.main.async {
+                self.objectWillChange.send()
+            }
         }
     }
     
@@ -329,6 +370,11 @@ final class RecordingsManager: ObservableObject {
             
             recordings[index] = updatedRecording
             saveRecordings()
+            
+            // Notify observers on main thread to ensure UI updates
+            DispatchQueue.main.async {
+                self.objectWillChange.send()
+            }
         }
     }
     
@@ -364,14 +410,6 @@ final class RecordingsManager: ObservableObject {
     }
     
     func startTranscription(for recording: Recording, languageHint: String? = nil) {
-        // Check if Own Key subscriber has API key configured
-        let subscriptionManager = SubscriptionManager.shared
-        if subscriptionManager.isOwnKeySubscriber && !subscriptionManager.hasApiKeyConfigured {
-            print("🎯 RecordingsManager: ❌ Cannot start transcription - Own Key subscriber without API key")
-            updateRecording(recording.id, status: .failed(reason: "API key required. Please add your API key in Settings."))
-            return
-        }
-
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let audioURL = documentsPath.appendingPathComponent(recording.fileName)
 
@@ -380,368 +418,274 @@ final class RecordingsManager: ObservableObject {
         print("    AudioURL: \(audioURL.path)")
         print("    File exists: \(FileManager.default.fileExists(atPath: audioURL.path))")
 
-        updateRecording(recording.id, status: .transcribing(progress: 0.0), languageHint: languageHint)
-
-        // Use direct service call like RecordingViewModel does (bypassing ProcessingManager for now)
-        Task {
-            await performDirectTranscription(recordingId: recording.id, audioURL: audioURL, languageHint: languageHint)
-        }
-    }
-    
-    private func performDirectTranscription(recordingId: UUID, audioURL: URL, languageHint: String?) async {
-        // Get recording details for health check
-        guard let recording = await MainActor.run(body: { recordings.first(where: { $0.id == recordingId }) }) else {
+        // Verify file exists and has content
+        guard FileManager.default.fileExists(atPath: audioURL.path) else {
+            print("🎯 RecordingsManager: ❌ Audio file not found at path: \(audioURL.path)")
+            updateRecording(recording.id, status: .failed(reason: "Audio file not found"))
             return
         }
-
-        // Pre-flight health check
-        let fileSize = (try? FileManager.default.attributesOfItem(atPath: audioURL.path)[.size] as? Int64) ?? 0
-        let healthCheck = await ProcessingHealthCheck.shared.checkTranscriptionReadiness(
-            duration: recording.duration,
-            fileSize: fileSize
-        )
-
-        // Handle critical issues
-        switch healthCheck {
-        case .critical(let message, let suggestion):
-            await MainActor.run {
-                print("🎯 RecordingsManager: ❌ Pre-flight check failed: \(message)")
-                updateRecording(recordingId, status: .failed(reason: "\(message). \(suggestion)"))
-            }
-            return
-
-        case .warning(let message, let suggestion):
-            print("⚠️ RecordingsManager: Pre-flight warning: \(message) - \(suggestion)")
-            // Continue but log warning
-
-        case .healthy:
-            print("✅ RecordingsManager: Pre-flight check passed")
-        }
-
-        // Create transcription service
-        guard let service = OpenAITranscriptionService.createFromInfoPlist() else {
-            await MainActor.run {
-                updateRecording(recordingId, status: .failed(reason: "API key not configured"))
-            }
-            return
-        }
-
-        let startTime = Date()
-        var lastProgress: Double = 0
-        var healthChecksPassed = 0
-        var hasShownSlowWarning = false
 
         do {
-            print("🎯 RecordingsManager: Calling transcription service directly")
-            let transcript = try await service.transcribe(
-                fileURL: audioURL,
-                languageHint: languageHint,
-                progress: { progress in
-                    Task { @MainActor in
-                        // Monitor health during first 10 seconds
-                        let elapsed = Date().timeIntervalSince(startTime)
-                        if elapsed < 15.0 {
-                            let health = await ProcessingHealthCheck.shared.monitorTranscriptionHealth(
-                                startTime: startTime,
-                                progress: progress,
-                                timeout: 10.0
-                            )
-
-                            switch health {
-                            case .critical(let message, let suggestion):
-                                print("🎯 RecordingsManager: ❌ Health check failed: \(message)")
-                                // Auto-pause processing
-                                self.updateRecording(recordingId, status: .transcribingPaused(progress: progress))
-                                // Show error with suggestion
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                    self.updateRecording(recordingId, status: .failed(reason: "\(message). \(suggestion)"))
-                                }
-                                return
-
-                            case .warning(let message, let suggestion):
-                                if !hasShownSlowWarning {
-                                    print("⚠️ RecordingsManager: Health warning: \(message) - \(suggestion)")
-                                    hasShownSlowWarning = true
-                                }
-
-                            case .healthy:
-                                healthChecksPassed += 1
-                            }
-                        }
-
-                        lastProgress = progress
-                        self.updateRecording(recordingId, status: .transcribing(progress: progress))
-                    }
-                },
-                cancelToken: CancellationToken()
-            )
+            let fileAttributes = try FileManager.default.attributesOfItem(atPath: audioURL.path)
+            let fileSize = fileAttributes[.size] as? Int64 ?? 0
             
-            await MainActor.run {
-                print("🎯 RecordingsManager: ✅ Transcription completed (\(transcript.count) chars)")
-
-                // Determine which transcription service was used
-                let modelLabel: String
-                let useLocal = UserDefaults.standard.bool(forKey: "use_local_transcription")
-                if useLocal {
-                    // Get the selected model from WhisperModelManager
-                    let selectedModel = WhisperModelManager.shared.selectedModel
-                    modelLabel = "Local (\(selectedModel.displayName))"
-                } else {
-                    modelLabel = "Cloud (OpenAI Whisper)"
-                }
-
-                updateRecording(recordingId, status: .idle, transcript: transcript, transcriptionModel: modelLabel)
-
-                // Notify user
-                if let recording = recordings.first(where: { $0.id == recordingId }) {
-                    NotificationManager.shared.notifyTranscriptionComplete(
-                        recordingTitle: recording.title.isEmpty ? "Recording" : recording.title,
-                        duration: recording.duration
-                    )
-                }
-
-                // Analytics: transcription completed
-                if let recording = recordings.first(where: { $0.id == recordingId }) {
-                    Analytics.track("transcription_completed", props: [
-                        "engine": "whisper",
-                        "duration_s": Int(recording.duration)
-                    ])
-                }
-                
-                // Start summarization
-                if !transcript.isEmpty {
-                    // Check if Own Key subscriber has API key configured
-                    let subscriptionManager = SubscriptionManager.shared
-                    if subscriptionManager.isOwnKeySubscriber && !subscriptionManager.hasApiKeyConfigured {
-                        print("🎯 RecordingsManager: ❌ Cannot start summarization - Own Key subscriber without API key")
-                        updateRecording(recordingId, status: .failed(reason: "API key required. Please add your API key in Settings."))
-                    } else {
-                        performDirectSummarization(recordingId: recordingId, transcript: transcript)
-                    }
-                }
+            if fileSize == 0 {
+                print("🎯 RecordingsManager: ❌ Audio file is empty (0 bytes)")
+                updateRecording(recording.id, status: .failed(reason: "Audio file is empty"))
+                return
             }
             
+            print("🎯 RecordingsManager: ✅ File verified - size: \(fileSize) bytes")
         } catch {
-            await MainActor.run {
-                print("🎯 RecordingsManager: ❌ Transcription failed: \(error)")
-                updateRecording(recordingId, status: .failed(reason: error.localizedDescription))
+            print("🎯 RecordingsManager: ❌ Error checking file: \(error)")
+            updateRecording(recording.id, status: .failed(reason: "Error accessing audio file"))
+            return
+        }
+
+        updateRecording(recording.id, status: .transcribing(progress: 0.1))
+
+        // 🚀 Use WhisperKit on-device transcription (fast, private, no internet needed)
+        startWhisperKitTranscription(for: recording, audioURL: audioURL, languageHint: languageHint)
+    }
+    
+    // MARK: - WhisperKit On-Device Transcription
+    
+    private func startWhisperKitTranscription(for recording: Recording, audioURL: URL, languageHint: String?) {
+        Task { @MainActor in
+            do {
+                let modelName = WhisperModelManager.shared.selectedModel
+                let speedInfo = switch modelName {
+                case .tiny: "~10x faster than real-time"
+                case .base: "~5x faster than real-time"
+                case .small: "~2x faster than real-time"
+                case .medium: "~1x real-time"
+                case .large: "~0.5x real-time"
+                }
+                
+                print("🚀 WHISPERKIT: Starting on-device transcription...")
+                print("   Model: \(modelName.displayName)")
+                print("   Expected speed: \(speedInfo)")
+                
+                // Use shared instance to avoid multiple model loads
+                let whisperKitService = WhisperKitTranscriptionService.shared()
+                let cancelToken = CancellationToken()
+                
+                self.updateRecording(recording.id, status: .transcribing(progress: 0.1))
+                self.objectWillChange.send()
+                
+                let transcript = try await whisperKitService.transcribe(
+                    url: audioURL,
+                    languageHint: languageHint,
+                    onDevicePreferred: true,
+                    progress: { [weak self] progress in
+                        Task { @MainActor in
+                            guard let self = self else { return }
+                            self.updateRecording(recording.id, status: .transcribing(progress: 0.1 + progress * 0.8))
+                            self.objectWillChange.send()
+                        }
+                    },
+                    cancelToken: cancelToken
+                )
+                
+                // Store the model name that was used
+                let transcriptionModelName = "WhisperKit \(modelName.displayName)"
+                let formattedTranscript = TranscriptPostProcessor.format(transcript)
+                print("✅ WHISPERKIT: Success! \(formattedTranscript.count) chars using \(transcriptionModelName)")
+                print("📝 Saving transcription model: \(transcriptionModelName)")
+                self.updateRecording(recording.id, status: .done, transcript: formattedTranscript, transcriptionModel: transcriptionModelName)
+                print("📝 Recording updated with model info")
+                self.objectWillChange.send()
+                
+                // Auto-start summary if transcript is not empty
+                if !formattedTranscript.isEmpty {
+                    print("🔄 WHISPERKIT: Starting summary...")
+                    self.startSummarization(for: recording.id, transcript: formattedTranscript)
+                }
+                
+            } catch {
+                print("❌ WHISPERKIT: Failed - \(error.localizedDescription)")
+                self.updateRecording(recording.id, status: .failed(reason: "Transcription failed: \(error.localizedDescription)"))
+                self.objectWillChange.send()
             }
         }
     }
     
-    private func performDirectSummarization(recordingId: UUID, transcript: String) {
-        updateRecording(recordingId, status: .summarizing(progress: 0.0))
+    // MARK: - OpenAI Whisper (Cloud) Transcription
+    
+    func retryTranscription(for recording: Recording) {
+        telemetryService.logRetryTap(kind: "transcribe")
+        Analytics.track("retry_tapped", props: ["type": "transcription"])
+        
+        // Make retry visible + meaningful:
+        // Clear existing transcript/summary so UI shows "transcribing" and the user doesn't think nothing happened.
+        let modelName = "WhisperKit \(WhisperModelManager.shared.selectedModel.displayName)"
+        updateRecording(
+            recording.id,
+            status: .transcribing(progress: 0.01),
+            transcript: nil,
+            summary: nil,
+            rawSummary: nil,
+            transcriptionModel: modelName
+        )
+        objectWillChange.send()
+        
+        startTranscription(for: recording, languageHint: recording.languageHint)
+    }
 
-        Task {
-            let summaryService = EnhancedSummaryService.shared
-
+    // DIRECT SIMPLE SUMMARIZATION - Using EnhancedSummaryService
+    func startSummarization(for recordingId: UUID, transcript: String) {
+        print("📝 Starting summarization using EnhancedSummaryService...")
+        updateRecording(recordingId, status: .summarizing(progress: 0.1))
+        
+        Task { @MainActor in
             do {
-                // Pre-flight health check
-                let healthCheck = await ProcessingHealthCheck.shared.checkSummarizationReadiness(
-                    transcriptLength: transcript.count
-                )
-
-                // Handle critical issues
-                switch healthCheck {
-                case .critical(let message, let suggestion):
-                    await MainActor.run {
-                        print("❌ Pre-flight check failed: \(message)")
-                        updateRecording(recordingId, status: .failed(reason: "\(message). \(suggestion)"))
-                    }
-                    return
-
-                case .warning(let message, let suggestion):
-                    print("⚠️ Pre-flight warning: \(message) - \(suggestion)")
-
-                case .healthy:
-                    print("✅ Pre-flight check passed for summarization")
-                }
-
-                // Get user settings
-                let defaultModeString = UserDefaults.standard.string(forKey: "defaultMode") ?? SummaryMode.personal.rawValue
-                let autoDetectMode = UserDefaults.standard.bool(forKey: "autoDetectMode")
-                let defaultMode = SummaryMode(rawValue: defaultModeString) ?? .personal
-
-                var selectedMode = defaultMode
-
-                if autoDetectMode {
-                    print("🎯 RecordingsManager: Auto-detecting mode...")
-                    // NOTE: EnhancedSummaryService currently has no `detectMode` API.
-                    // If a detection API is added (e.g., `detectSummaryMode`), replace this placeholder accordingly.
-                    // For now, we fall back to the default mode to avoid compile errors.
-                    // selectedMode = try await summaryService.detectSummaryMode(
-                    //     transcript: transcript,
-                    //     cancelToken: CancellationToken()
-                    // )
-                    // print("🎯 RecordingsManager: Detected mode: \(selectedMode.rawValue)")
-                    print("🎯 RecordingsManager: Mode detection API unavailable, using default: \(selectedMode.rawValue)")
-                    await MainActor.run {
-                        updateRecordingDetectedMode(recordingId, detectedMode: selectedMode.rawValue)
-                        updateRecording(recordingId, status: .summarizing(progress: 0.1))
-                    }
-                } else {
-                    print("🎯 RecordingsManager: Using default mode: \(selectedMode.rawValue)")
-                }
-
+                // Use EnhancedSummaryService which handles API key management
+                let summaryService = EnhancedSummaryService.shared
+                
+                self.updateRecording(recordingId, status: .summarizing(progress: 0.3))
+                
                 // Get selected summary length
                 let selectedLength: SummaryLength = {
                     let lengthString = UserDefaults.standard.string(forKey: "defaultSummaryLength") ?? SummaryLength.standard.rawValue
                     return SummaryLength(rawValue: lengthString) ?? .standard
                 }()
-
-                print("🎯 RecordingsManager: Starting summarization with mode: \(selectedMode.rawValue), length: \(selectedLength.rawValue)")
-
-                // Analytics: summary requested
-                let activeProvider = "app_default" // TODO: Get actual provider from settings
-                Analytics.track("summary_requested", provider: activeProvider, props: [
-                    "mode": selectedMode.rawValue,
-                    "length": selectedLength.rawValue
-                ])
-
-                let startTime = Date()
-                var healthChecksPassed = 0
-                var hasShownSlowWarning = false
-
+                
+                print("📝 Calling EnhancedSummaryService with length: \(selectedLength.rawValue)...")
+                
                 let result = try await summaryService.summarize(
                     transcript: transcript,
+                    length: selectedLength,
                     progress: { progress in
                         Task { @MainActor in
-                            // Monitor health during first 15 seconds
-                            let elapsed = Date().timeIntervalSince(startTime)
-                            if elapsed < 15.0 {
-                                let health = await ProcessingHealthCheck.shared.monitorSummarizationHealth(
-                                    startTime: startTime,
-                                    progress: progress,
-                                    timeout: 10.0
-                                )
-
-                                switch health {
-                                case .critical(let message, let suggestion):
-                                    print("❌ Health check failed during summarization: \(message)")
-                                    // Auto-pause processing
-                                    self.updateRecording(recordingId, status: .summarizingPaused(progress: progress))
-                                    // Show error with suggestion after brief delay
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        self.updateRecording(recordingId, status: .failed(reason: "\(message). \(suggestion)"))
-                                    }
-                                    return
-
-                                case .warning(let message, let suggestion):
-                                    if !hasShownSlowWarning {
-                                        print("⚠️ Health warning: \(message) - \(suggestion)")
-                                        hasShownSlowWarning = true
-                                    }
-
-                                case .healthy:
-                                    healthChecksPassed += 1
-                                    if healthChecksPassed == 1 {
-                                        print("✅ Summarization health check passed")
-                                    }
-                                }
-                            }
-
-                            self.updateRecording(recordingId, status: .summarizing(progress: progress))
+                            self.updateRecording(recordingId, status: .summarizing(progress: 0.3 + progress * 0.6))
+                            self.objectWillChange.send()
                         }
                     },
                     cancelToken: CancellationToken()
                 )
-                let elapsedMs = Int(Date().timeIntervalSince(startTime) * 1000)
                 
-                await MainActor.run {
-                    print("🎯 RecordingsManager: ✅ Summary completed (\(result.clean.count) chars)")
-                    updateRecordingWithBothSummaries(recordingId: recordingId, cleanSummary: result.clean, rawSummary: result.raw ?? result.clean)
-
-                    // Notify user
-                    if let recording = recordings.first(where: { $0.id == recordingId }) {
-                        NotificationManager.shared.notifySummaryComplete(
-                            recordingTitle: recording.title.isEmpty ? "Recording" : recording.title
-                        )
-                    }
-
-                    // Analytics: summary completed successfully
-                    Analytics.track("summary_generated", provider: activeProvider, props: [
-                        "ms": elapsedMs
-                    ])
-                }
+                print("✅ EnhancedSummaryService: Summary done! \(result.clean.count) chars")
+                self.updateRecording(recordingId, status: .done, summary: result.clean, rawSummary: result.raw)
+                self.objectWillChange.send()
                 
             } catch {
-                await MainActor.run {
-                    print("🎯 RecordingsManager: ❌ Summarization failed: \(error)")
-                    updateRecording(recordingId, status: .failed(reason: error.localizedDescription))
-                    
-                    // Analytics: summary failed
-                    let activeProvider = "app_default" // TODO: Get actual provider from settings
-                    Analytics.track("summary_failed", provider: activeProvider, props: [
-                        "reason": error.localizedDescription
-                    ])
-                }
+                print("❌ EnhancedSummaryService: Summary failed - \(error.localizedDescription)")
+                self.updateRecording(recordingId, status: .failed(reason: "Summary generation failed: \(error.localizedDescription)"))
+                self.objectWillChange.send()
             }
         }
     }
     
-    func retryTranscription(for recording: Recording) {
-        telemetryService.logRetryTap(kind: "transcribe")
-        Analytics.track("retry_tapped", props: ["type": "transcription"])
-        startTranscription(for: recording, languageHint: recording.languageHint)
-    }
-
-    func pauseTranscription(for recording: Recording) {
-        // Find the active operation for this recording
-        if let operation = processingManager.activeOperations.values.first(where: {
-            $0.recordingId == recording.id && $0.type == .transcription
-        }) {
-            processingManager.pauseOperation(operation.id)
-            print("⏸️ RecordingsManager: Paused transcription for recording \(recording.id)")
+    // MARK: - Bulk Summary Regeneration
+    
+    /// Regenerate summaries in bulk.
+    /// - Parameter onlyFixLocalFallback: If true, only targets summaries that look like the local fallback (or missing summaries).
+    func regenerateSummariesInBulk(onlyFixLocalFallback: Bool) {
+        guard !isRegeneratingSummaries else { return }
+        
+        let candidates: [Recording] = recordings.filter { r in
+            guard let transcript = r.transcript?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !transcript.isEmpty else { return false }
+            
+            // If summary is missing, always include
+            if r.summary?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
+                return true
+            }
+            
+            guard onlyFixLocalFallback else { return true }
+            
+            let s = (r.summary ?? "")
+            return s.contains("Local Summary")
+                || s.contains("Local Extract")
+                || s.contains("simplified local extract")
+                || s.contains("Summary (Local Extract)")
+        }
+        
+        isRegeneratingSummaries = true
+        regenerateSummariesProgress = 0
+        regenerateSummariesProcessedCount = 0
+        regenerateSummariesTotalCount = candidates.count
+        regenerateSummariesLastError = nil
+        regenerateSummariesStatusText = candidates.isEmpty ? "No recordings to update" : "Preparing…"
+        
+        // Cancel any previous task just in case
+        regenerateSummariesTask?.cancel()
+        
+        regenerateSummariesTask = Task { @MainActor in
+            defer {
+                isRegeneratingSummaries = false
+                if regenerateSummariesTotalCount > 0 && regenerateSummariesProcessedCount == regenerateSummariesTotalCount {
+                    regenerateSummariesStatusText = "Done"
+                    regenerateSummariesProgress = 1.0
+                }
+            }
+            
+            guard !candidates.isEmpty else { return }
+            
+            let summaryService = EnhancedSummaryService.shared
+            let selectedLength: SummaryLength = {
+                let lengthString = UserDefaults.standard.string(forKey: "defaultSummaryLength") ?? SummaryLength.standard.rawValue
+                return SummaryLength(rawValue: lengthString) ?? .standard
+            }()
+            
+            for (idx, rec) in candidates.enumerated() {
+                if Task.isCancelled { break }
+                
+                let title = rec.title.isEmpty ? "Recording" : rec.title
+                regenerateSummariesStatusText = "Summarizing \(idx + 1) / \(candidates.count): \(title)"
+                
+                // Mark this recording as summarizing for UI feedback
+                updateRecording(rec.id, status: .summarizing(progress: 0.05))
+                
+                do {
+                    let result = try await summaryService.summarize(
+                        transcript: rec.transcript ?? "",
+                        length: selectedLength,
+                        progress: { [weak self] p in
+                            Task { @MainActor in
+                                guard let self else { return }
+                                // Recording-level progress (0.05 .. 0.95)
+                                self.updateRecording(rec.id, status: .summarizing(progress: 0.05 + p * 0.90))
+                                
+                                // Bulk-level progress
+                                let base = Double(idx) / Double(max(candidates.count, 1))
+                                let step = 1.0 / Double(max(candidates.count, 1))
+                                self.regenerateSummariesProgress = min(1.0, base + p * step)
+                            }
+                        },
+                        cancelToken: CancellationToken { Task.isCancelled }
+                    )
+                    
+                    updateRecording(rec.id, status: .done, summary: result.clean, rawSummary: result.raw)
+                } catch {
+                    regenerateSummariesLastError = error.localizedDescription
+                    updateRecording(rec.id, status: .failed(reason: "Summary generation failed: \(error.localizedDescription)"))
+                }
+                
+                regenerateSummariesProcessedCount = idx + 1
+                regenerateSummariesProgress = Double(regenerateSummariesProcessedCount) / Double(max(candidates.count, 1))
+            }
         }
     }
-
-    func resumeTranscription(for recording: Recording) {
-        // Find the active operation for this recording
-        if let operation = processingManager.activeOperations.values.first(where: {
-            $0.recordingId == recording.id && $0.type == .transcription
-        }) {
-            processingManager.resumeOperation(operation.id)
-            print("▶️ RecordingsManager: Resumed transcription for recording \(recording.id)")
-        }
+    
+    func cancelRegenerateSummariesInBulk() {
+        regenerateSummariesTask?.cancel()
+        regenerateSummariesTask = nil
+        isRegeneratingSummaries = false
+        regenerateSummariesStatusText = "Cancelled"
     }
-
-    func pauseSummarization(for recording: Recording) {
-        // Find the active operation for this recording
-        if let operation = processingManager.activeOperations.values.first(where: {
-            $0.recordingId == recording.id && $0.type == .summarization
-        }) {
-            processingManager.pauseOperation(operation.id)
-            print("⏸️ RecordingsManager: Paused summarization for recording \(recording.id)")
-        }
-    }
-
-    func resumeSummarization(for recording: Recording) {
-        // Find the active operation for this recording
-        if let operation = processingManager.activeOperations.values.first(where: {
-            $0.recordingId == recording.id && $0.type == .summarization
-        }) {
-            processingManager.resumeOperation(operation.id)
-            print("▶️ RecordingsManager: Resumed summarization for recording \(recording.id)")
-        }
-    }
-
+    
     func retrySummarization(for recording: Recording) {
-        guard let transcript = recording.transcript, !transcript.isEmpty else { return }
-
-        // Check if Own Key subscriber has API key configured
-        let subscriptionManager = SubscriptionManager.shared
-        if subscriptionManager.isOwnKeySubscriber && !subscriptionManager.hasApiKeyConfigured {
-            print("🎯 RecordingsManager: ❌ Cannot start summarization - Own Key subscriber without API key")
-            updateRecording(recording.id, status: .failed(reason: "API key required. Please add your API key in Settings."))
+        guard let transcript = recording.transcript, !transcript.isEmpty else {
+            print("❌ Cannot retry summarization - no transcript")
             return
         }
-
+        
         telemetryService.logRetryTap(kind: "summarize")
         Analytics.track("retry_tapped", props: ["type": "summary"])
-        updateRecording(recording.id, status: .summarizing(progress: 0.0))
-
-        // Use direct summarization like the main flow
-        performDirectSummarization(recordingId: recording.id, transcript: transcript)
+        
+        // Use direct simple summarization
+        startSummarization(for: recording.id, transcript: transcript)
     }
     
     func cancelProcessing(for recordingId: UUID) {
@@ -797,6 +741,11 @@ final class RecordingsManager: ObservableObject {
         
         recordings[index] = recordings[index].withTags(normalizedTags)
         saveRecordings()
+        
+        // Notify observers on main thread to ensure UI updates
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
+        }
     }
     
     func addTagToRecording(recordingId: UUID, tag: String) {
@@ -813,6 +762,11 @@ final class RecordingsManager: ObservableObject {
             
             recordings[index] = recordings[index].withTags(currentTags.normalized())
             saveRecordings()
+            
+            // Notify observers on main thread to ensure UI updates
+            DispatchQueue.main.async {
+                self.objectWillChange.send()
+            }
         }
     }
     
@@ -823,6 +777,11 @@ final class RecordingsManager: ObservableObject {
         
         recordings[index] = recordings[index].withTags(currentTags)
         saveRecordings()
+        
+        // Notify observers on main thread to ensure UI updates
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
+        }
     }
     
     private func updateRecordingWithBothSummaries(recordingId: UUID, cleanSummary: String, rawSummary: String) {

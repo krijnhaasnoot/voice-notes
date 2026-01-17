@@ -55,8 +55,18 @@ class OpenAISummaryProvider: SummaryProvider {
         cancelToken: CancellationToken
     ) async throws -> SummaryResult {
         
-        guard let apiKey = try KeyStore.shared.retrieve(for: .openai) else {
-            print("❌ OpenAISummaryProvider: API key missing")
+        // Try KeyStore first, then fallback to Info.plist
+        let apiKey: String
+        if let storedKey = try KeyStore.shared.retrieve(for: .openai) {
+            apiKey = storedKey
+            print("🔑 OpenAISummaryProvider: Using API key from KeyStore")
+        } else if let plistKey = Bundle.main.object(forInfoDictionaryKey: "OpenAIAPIKey") as? String,
+                  !plistKey.isEmpty,
+                  plistKey.hasPrefix("sk-") {
+            apiKey = plistKey
+            print("🔑 OpenAISummaryProvider: Using API key from Info.plist (fallback)")
+        } else {
+            print("❌ OpenAISummaryProvider: No API key found in KeyStore or Info.plist")
             throw SummarizationError.apiKeyMissing
         }
 
@@ -80,6 +90,8 @@ class OpenAISummaryProvider: SummaryProvider {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let requestBody: [String: Any] = [
+            // Use a widely-available, lightweight chat model for summaries.
+            // (The previous value "gpt-5-nano" caused HTTP 400s and forced local-extract fallback.)
             "model": "gpt-4o-mini",
             "messages": [
                 [

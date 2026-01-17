@@ -7,6 +7,7 @@ struct RecordingDetailView: View {
     @EnvironmentObject var documentStore: DocumentStore
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @ObservedObject private var usageVM = UsageViewModel.shared
+    @ObservedObject private var modelManager = WhisperModelManager.shared
     @State private var audioPlayer: AVAudioPlayer?
     @State private var isPlaying = false
     @State private var showingDeleteAlert = false
@@ -30,12 +31,19 @@ struct RecordingDetailView: View {
     @State private var showingListItemConfirmation = false
     @State private var detectedListItems: DetectionResult?
     @State private var lastProcessedSummary: String?
+    @State private var showingInteractivePrompts = false
+    @State private var refreshTrigger = UUID()  // Force view refresh
     @Environment(\.presentationMode) var presentationMode
+    
+    // Computed property to get current recording with live updates
+    private var recording: Recording? {
+        recordingsManager.recordings.first(where: { $0.id == recordingId })
+    }
     
     var body: some View {
         NavigationView {
             Group {
-                if let recording = recordingsManager.recordings.first(where: { $0.id == recordingId }) {
+                if let recording = recording {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {
                             headerSection(recording)
@@ -46,7 +54,12 @@ struct RecordingDetailView: View {
                             }
 
                             recordingInfoSection(recording)
-                            summarySection(recording)
+                            
+                            // Interactive AI Assistant section (new)
+                            if let transcript = recording.transcript, !transcript.isEmpty {
+                                interactivePromptsSection(recording, transcript: transcript)
+                            }
+                            
                             transcriptSection(recording)
                             actionItemsSection(recording)
                             playbackSection(recording)
@@ -58,6 +71,8 @@ struct RecordingDetailView: View {
                         }
                         .padding()
                     }
+                    // Force refresh when recording status changes
+                    .id("\(recording.id)-\(recording.status.description)-\(recording.transcript?.count ?? 0)-\(refreshTrigger)")
                 } else {
                     VStack {
                         Text("Recording not found")
@@ -148,6 +163,10 @@ struct RecordingDetailView: View {
                     }
                 )
             }
+        }
+        .onReceive(recordingsManager.objectWillChange) { _ in
+            // Force view refresh when recordingsManager changes
+            refreshTrigger = UUID()
         }
         .onChange(of: recordingsManager.recordings.count) { _ in
             // Check if summary was just completed
@@ -301,10 +320,31 @@ struct RecordingDetailView: View {
     
     private func transcriptSection(_ recording: Recording) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Transcript")
-                    .font(.poppins.headline)
-                    .fontWeight(.semibold)
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Transcript")
+                        .font(.poppins.headline)
+                        .fontWeight(.semibold)
+                    
+                    if let modelName = recording.transcriptionModel, !modelName.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "cpu")
+                                .font(.system(size: 10))
+                            Text(modelName)
+                        }
+                        .font(.poppins.caption2)
+                        .foregroundColor(.secondary)
+                    } else if recording.transcript != nil && !recording.transcript!.isEmpty {
+                        // Fallback for old recordings without model info
+                        HStack(spacing: 4) {
+                            Image(systemName: "cpu")
+                                .font(.system(size: 10))
+                            Text("Legacy transcription")
+                        }
+                        .font(.poppins.caption2)
+                        .foregroundColor(.secondary.opacity(0.6))
+                    }
+                }
                 
                 Spacer()
                 
@@ -352,6 +392,11 @@ struct RecordingDetailView: View {
                         .foregroundColor(.blue)
                 } else if case .failed = recording.status, recording.transcript == nil {
                     Button("Retry") {
+                        // Refresh usage data first (in case it's stale)
+                        Task {
+                            await usageVM.refresh()
+                        }
+                        
                         if usageVM.isOverLimit {
                             showingMinutesExhaustedAlert = true
                         } else {
@@ -359,8 +404,8 @@ struct RecordingDetailView: View {
                         }
                     }
                     .font(.poppins.body)
-                    .disabled(usageVM.isOverLimit || usageVM.isLoading || usageVM.isStale)
-                    .opacity((usageVM.isOverLimit || usageVM.isLoading || usageVM.isStale) ? 0.5 : 1.0)
+                    .disabled(usageVM.isLoading)
+                    .opacity(usageVM.isLoading ? 0.5 : 1.0)
                     .foregroundColor(.blue)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -378,20 +423,15 @@ struct RecordingDetailView: View {
                         .cornerRadius(8)
                         .frame(minHeight: 100)
                 } else {
-                    Text(transcript)
+                    FormattedSummaryText(summary: transcript)
                         .font(.poppins.body)
                         .textSelection(.enabled)
                         .padding()
                         .background(Color.secondary.opacity(0.05))
                         .cornerRadius(8)
                 }
-            } else if case .transcribing = recording.status {
-                HStack {
-                    ProgressView()
-                    Text("Processing audio...")
-                        .foregroundColor(.secondary)
-                }
-                .padding()
+            } else if case .transcribing(let progress) = recording.status {
+                transcriptionProgressView(progress: progress, duration: recording.duration)
             } else if case .failed(let reason) = recording.status {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -416,6 +456,250 @@ struct RecordingDetailView: View {
         .padding()
         .background(Color.secondary.opacity(0.1))
         .cornerRadius(12)
+    }
+    
+    private func transcriptionProgressView(progress: Double, duration: TimeInterval) -> some View {
+        VStack(spacing: 16) {
+            // Main progress indicator
+            VStack(spacing: 12) {
+                // Animated icon
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.blue.opacity(0.1))
+                            .frame(width: 48, height: 48)
+                        
+                        if #available(iOS 17.0, *) {
+                            Image(systemName: "waveform")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundColor(.blue)
+                                .symbolEffect(.variableColor.iterative, options: .repeating)
+                        } else {
+                            Image(systemName: "waveform")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Transcribing audio...")
+                            .font(.poppins.headline)
+                            .foregroundColor(.primary)
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "cpu")
+                                .font(.system(size: 10))
+                            Text("WhisperKit \(modelManager.selectedModel.displayName)")
+                                .fontWeight(.medium)
+                        }
+                        .font(.poppins.caption)
+                        .foregroundColor(.blue)
+                        
+                        Text(estimatedTimeRemaining(progress: progress, duration: duration))
+                            .font(.poppins.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                }
+                
+                // Progress bar
+                VStack(spacing: 8) {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            // Background
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.blue.opacity(0.1))
+                                .frame(height: 8)
+                            
+                            // Progress fill
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.blue.opacity(0.8), Color.blue],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geometry.size.width * progress, height: 8)
+                                .animation(.easeInOut(duration: 0.3), value: progress)
+                        }
+                    }
+                    .frame(height: 8)
+                    
+                    HStack {
+                        Text("\(Int(progress * 100))%")
+                            .font(.poppins.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.blue)
+                        
+                        Spacer()
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.blue.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+            )
+            
+            // Info message
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue)
+                
+                Text("Your transcript will appear here when processing is complete")
+                    .font(.poppins.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 4)
+        }
+        .padding()
+    }
+    
+    private func estimatedTimeRemaining(progress: Double, duration: TimeInterval) -> String {
+        guard progress > 0.1 else {
+            return "Initializing..."
+        }
+        
+        // Speed multiplier based on model
+        let speedMultiplier: Double = {
+            switch modelManager.selectedModel {
+            case .tiny: return 10.0   // ~10x faster than real-time
+            case .base: return 5.0    // ~5x faster than real-time
+            case .small: return 2.0   // ~2x faster than real-time
+            case .medium: return 1.0  // ~1x real-time
+            case .large: return 0.5   // ~0.5x (slower than real-time)
+            }
+        }()
+        
+        let estimatedTotalTime = duration / speedMultiplier
+        let elapsed = estimatedTotalTime * progress
+        let remaining = max(0, estimatedTotalTime - elapsed)
+        
+        if remaining < 1 {
+            return "Almost done..."
+        } else if remaining < 60 {
+            return "About \(Int(remaining)) seconds remaining"
+        } else {
+            let minutes = Int(remaining / 60)
+            return "About \(minutes) minute\(minutes == 1 ? "" : "s") remaining"
+        }
+    }
+    
+    private func summarizationProgressView(progress: Double, recording: Recording) -> some View {
+        VStack(spacing: 16) {
+            // Main progress indicator
+            VStack(spacing: 12) {
+                // Animated icon
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.orange.opacity(0.1))
+                            .frame(width: 48, height: 48)
+                        
+                        if #available(iOS 17.0, *) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundColor(.orange)
+                                .symbolEffect(.pulse, options: .repeating)
+                        } else {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Generating AI summary...")
+                            .font(.poppins.headline)
+                            .foregroundColor(.primary)
+                        
+                        Text(progress < 0.3 ? "Analyzing transcript..." : progress < 0.7 ? "Creating summary..." : "Finalizing...")
+                            .font(.poppins.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                }
+                
+                // Progress bar
+                VStack(spacing: 8) {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            // Background
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.orange.opacity(0.1))
+                                .frame(height: 8)
+                            
+                            // Progress fill
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.orange.opacity(0.8), Color.orange],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geometry.size.width * progress, height: 8)
+                                .animation(.easeInOut(duration: 0.3), value: progress)
+                        }
+                    }
+                    .frame(height: 8)
+                    
+                    HStack {
+                        Text("\(Int(progress * 100))%")
+                            .font(.poppins.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.orange)
+                        
+                        Spacer()
+                        
+                        Text("Claude AI")
+                            .font(.poppins.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.orange.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+            )
+            
+            // Warning for large transcripts
+            if let transcript = recording.transcript, transcript.count > 50000 {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(.orange)
+                    
+                    Text("Large transcript - this may take a few moments")
+                        .font(.poppins.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 4)
+            }
+        }
+        .padding()
+    }
+    
+    private func interactivePromptsSection(_ recording: Recording, transcript: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            InteractivePromptsView(
+                recordingId: recording.id,
+                transcript: transcript
+            )
+        }
     }
     
     private func summarySection(_ recording: Recording) -> some View {
@@ -497,23 +781,8 @@ struct RecordingDetailView: View {
                     }
                     .padding(.horizontal, 4)
                 }
-            } else if case .summarizing = recording.status {
-                VStack(spacing: 8) {
-                    HStack {
-                        ProgressView()
-                        Text(summarizingMessage(for: recording))
-                            .foregroundColor(.secondary)
-                    }
-
-                    // Show extra info for large transcripts
-                    if let transcript = recording.transcript, transcript.count > 50000 {
-                        Text(NSLocalizedString("progress.large_transcript_warning", comment: "Large transcript warning"))
-                            .font(.poppins.caption)
-                            .foregroundColor(.orange)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-                .padding()
+            } else if case .summarizing(let progress) = recording.status {
+                summarizationProgressView(progress: progress, recording: recording)
             } else if case .failed(let reason) = recording.status, recording.transcript != nil {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -1550,37 +1819,75 @@ struct FormattedSummaryText: View {
     let summary: String
     
     var body: some View {
-        // Create AttributedString manually to preserve whitespace and formatting
+        // Use iOS 15+ markdown support in AttributedString
         Text(createFormattedText())
     }
     
     private func createFormattedText() -> AttributedString {
-        var result = AttributedString()
+        // Try to parse markdown directly
+        if let attributed = try? AttributedString(markdown: summary, options: AttributedString.MarkdownParsingOptions(
+            interpretedSyntax: .inlineOnlyPreservingWhitespace
+        )) {
+            return attributed
+        }
         
-        // Split into lines and process each one
-        let lines = summary.components(separatedBy: .newlines)
+        // Fallback: manual parsing for **bold** patterns
+        return parseMarkdownManually(summary)
+    }
+    
+    private func parseMarkdownManually(_ text: String) -> AttributedString {
+        var result = AttributedString()
+        let lines = text.components(separatedBy: .newlines)
         
         for (index, line) in lines.enumerated() {
             if index > 0 {
                 result.append(AttributedString("\n"))
             }
             
-            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
-            
-            // Check if this line contains a bold label
-            if trimmedLine.hasPrefix("**") && trimmedLine.hasSuffix("**") && trimmedLine.count > 4 {
-                // This is a bold label - extract the text and make it bold
-                let labelText = String(trimmedLine.dropFirst(2).dropLast(2))
-                var boldText = AttributedString(labelText)
-                boldText.font = .headline.bold()
-                result.append(boldText)
-            } else if !trimmedLine.isEmpty {
-                // Regular text
-                result.append(AttributedString(line))
-            } else {
-                // Empty line - preserve as spacing
+            if line.trimmingCharacters(in: .whitespaces).isEmpty {
                 result.append(AttributedString(" "))
+                continue
             }
+            
+            // Parse inline **bold** patterns
+            result.append(parseInlineBold(line))
+        }
+        
+        return result
+    }
+    
+    private func parseInlineBold(_ text: String) -> AttributedString {
+        var result = AttributedString()
+        var remaining = text[...]
+        
+        while let boldStart = remaining.range(of: "**") {
+            // Add text before **
+            let beforeBold = String(remaining[..<boldStart.lowerBound])
+            if !beforeBold.isEmpty {
+                result.append(AttributedString(beforeBold))
+            }
+            
+            // Find closing **
+            let afterStart = remaining[boldStart.upperBound...]
+            if let boldEnd = afterStart.range(of: "**") {
+                // Extract bold text
+                let boldText = String(afterStart[..<boldEnd.lowerBound])
+                var boldAttr = AttributedString(boldText)
+                boldAttr.font = .body.bold()
+                result.append(boldAttr)
+                
+                // Move past closing **
+                remaining = afterStart[boldEnd.upperBound...]
+            } else {
+                // No closing **, treat ** as literal
+                result.append(AttributedString("**"))
+                remaining = afterStart
+            }
+        }
+        
+        // Add remaining text
+        if !remaining.isEmpty {
+            result.append(AttributedString(String(remaining)))
         }
         
         return result

@@ -4,24 +4,10 @@ import UIKit
 extension SummaryMode {
     var description: String {
         switch self {
-        case .primaryCare:
-            return NSLocalizedString("summary.desc.primaryCare", comment: "Primary care mode description")
-        case .patientRecord:
-            return NSLocalizedString("summary.desc.patientRecord", comment: "Patient record mode description")
-        case .dentist:
-            return NSLocalizedString("summary.desc.dentist", comment: "Dentist mode description")
-        case .techTeam:
-            return NSLocalizedString("summary.desc.techTeam", comment: "Tech team mode description")
-        case .planning:
-            return NSLocalizedString("summary.desc.planning", comment: "Planning mode description")
-        case .alignment:
-            return NSLocalizedString("summary.desc.alignment", comment: "Alignment mode description")
-        case .brainstorm:
-            return NSLocalizedString("summary.desc.brainstorm", comment: "Brainstorm mode description")
-        case .lecture:
-            return NSLocalizedString("summary.desc.lecture", comment: "Lecture mode description")
-        case .interview:
-            return NSLocalizedString("summary.desc.interview", comment: "Interview mode description")
+        case .medical:
+            return NSLocalizedString("summary.desc.medical", comment: "Medical mode description")
+        case .work:
+            return NSLocalizedString("summary.desc.work", comment: "Work mode description")
         case .personal:
             return NSLocalizedString("summary.desc.personal", comment: "Personal mode description")
         }
@@ -302,7 +288,7 @@ struct SettingsView: View {
                                     .font(.poppins.body)
                                     .foregroundColor(.primary)
 
-                                Text(NSLocalizedString("settings.advanced_settings_desc", comment: "AI provider, summaries, lists, tags, and interface"))
+                                Text(NSLocalizedString("settings.advanced_settings_desc", comment: "AI provider, summaries, and interface"))
                                     .font(.poppins.caption)
                                     .foregroundColor(.secondary)
                             }

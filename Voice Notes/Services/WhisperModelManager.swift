@@ -100,7 +100,7 @@ class WhisperModelManager: ObservableObject {
     static let shared = WhisperModelManager()
 
     @Published var downloadState: ModelDownloadState = .notDownloaded
-    @Published var selectedModel: WhisperModelSize = .base
+    @Published var selectedModel: WhisperModelSize = .base  // Balanced speed and quality
     @Published var selectedLanguage: WhisperLanguage = .dutch
 
     private let networkMonitor = NWPathMonitor()
@@ -186,35 +186,40 @@ class WhisperModelManager: ObservableObject {
     // MARK: - Bundled Model Management
 
     private func copyBundledModelsIfNeeded() {
-        // Check for bundled models in app bundle
-        // Model should be in the main bundle at path: "BundledModels/whisper-base/*"
-        guard let bundlePath = Bundle.main.path(forResource: "whisper-base", ofType: nil, inDirectory: "BundledModels") else {
-            print("ℹ️ WhisperModelManager: No bundled base model found")
-            return
+        // Check for bundled models in app bundle - prefer base for balanced speed and quality
+        // Model should be in the main bundle at path: "BundledModels/whisper-base/*" or "BundledModels/openai_whisper-base/*"
+        let modelNames = ["openai_whisper-base", "whisper-base", "openai_whisper-tiny", "whisper-tiny"]
+        
+        for modelName in modelNames {
+            if let bundlePath = Bundle.main.path(forResource: modelName, ofType: nil, inDirectory: "BundledModels") {
+                let bundleURL = URL(fileURLWithPath: bundlePath)
+                let modelSize: WhisperModelSize = modelName.contains("tiny") ? .tiny : .base
+                let destinationURL = modelPath(for: modelSize)
+                
+                // Check if already copied
+                if isModelDownloaded(modelSize) {
+                    print("ℹ️ WhisperModelManager: \(modelSize.displayName) model already exists, skipping copy")
+                    return
+                }
+                
+                // Copy bundled model to documents directory
+                do {
+                    try FileManager.default.copyItem(at: bundleURL, to: destinationURL)
+                    print("✅ WhisperModelManager: Bundled \(modelSize.displayName) model copied successfully")
+                    print("   From: \(bundleURL.path)")
+                    print("   To: \(destinationURL.path)")
+                    return
+                } catch {
+                    print("❌ WhisperModelManager: Failed to copy bundled model: \(error)")
+                }
+            }
         }
-
-        let bundleURL = URL(fileURLWithPath: bundlePath)
-        let destinationURL = modelPath(for: .base)
-
-        // Check if already copied
-        if isModelDownloaded(.base) {
-            print("ℹ️ WhisperModelManager: Base model already exists, skipping copy")
-            return
-        }
-
-        // Copy bundled model to documents directory
-        do {
-            try FileManager.default.copyItem(at: bundleURL, to: destinationURL)
-            print("✅ WhisperModelManager: Bundled base model copied successfully")
-            print("   From: \(bundleURL.path)")
-            print("   To: \(destinationURL.path)")
-        } catch {
-            print("❌ WhisperModelManager: Failed to copy bundled model: \(error)")
-        }
+        
+        print("ℹ️ WhisperModelManager: No bundled model found")
     }
 
     private func autoDownloadBaseModelIfNeeded() {
-        // Check if base model is already available
+        // Check if base model is already available (balanced speed and quality)
         if isModelDownloaded(.base) {
             print("✅ WhisperModelManager: Base model already available")
             return

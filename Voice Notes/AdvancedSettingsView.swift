@@ -4,12 +4,12 @@ struct AdvancedSettingsView: View {
     @AppStorage("defaultMode") private var defaultMode: String = SummaryMode.personal.rawValue
     @AppStorage("defaultSummaryLength") private var defaultSummaryLength: String = SummaryLength.standard.rawValue
     @AppStorage("autoDetectMode") private var autoDetectMode: Bool = false
-    @AppStorage("defaultDocumentType") private var defaultDocumentType: String = DocumentType.todo.rawValue
-    @AppStorage("autoSaveToDocuments") private var autoSaveToDocuments: Bool = false
     @AppStorage("useCompactView") private var useCompactView: Bool = true
     @Binding var showingAlternativeView: Bool
     @ObservedObject var recordingsManager: RecordingsManager
     @Environment(\.dismiss) private var dismiss
+    
+    @State private var showingRegenerateAllConfirm = false
 
     private var selectedMode: SummaryMode {
         SummaryMode(rawValue: defaultMode) ?? .personal
@@ -17,10 +17,6 @@ struct AdvancedSettingsView: View {
 
     private var selectedSummaryLength: SummaryLength {
         SummaryLength(rawValue: defaultSummaryLength) ?? .standard
-    }
-
-    private var selectedDocumentType: DocumentType {
-        DocumentType(rawValue: defaultDocumentType) ?? .todo
     }
 
     var body: some View {
@@ -134,68 +130,6 @@ struct AdvancedSettingsView: View {
                 .padding(.vertical, 4)
             }
 
-            // List Settings
-            Section(header: Text(NSLocalizedString("settings.list_settings", comment: "List Settings"))) {
-                // Default List Type Picker
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(NSLocalizedString("settings.default_list_type", comment: "Default List Type"))
-                        .font(.poppins.headline)
-
-                    Picker("Default List Type", selection: Binding(
-                        get: { selectedDocumentType },
-                        set: { defaultDocumentType = $0.rawValue }
-                    )) {
-                        ForEach(DocumentType.allCases, id: \.self) { type in
-                            HStack {
-                                Image(systemName: type.systemImage)
-                                    .foregroundColor(type.color)
-                                Text(type.displayName)
-                            }
-                            .tag(type)
-                        }
-                    }
-                    .pickerStyle(.menu)
-
-                    Text(String(format: NSLocalizedString("settings.default_list_note", comment: "Default list note"), selectedDocumentType.displayName))
-                        .font(.poppins.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.vertical, 4)
-
-                // Auto-save to documents Toggle
-                VStack(alignment: .leading, spacing: 8) {
-                    Toggle(NSLocalizedString("settings.auto_save_action_items", comment: "Auto-save Action Items"), isOn: $autoSaveToDocuments)
-                        .font(.poppins.headline)
-
-                    Text(autoSaveToDocuments ?
-                         NSLocalizedString("settings.auto_save_on", comment: "Auto-save on") :
-                         NSLocalizedString("settings.auto_save_off", comment: "Auto-save off"))
-                        .font(.poppins.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.vertical, 4)
-            }
-
-            // Organization
-            Section(header: Text(NSLocalizedString("settings.organization", comment: "Organization"))) {
-                NavigationLink(destination: TagManagementView()) {
-                    HStack {
-                        Image(systemName: "tag.fill")
-                            .foregroundColor(.green)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(NSLocalizedString("settings.manage_tags", comment: "Manage Tags"))
-                                .font(.poppins.body)
-
-                            Text(NSLocalizedString("settings.organize_rename_merge", comment: "Organize, rename, merge tags"))
-                                .font(.poppins.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-
             // Interface
             Section(header: Text(NSLocalizedString("settings.interface", comment: "Interface"))) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -228,8 +162,60 @@ struct AdvancedSettingsView: View {
                 }
                 .padding(.vertical, 4)
             }
+            
+            // Maintenance
+            Section(header: Text("Maintenance")) {
+                VStack(alignment: .leading, spacing: 12) {
+                    if recordingsManager.isRegeneratingSummaries {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ProgressView(value: recordingsManager.regenerateSummariesProgress)
+                            
+                            Text(recordingsManager.regenerateSummariesStatusText)
+                                .font(.poppins.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text("\(recordingsManager.regenerateSummariesProcessedCount) / \(recordingsManager.regenerateSummariesTotalCount)")
+                                .font(.poppins.caption2)
+                                .foregroundColor(.secondary)
+                            
+                            if let err = recordingsManager.regenerateSummariesLastError {
+                                Text("Last error: \(err)")
+                                    .font(.poppins.caption2)
+                                    .foregroundColor(.red)
+                            }
+                            
+                            Button("Cancel") {
+                                recordingsManager.cancelRegenerateSummariesInBulk()
+                            }
+                            .foregroundColor(.red)
+                        }
+                    } else {
+                        Button("Fix Local Summaries (recommended)") {
+                            recordingsManager.regenerateSummariesInBulk(onlyFixLocalFallback: true)
+                        }
+                        
+                        Button("Regenerate ALL Summaries") {
+                            showingRegenerateAllConfirm = true
+                        }
+                        .foregroundColor(.red)
+                    }
+                    
+                    Text("Tip: ‘Fix Local Summaries’ will only re-run summaries that look like the local fallback (or missing).")
+                        .font(.poppins.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
         }
         .navigationTitle(NSLocalizedString("settings.advanced_settings", comment: "Advanced Settings"))
         .navigationBarTitleDisplayMode(.large)
+        .alert("Regenerate all summaries?", isPresented: $showingRegenerateAllConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Regenerate All", role: .destructive) {
+                recordingsManager.regenerateSummariesInBulk(onlyFixLocalFallback: false)
+            }
+        } message: {
+            Text("This will overwrite existing summaries for all recordings that have a transcript.")
+        }
     }
 }

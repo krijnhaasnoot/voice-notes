@@ -4,37 +4,39 @@ import UIKit
 @MainActor
 class ProcessingManager: ObservableObject {
     @Published var activeOperations: [UUID: ProcessingOperation] = [:]
-    @Published var pausedOperations: Set<UUID> = []
 
+    private let whisperKitService: WhisperKitTranscriptionService
     private let cloudTranscriptionService: OpenAIWhisperTranscriptionService?
-    private let localTranscriptionService: WhisperKitTranscriptionService
+    private let appleSpeechService: AppleSpeechTranscriptionService
     private let summaryService: EnhancedSummaryService
 
     init() {
-        // Load API key from Info.plist instead of UserDefaults
+        // 🚀 Primary: WhisperKit on-device transcription
+        self.whisperKitService = WhisperKitTranscriptionService()
+        
+        // Fallback: Cloud transcription (OpenAI Whisper API)
         self.cloudTranscriptionService = OpenAIWhisperTranscriptionService.createFromInfoPlist()
-        self.localTranscriptionService = WhisperKitTranscriptionService(modelManager: .shared)
+        
+        // Fallback: Apple Speech Recognition (free, on-device, but lower quality)
+        self.appleSpeechService = AppleSpeechTranscriptionService()
+        
         self.summaryService = EnhancedSummaryService.shared
 
-        if cloudTranscriptionService == nil {
-            print("⚠️ ProcessingManager: Cloud transcription service not available - check OpenAI API key in Info.plist")
-        }
+        print("🚀 ProcessingManager: WhisperKit on-device transcription initialized")
+        let modelInfo = WhisperModelManager.shared.selectedModel
+        print("   Model: \(modelInfo.displayName)")
     }
 
     private var currentTranscriptionService: (any TranscriptionService)? {
-        // Check user preference for local vs cloud transcription
-        let useLocal = UserDefaults.standard.bool(forKey: "use_local_transcription")
-
-        if useLocal {
-            print("🎙️ Using local (WhisperKit) transcription")
-            return localTranscriptionService
-        } else {
-            print("☁️ Using cloud (OpenAI) transcription")
-            if let service = cloudTranscriptionService {
-                return service
-            }
-            return nil
-        }
+        // 🚀 USING WHISPERKIT ON-DEVICE (fast, high-quality, private, no internet needed)
+        let modelInfo = WhisperModelManager.shared.selectedModel
+        print("🚀 Using WhisperKit on-device transcription")
+        print("   Model: \(modelInfo.displayName) - \(modelInfo.description)")
+        return whisperKitService
+        
+        // FALLBACK OPTIONS (uncomment if needed):
+        // Cloud (OpenAI): return cloudTranscriptionService ?? appleSpeechService
+        // Apple Speech (low quality): return appleSpeechService
     }
     
     func startTranscription(for recordingId: UUID, audioURL: URL, languageHint: String? = nil) -> ProcessingOperation {
@@ -57,7 +59,7 @@ class ProcessingManager: ObservableObject {
         
         Task {
             defer {
-                BackgroundTaskManager.shared.endBackgroundTask()
+                BackgroundTaskManager.shared.endBackgroundTask(backgroundTaskId)
             }
             await performTranscription(operation: operation, audioURL: audioURL, languageHint: languageHint)
         }
@@ -72,9 +74,6 @@ class ProcessingManager: ObservableObject {
                 switch existingOperation.status {
                 case .running:
                     print("🔄 ProcessingManager: Summarization already running for recording \(recordingId), skipping")
-                    return existingOperation
-                case .paused(let progress):
-                    print("⏸️ ProcessingManager: Summarization paused at \(Int(progress * 100))%, returning existing operation")
                     return existingOperation
                 case .completed, .failed, .cancelled:
                     // Clean up completed operation
@@ -99,7 +98,7 @@ class ProcessingManager: ObservableObject {
         
         Task {
             defer {
-                BackgroundTaskManager.shared.endBackgroundTask()
+                BackgroundTaskManager.shared.endBackgroundTask(backgroundTaskId)
             }
             await performSummarization(operation: operation, transcript: transcript)
         }
@@ -112,49 +111,6 @@ class ProcessingManager: ObservableObject {
         operation.status = .cancelled
         operation.cancelToken = CancellationToken { true }
         activeOperations[operationId] = operation
-    }
-
-    func pauseOperation(_ operationId: UUID) {
-        guard var operation = activeOperations[operationId] else { return }
-
-        // Get current progress
-        let currentProgress: Double
-        switch operation.status {
-        case .running(let progress):
-            currentProgress = progress
-        case .paused(let progress):
-            // Already paused
-            return
-        default:
-            return
-        }
-
-        // Mark as paused
-        operation.status = .paused(progress: currentProgress)
-        pausedOperations.insert(operationId)
-        activeOperations[operationId] = operation
-
-        print("⏸️ ProcessingManager: Operation \(operationId) paused at \(Int(currentProgress * 100))%")
-    }
-
-    func resumeOperation(_ operationId: UUID) {
-        guard var operation = activeOperations[operationId] else { return }
-
-        // Get current progress
-        let currentProgress: Double
-        switch operation.status {
-        case .paused(let progress):
-            currentProgress = progress
-        default:
-            return
-        }
-
-        // Mark as running
-        operation.status = .running(progress: currentProgress)
-        pausedOperations.remove(operationId)
-        activeOperations[operationId] = operation
-
-        print("▶️ ProcessingManager: Operation \(operationId) resumed from \(Int(currentProgress * 100))%")
     }
     
     private func performTranscription(operation: ProcessingOperation, audioURL: URL, languageHint: String?) async {
@@ -178,7 +134,7 @@ class ProcessingManager: ObservableObject {
             let transcript = try await service.transcribe(
                 url: audioURL,
                 languageHint: languageHint,
-                onDevicePreferred: UserDefaults.standard.bool(forKey: "use_local_transcription"),
+                onDevicePreferred: false, // Always use cloud
                 progress: { progress in
                     Task { @MainActor in
                         self.updateOperationProgress(operation.id, progress: progress)
@@ -236,10 +192,13 @@ class ProcessingManager: ObservableObject {
             
             await MainActor.run {
                 if var op = activeOperations[operation.id] {
-                    op.status = .completed(result: .summary(result.clean))
+                    op.status = .completed(result: .summary(clean: result.clean, raw: result.raw))
                     activeOperations[operation.id] = op
                     print("🔄 ProcessingManager: Summary completed for recording \(op.recordingId)")
                     print("    Summary length: \(result.clean.count) chars")
+                    if let rawLength = result.raw?.count {
+                        print("    Raw summary length: \(rawLength) chars")
+                    }
                     
                     // Clean up completed operation after a brief delay to allow UI update
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -265,13 +224,8 @@ class ProcessingManager: ObservableObject {
     private func updateOperationProgress(_ operationId: UUID, progress: Double) {
         guard var operation = activeOperations[operationId] else { return }
 
-        // Check if operation is paused - if so, keep paused status but update progress
-        if pausedOperations.contains(operationId) {
-            operation.status = .paused(progress: progress)
-        } else {
-            operation.status = .running(progress: progress)
-        }
-
+        // Update progress
+        operation.status = .running(progress: progress)
         activeOperations[operationId] = operation
 
         // Manually trigger objectWillChange for progress updates
@@ -318,7 +272,6 @@ struct ProcessingOperation {
     
     enum OperationStatus {
         case running(progress: Double)
-        case paused(progress: Double)
         case completed(result: OperationResult)
         case failed(error: Error)
         case cancelled
@@ -326,7 +279,7 @@ struct ProcessingOperation {
     
     enum OperationResult {
         case transcript(String)
-        case summary(String)
+        case summary(clean: String, raw: String?)
     }
 }
 

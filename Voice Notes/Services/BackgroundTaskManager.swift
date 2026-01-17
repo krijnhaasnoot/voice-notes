@@ -6,7 +6,7 @@ class BackgroundTaskManager: ObservableObject {
     static let shared = BackgroundTaskManager()
     
     private let backgroundTaskIdentifier = "com.kinder.Voice-Notes.refresh"
-    private var processingTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
+    private var activeTaskIdentifiers: [UIBackgroundTaskIdentifier: String] = [:]
     private var isRegistered = false
     
     private init() {}
@@ -23,30 +23,35 @@ class BackgroundTaskManager: ObservableObject {
     }
     
     func beginBackgroundTask(name: String = "Processing") -> UIBackgroundTaskIdentifier {
-        // End any existing task first to prevent leaks
-        if processingTaskIdentifier != .invalid {
-            print("⚠️ BackgroundTaskManager: Ending previous background task before starting new one")
-            endBackgroundTask()
-        }
-
-        let taskId = UIApplication.shared.beginBackgroundTask(withName: name) {
+        var taskId: UIBackgroundTaskIdentifier = .invalid
+        taskId = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
             // Called when time is about to expire
-            self.endBackgroundTask()
+            self?.endBackgroundTask(taskId)
         }
 
         if taskId != .invalid {
-            print("📱 BackgroundTaskManager: Started background task \(taskId) for \(name)")
-            processingTaskIdentifier = taskId
+            activeTaskIdentifiers[taskId] = name
+            print("📱 BackgroundTaskManager: Started background task \(taskId) for \(name) (active: \(activeTaskIdentifiers.count))")
         }
 
         return taskId
     }
     
-    func endBackgroundTask() {
-        if processingTaskIdentifier != .invalid {
-            print("📱 BackgroundTaskManager: Ending background task \(processingTaskIdentifier)")
-            UIApplication.shared.endBackgroundTask(processingTaskIdentifier)
-            processingTaskIdentifier = .invalid
+    func endBackgroundTask(_ taskId: UIBackgroundTaskIdentifier) {
+        guard taskId != .invalid else { return }
+        if let name = activeTaskIdentifiers[taskId] {
+            print("📱 BackgroundTaskManager: Ending background task \(taskId) for \(name)")
+        } else {
+            print("📱 BackgroundTaskManager: Ending background task \(taskId)")
+        }
+        UIApplication.shared.endBackgroundTask(taskId)
+        activeTaskIdentifiers.removeValue(forKey: taskId)
+    }
+    
+    func endAllBackgroundTasks() {
+        let ids = Array(activeTaskIdentifiers.keys)
+        for id in ids {
+            endBackgroundTask(id)
         }
     }
     
@@ -87,12 +92,12 @@ class BackgroundTaskManager: ObservableObject {
                     let fileURL = recording.resolvedFileURL
                     // If `resolvedFileURL` is guaranteed non-optional, proceed directly. If it can fail in some cases,
                     // ensure `resolvedFileURL` itself returns a valid URL or adjust the model to expose an optional and handle it here.
-                    try await processingManager.startTranscription(for: recording.id, audioURL: fileURL)
+                    _ = processingManager.startTranscription(for: recording.id, audioURL: fileURL)
                     print("📱 BackgroundTaskManager: ✅ Started transcription for recording \(recording.id)")
                 } else if recording.summary == nil || recording.summary?.isEmpty == true,
                           let transcript = recording.transcript, !transcript.isEmpty {
                     // Start summarization
-                    try await processingManager.startSummarization(for: recording.id, transcript: transcript)
+                    _ = processingManager.startSummarization(for: recording.id, transcript: transcript)
                     print("📱 BackgroundTaskManager: ✅ Started summarization for recording \(recording.id)")
                 }
             } catch {
